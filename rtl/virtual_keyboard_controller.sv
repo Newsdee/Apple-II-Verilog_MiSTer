@@ -304,17 +304,69 @@ always @(posedge clk) begin
 			selected_col <= selected_col - 1'd1;
 		end else if(active && commands_page && joystick_pressed[0] && selected_col != 3) begin
 			selected_col <= selected_col + 1'd1;
+		end else if(active && !commands_page && joystick[5] && joystick_pressed[1]) begin
+			selected_col <= 0;
+		end else if(active && !commands_page && joystick[5] && joystick_pressed[0]) begin
+			selected_col <= row_last_col(selected_row);
+		end else if(active && !commands_page && joystick[5] && joystick_pressed[3]) begin
+			selected_row <= 0;
+		end else if(active && !commands_page && joystick[5] && joystick_pressed[2]) begin
+			selected_row <= 4;
+			if(selected_col > row_last_col(4)) selected_col <= row_last_col(4);
 		end else if(active && !commands_page && joystick_pressed[1] && selected_col != 0) begin
 			selected_col <= selected_col - 1'd1;
+		end else if(active && !commands_page && joystick_pressed[0] && selected_row == 1 && selected_col == 13) begin
+			selected_row <= 2;
+			selected_col <= 13;
+		end else if(active && !commands_page && joystick_pressed[0] && selected_row == 2 && selected_col == 12) begin
+			selected_row <= 1;
+			selected_col <= 13;
 		end else if(active && !commands_page && joystick_pressed[0] && selected_col < row_last_col(selected_row)) begin
 			selected_col <= selected_col + 1'd1;
 		end else if(active && !commands_page && selected_row == 2 && selected_col == 13 && joystick_pressed[3]) begin
 			overlay_top <= 1;
 		end else if(active && !commands_page && selected_row == 2 && selected_col == 13 && joystick_pressed[2]) begin
 			overlay_top <= 0;
+		end else if(active && !commands_page && joystick_pressed[3] && selected_row == 4 && selected_col == 8) begin
+			selected_row <= 1;
+			selected_col <= 13;
+		end else if(active && !commands_page && joystick_pressed[3] && selected_row == 4 && selected_col == 2) begin
+			selected_row <= 3;
+			selected_col <= 6;
+		end else if(active && !commands_page && joystick_pressed[3] && selected_row == 4 && selected_col == 1) begin
+			selected_row <= 3;
+			selected_col <= 2;
+		end else if(active && !commands_page && joystick_pressed[3] && selected_row == 4 && selected_col == 3) begin
+			selected_row <= 3;
+			selected_col <= 8;
+		end else if(active && !commands_page && joystick_pressed[3] && selected_row == 4 && selected_col == 4) begin
+			selected_row <= 3;
+			selected_col <= 9;
+		end else if(active && !commands_page && joystick_pressed[3] && selected_row == 4 && selected_col == 5) begin
+			selected_row <= 3;
+			selected_col <= 10;
+		end else if(active && !commands_page && joystick_pressed[3] && selected_row == 4 && selected_col == 6) begin
+			selected_row <= 3;
+			selected_col <= 11;
+		end else if(active && !commands_page && joystick_pressed[3] && selected_row == 4 && selected_col == 7) begin
+			selected_row <= 3;
+			selected_col <= 12;
 		end else if(active && !commands_page && joystick_pressed[3] && selected_row != 0) begin
 			selected_row <= selected_row - 1'd1;
 			if(selected_col > row_last_col(selected_row - 1'd1)) selected_col <= row_last_col(selected_row - 1'd1);
+		end else if(active && !commands_page && joystick_pressed[2] && selected_row == 1 && selected_col == 13) begin
+			selected_row <= 3;
+			selected_col <= 12;
+		end else if(active && !commands_page && joystick_pressed[2] && selected_row == 3 && selected_col == 12) begin
+			selected_row <= 4;
+			selected_col <= 7;
+		end else if(active && !commands_page && joystick_pressed[2] && selected_row == 3 &&
+			selected_col >= 3 && selected_col <= 7) begin
+			selected_row <= 4;
+			selected_col <= 2;
+		end else if(active && !commands_page && joystick_pressed[2] && selected_row == 0 && selected_col == 14) begin
+			selected_row <= 1;
+			selected_col <= 13;
 		end else if(active && !commands_page && joystick_pressed[2] && selected_row != 4) begin
 			selected_row <= selected_row + 1'd1;
 			if(selected_col > row_last_col(selected_row + 1'd1)) selected_col <= row_last_col(selected_row + 1'd1);
@@ -375,15 +427,61 @@ always @(posedge clk) begin
 			end else begin
 				if(key_down && extended && scan_code == SC_LEFT && selected_col != 0)
 					selected_col <= selected_col - 1'd1;
+				else if(key_down && extended && scan_code == SC_RIGHT && selected_row == 1 && selected_col == 13) begin
+					selected_row <= 2;
+					selected_col <= 13;
+				end
+				else if(key_down && extended && scan_code == SC_RIGHT && selected_row == 2 && selected_col == 12) begin
+					selected_row <= 1;
+					selected_col <= 13;
+				end
 				else if(key_down && extended && scan_code == SC_RIGHT && selected_col < row_last_col(selected_row))
 					selected_col <= selected_col + 1'd1;
 				else if(key_down && extended && scan_code == SC_UP && selected_row == 2 && selected_col == 13)
 					overlay_top <= 1;
 				else if(key_down && extended && scan_code == SC_DOWN && selected_row == 2 && selected_col == 13)
 					overlay_top <= 0;
+				else if(key_down && extended && scan_code == SC_UP && selected_row == 4 && selected_col == 8) begin
+					selected_row <= 1;
+					selected_col <= 13;
+				end else if(key_down && extended && scan_code == SC_UP && selected_row == 4 && selected_col == 2) begin
+					selected_row <= 3;
+					selected_col <= 6;
+				end else if(key_down && extended && scan_code == SC_UP && selected_row == 4 && selected_col == 1) begin
+					selected_row <= 3;
+					selected_col <= 2;
+				end else if(key_down && extended && scan_code == SC_UP && selected_row == 4 && selected_col == 3) begin
+					selected_row <= 3;
+					selected_col <= 8;
+				end else if(key_down && extended && scan_code == SC_UP && selected_row == 4 && selected_col == 4) begin
+					selected_row <= 3;
+					selected_col <= 9;
+				end else if(key_down && extended && scan_code == SC_UP && selected_row == 4 && selected_col == 5) begin
+					selected_row <= 3;
+					selected_col <= 10;
+				end else if(key_down && extended && scan_code == SC_UP && selected_row == 4 && selected_col == 6) begin
+					selected_row <= 3;
+					selected_col <= 11;
+				end else if(key_down && extended && scan_code == SC_UP && selected_row == 4 && selected_col == 7) begin
+					selected_row <= 3;
+					selected_col <= 12;
+				end
 				else if(key_down && extended && scan_code == SC_UP && selected_row != 0) begin
 					selected_row <= selected_row - 1'd1;
 					if(selected_col > row_last_col(selected_row - 1'd1)) selected_col <= row_last_col(selected_row - 1'd1);
+				end else if(key_down && extended && scan_code == SC_DOWN && selected_row == 1 && selected_col == 13) begin
+					selected_row <= 3;
+					selected_col <= 12;
+				end else if(key_down && extended && scan_code == SC_DOWN && selected_row == 3 && selected_col == 12) begin
+					selected_row <= 4;
+					selected_col <= 7;
+				end else if(key_down && extended && scan_code == SC_DOWN && selected_row == 3 &&
+					selected_col >= 3 && selected_col <= 7) begin
+					selected_row <= 4;
+					selected_col <= 2;
+				end else if(key_down && extended && scan_code == SC_DOWN && selected_row == 0 && selected_col == 14) begin
+					selected_row <= 1;
+					selected_col <= 13;
 				end else if(key_down && extended && scan_code == SC_DOWN && selected_row != 4) begin
 					selected_row <= selected_row + 1'd1;
 					if(selected_col > row_last_col(selected_row + 1'd1)) selected_col <= row_last_col(selected_row + 1'd1);

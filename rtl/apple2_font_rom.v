@@ -11,18 +11,16 @@ module apple2_font_rom (
 	output reg  [7:0]  glyph_data
 );
 
-wire [11:0] rom_addr = ioctl_wr ? ioctl_addr[11:0] :
-	{2'b00, alternate_character | lowercase_character,
+wire [12:0] rom_addr = ioctl_wr ? ioctl_addr[12:0] :
+	{ROMSWITCH, 2'b00, alternate_character | lowercase_character,
 	 character_code[5:0], glyph_row};
-reg [7:0] font_rom [0:4095];
+reg [7:0] font_rom [0:8191];
 
-initial $readmemh("rtl/roms/video.hex", font_rom);
+initial $readmemh("rtl/roms/video2.hex", font_rom);
 
 always @(posedge CLK_14M) begin
 	if(ioctl_wr) font_rom[rom_addr] <= ioctl_data;
 	glyph_data <= font_rom[rom_addr];
 end
-
-wire unused_romswitch = ROMSWITCH;
 
 endmodule

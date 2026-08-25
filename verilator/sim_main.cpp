@@ -91,7 +91,8 @@ bool text_color = false;
 bool gray_seam_fix = true;
 bool ntsc_vertical_comb = true;
 int pixel_clock_mode = 0;
-int virtual_keyboard_mode = 1;
+bool virtual_keyboard_enabled = true;
+int virtual_keyboard_visibility = 0;
 
 // Verilog module
 // --------------
@@ -104,7 +105,8 @@ void applyVideoSettings() {
 	top->gray_seam_fix = gray_seam_fix;
 	top->ntsc_vertical_comb = ntsc_vertical_comb;
 	top->pixel_clock_double = pixel_clock_mode == 0;
-	top->virtual_keyboard_mode = virtual_keyboard_mode;
+	top->virtual_keyboard_enabled = virtual_keyboard_enabled;
+	top->virtual_keyboard_visibility = virtual_keyboard_visibility;
 }
 
 #ifndef _MSC_VER
@@ -482,8 +484,9 @@ int main(int argc, char** argv, char** env) {
 		if (ImGui::Checkbox("Sharper RGB (F6)", &gray_seam_fix)) applyVideoSettings(); ImGui::SameLine();
 		if (ImGui::Checkbox("Vertical blend (F7)", &ntsc_vertical_comb)) applyVideoSettings();
 		if (ImGui::Combo("Pixel clock", &pixel_clock_mode, "Double\0Normal\0")) applyVideoSettings();
-		if (ImGui::Combo("On-screen keyboard", &virtual_keyboard_mode,
-			"Off\0Opaque\0" "75%\0" "50%\0")) applyVideoSettings();
+		if (ImGui::Checkbox("Virtual keyboard", &virtual_keyboard_enabled)) applyVideoSettings();
+		if (ImGui::Combo("Keypad visibility", &virtual_keyboard_visibility,
+			"100%\0" "75%\0" "50%\0" "25%\0")) applyVideoSettings();
 
 		ImGui::End();
 
