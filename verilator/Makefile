@@ -67,6 +67,9 @@ V_SRC = \
 		$(RTL)/6551rx.v \
 		$(RTL)/R65Cx2.sv \
 		$(RTL)/vga_controller.v  \
+		$(RTL)/apple2_font_rom.v  \
+		$(RTL)/virtual_keyboard_controller.sv  \
+		$(RTL)/virtual_keyboard_overlay.sv  \
 		$(RTL)/mockingboard/mockingboard.v  \
 		$(RTL)/mockingboard/via6522.v  \
 		$(RTL)/mockingboard/YM2149.sv  \

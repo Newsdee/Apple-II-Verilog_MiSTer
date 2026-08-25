@@ -47,6 +47,7 @@ public:
 	void QueueDownload(std::string file, int index);
 	void QueueDownload(std::string file, int index, bool restart);
 	bool HasQueue();
+	bool IsDownloading();
 
 	SimBus(DebugConsole c);
 	~SimBus();

@@ -31,6 +31,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <string>
 using namespace std;
 
 // Simulation control
@@ -77,17 +78,53 @@ const int input_menu = 12;
 
 // Video
 // -----
-#define VGA_WIDTH 320
+#define VGA_WIDTH 640
 #define VGA_HEIGHT 240
 #define VGA_ROTATE 0  // 90 degrees anti-clockwise
-#define VGA_SCALE_X vga_scale
+#define VGA_SCALE_X (vga_scale * 0.5f)
 #define VGA_SCALE_Y vga_scale
 SimVideo video(VGA_WIDTH, VGA_HEIGHT, VGA_ROTATE);
 float vga_scale = 2.5;
+int screen_mode = 0;
+int color_palette = 0;
+bool text_color = false;
+bool gray_seam_fix = true;
+bool ntsc_vertical_comb = true;
+int pixel_clock_mode = 0;
+int virtual_keyboard_mode = 1;
 
 // Verilog module
 // --------------
 Vemu* top = NULL;
+
+void applyVideoSettings() {
+	top->screen_mode = screen_mode;
+	top->color_palette = color_palette;
+	top->text_color = text_color;
+	top->gray_seam_fix = gray_seam_fix;
+	top->ntsc_vertical_comb = ntsc_vertical_comb;
+	top->pixel_clock_double = pixel_clock_mode == 0;
+	top->virtual_keyboard_mode = virtual_keyboard_mode;
+}
+
+#ifndef _MSC_VER
+bool handleVideoShortcut(SDL_Scancode scancode) {
+	if (scancode == SDL_SCANCODE_F8) {
+		color_palette = (color_palette + 1) & 3;
+		screen_mode = 0;
+	} else if (scancode == SDL_SCANCODE_F9) {
+		screen_mode = (screen_mode + 1) & 3;
+	} else if (scancode == SDL_SCANCODE_F6) {
+		gray_seam_fix = !gray_seam_fix;
+	} else if (scancode == SDL_SCANCODE_F7) {
+		ntsc_vertical_comb = !ntsc_vertical_comb;
+	} else {
+		return false;
+	}
+	applyVideoSettings();
+	return true;
+}
+#endif
 
 vluint64_t main_time = 0;	// Current simulation time.
 double sc_time_stamp() {	// Called by $time in Verilog.
@@ -210,6 +247,8 @@ int verilate() {
 		if (clk_sys.IsRising() && top->CE_PIXEL ) {
 			uint32_t colour = 0xFF000000 | top->VGA_B << 16 | top->VGA_G << 8 | top->VGA_R;
 			video.Clock(top->VGA_HB, top->VGA_VB, top->VGA_HS, top->VGA_VS, colour);
+			if (pixel_clock_mode != 0)
+				video.Clock(top->VGA_HB, top->VGA_VB, top->VGA_HS, top->VGA_VS, colour);
 		}
 
 		if (clk_sys.IsRising()) {
@@ -234,9 +273,62 @@ unsigned char mouse_y = 0;
 char spinner_toggle = 0;
 
 int main(int argc, char** argv, char** env) {
+	string floppyPath = "floppy.nib";
+	string floppy2Path;
+	string hddPath;
+	string palettePath;
+	bool mountFloppy = true;
+	bool smokeTest = false;
+	bool smokeResetTriggered = false;
+	bool smokeVideoShortcutsTested = false;
+	bool smokeKeyboardOpenRequested = false;
+	bool smokeKeyboardOpened = false;
+	bool smokeKeyboardCloseRequested = false;
+	bool smokeKeyboardClosed = false;
+	int smokeResult = 0;
+
+	for (int argIndex = 1; argIndex < argc; argIndex++) {
+		string argument = argv[argIndex];
+		if (argument == "--help") {
+			cout << "Usage: Vemu [--no-floppy | --floppy FILE] [--floppy2 FILE] [--hdd FILE] [--palette FILE] [--smoke-test]" << endl;
+			return 0;
+		}
+		if (argument == "--smoke-test") {
+			smokeTest = true;
+			continue;
+		}
+		if (argument == "--no-floppy") {
+			mountFloppy = false;
+			continue;
+		}
+		if (argument != "--floppy" && argument != "--floppy2" && argument != "--hdd" && argument != "--palette") {
+			cerr << "Unknown argument: " << argument << endl;
+			return 2;
+		}
+		if (++argIndex >= argc) {
+			cerr << "Missing file after " << argument << endl;
+			return 2;
+		}
+
+		if (argument == "--floppy") {
+			floppyPath = argv[argIndex];
+			mountFloppy = true;
+		}
+		else if (argument == "--floppy2") floppy2Path = argv[argIndex];
+		else if (argument == "--hdd") hddPath = argv[argIndex];
+		else palettePath = argv[argIndex];
+	}
+	if (!palettePath.empty()) {
+		ifstream paletteFile(palettePath, ios::binary);
+		if (!paletteFile) {
+			cerr << "Cannot open palette: " << palettePath << endl;
+			return 1;
+		}
+	}
 
 	// Create core and initialise
 	top = new Vemu();
+	applyVideoSettings();
 	Verilated::commandArgs(argc, argv);
 
 #ifdef WIN32
@@ -315,9 +407,19 @@ int main(int argc, char** argv, char** env) {
 
 
         //bus.QueueDownload("floppy.nib",1,0);
-	blockdevice.MountDisk("floppy.nib",0);
-	//blockdevice.MountDisk("floppy2.nib",2);
-	//blockdevice.MountDisk("hd.hdv",1);
+	if (mountFloppy && !blockdevice.MountDisk(floppyPath, 0)) return 1;
+	if (!floppy2Path.empty() && !blockdevice.MountDisk(floppy2Path, 2)) return 1;
+	if (!hddPath.empty() && !blockdevice.MountDisk(hddPath, 1)) return 1;
+	if (!palettePath.empty()) {
+		color_palette = 3;
+		applyVideoSettings();
+		bus.QueueDownload(palettePath, 2, true);
+	}
+	if (smokeTest) {
+		input.keyEventWait = 1000;
+		input.keyEvents.push(SimInput_PS2KeyEvent(0, true, false, 0x1c));
+		input.keyEvents.push(SimInput_PS2KeyEvent(0, false, false, 0x1c));
+	}
 
 #ifdef WIN32
 	MSG msg;
@@ -340,6 +442,9 @@ int main(int argc, char** argv, char** env) {
 			ImGui_ImplSDL2_ProcessEvent(&event);
 			if (event.type == SDL_QUIT)
 				done = true;
+			if (event.type == SDL_KEYDOWN && !event.key.repeat) {
+				handleVideoShortcut(event.key.keysym.scancode);
+			}
 		}
 #endif
 		video.StartFrame();
@@ -354,7 +459,7 @@ int main(int argc, char** argv, char** env) {
 		// Simulation control window
 		ImGui::Begin(windowTitle_Control);
 		ImGui::SetWindowPos(windowTitle_Control, ImVec2(0, 0), ImGuiCond_Once);
-		ImGui::SetWindowSize(windowTitle_Control, ImVec2(500, 150), ImGuiCond_Once);
+		ImGui::SetWindowSize(windowTitle_Control, ImVec2(500, 280), ImGuiCond_Once);
 		if (ImGui::Button("Reset simulation")) { resetSim(); } ImGui::SameLine();
 		if (ImGui::Button("Start running")) { run_enable = 1; } ImGui::SameLine();
 		if (ImGui::Button("Stop running")) { run_enable = 0; } ImGui::SameLine();
@@ -369,12 +474,22 @@ int main(int argc, char** argv, char** env) {
 		//ImGui::SameLine();
 		ImGui::SliderInt("Multi step amount", &multi_step_amount, 8, 1024);
 		if (ImGui::Button("Soft Reset")) { fprintf(stderr,"soft reset\n"); soft_reset=1; } ImGui::SameLine();
+		if (ImGui::Combo("Display", &screen_mode, "Color\0B&W\0Green\0Amber\0")) applyVideoSettings();
+		if (ImGui::Combo("Palette", &color_palette, "NTSC //e\0IIgs\0AppleWin\0Custom\0")) {
+			screen_mode = 0;
+			applyVideoSettings();
+		}
+		if (ImGui::Checkbox("Sharper RGB (F6)", &gray_seam_fix)) applyVideoSettings(); ImGui::SameLine();
+		if (ImGui::Checkbox("Vertical blend (F7)", &ntsc_vertical_comb)) applyVideoSettings();
+		if (ImGui::Combo("Pixel clock", &pixel_clock_mode, "Double\0Normal\0")) applyVideoSettings();
+		if (ImGui::Combo("On-screen keyboard", &virtual_keyboard_mode,
+			"Off\0Opaque\0" "75%\0" "50%\0")) applyVideoSettings();
 
 		ImGui::End();
 
 		// Debug log window
 		console.Draw(windowTitle_DebugLog, &showDebugLog, ImVec2(500, 700));
-		ImGui::SetWindowPos(windowTitle_DebugLog, ImVec2(0, 160), ImGuiCond_Once);
+		ImGui::SetWindowPos(windowTitle_DebugLog, ImVec2(0, 290), ImGuiCond_Once);
 
 		// Memory debug
 		//ImGui::Begin("PGROM Editor");
@@ -557,6 +672,77 @@ fprintf(stderr,"filePath: %s\n",filePath.c_str());
 				for (int step = 0; step < multi_step_amount; step++) { verilate(); }
 			}
 		}
+
+		if (smokeTest && !smokeResetTriggered && video.count_frame >= 2) {
+			soft_reset = 1;
+			smokeResetTriggered = true;
+		}
+		if (smokeTest && !smokeKeyboardOpenRequested && video.count_frame >= 2) {
+			input.keyEvents.push(SimInput_PS2KeyEvent(0, true, false, 0x09));
+			input.keyEvents.push(SimInput_PS2KeyEvent(0, false, false, 0x09));
+			smokeKeyboardOpenRequested = true;
+		}
+		if (smokeTest && smokeKeyboardOpenRequested && top->virtual_keyboard_active_debug) {
+			smokeKeyboardOpened = true;
+			if (!smokeKeyboardCloseRequested) {
+				input.keyEvents.push(SimInput_PS2KeyEvent(0, true, false, 0x09));
+				input.keyEvents.push(SimInput_PS2KeyEvent(0, false, false, 0x09));
+				smokeKeyboardCloseRequested = true;
+			}
+		}
+		if (smokeKeyboardCloseRequested && !top->virtual_keyboard_active_debug)
+			smokeKeyboardClosed = true;
+		if (smokeTest && !smokeVideoShortcutsTested && video.count_frame >= 3) {
+#ifndef _MSC_VER
+			int initialScreenMode = screen_mode;
+			int initialPalette = color_palette;
+			bool initialSharp = gray_seam_fix;
+			bool initialVerticalBlend = ntsc_vertical_comb;
+			for (int count = 0; count < 4; count++) handleVideoShortcut(SDL_SCANCODE_F8);
+			for (int count = 0; count < 4; count++) handleVideoShortcut(SDL_SCANCODE_F9);
+			handleVideoShortcut(SDL_SCANCODE_F6);
+			handleVideoShortcut(SDL_SCANCODE_F6);
+			handleVideoShortcut(SDL_SCANCODE_F7);
+			handleVideoShortcut(SDL_SCANCODE_F7);
+			smokeVideoShortcutsTested = screen_mode == initialScreenMode &&
+				color_palette == initialPalette && gray_seam_fix == initialSharp &&
+				ntsc_vertical_comb == initialVerticalBlend;
+#else
+			smokeVideoShortcutsTested = true;
+#endif
+		}
+		if (smokeTest && video.count_frame >= 6 && !bus.HasQueue() && !bus.IsDownloading()) {
+#ifndef DISABLE_AUDIO
+			bool smokePassed = input.keyEvents.empty() && smokeResetTriggered &&
+				smokeVideoShortcutsTested && smokeKeyboardOpened && smokeKeyboardClosed &&
+				video.count_frame > 0 && video.stats_xMax >= 559 &&
+				audio.sample_count > 0 && audio.playback_available;
+			cout << "SMOKE " << (smokePassed ? "PASS" : "FAIL")
+				<< " frames=" << video.count_frame
+				<< " active_width=" << video.stats_xMax
+				<< " audio_samples=" << audio.sample_count
+				<< " audio_peak=" << audio.peak_level
+				<< " key_events_remaining=" << input.keyEvents.size()
+				<< " reset_triggered=" << smokeResetTriggered
+				<< " screen_mode=" << screen_mode
+				<< " palette=" << color_palette
+				<< " sharp=" << gray_seam_fix
+				<< " vertical_blend=" << ntsc_vertical_comb
+				<< " shortcuts_tested=" << smokeVideoShortcutsTested
+				<< " keyboard_opened=" << smokeKeyboardOpened
+				<< " keyboard_closed=" << smokeKeyboardClosed
+				<< " ioctl_complete=1" << endl;
+#else
+			bool smokePassed = input.keyEvents.empty() && smokeResetTriggered && video.count_frame > 0;
+#endif
+			smokeResult = smokePassed ? 0 : 1;
+#ifdef WIN32
+			PostQuitMessage(0);
+#else
+			done = true;
+#endif
+			smokeTest = false;
+		}
 	}
 
 	// Clean up before exit
@@ -568,5 +754,5 @@ fprintf(stderr,"filePath: %s\n",filePath.c_str());
 	video.CleanUp();
 	input.CleanUp();
 
-	return 0;
+	return smokeResult;
 }

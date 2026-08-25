@@ -13,6 +13,9 @@ public:
 	float debug_wave_l[debug_max_samples];
 	float debug_wave_r[debug_max_samples];
 	int debug_pos;
+	unsigned long long sample_count;
+	float peak_level;
+	bool playback_available;
 
 	SimAudio(int systemClockFrequency, bool saveToFile);
 	~SimAudio();

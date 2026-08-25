@@ -13,18 +13,34 @@
 module keyboard(
     CLK_14M,
     PS2_Key,
+    virtual_active,
+    virtual_event,
+    virtual_pressed,
+    virtual_code,
+    virtual_open_apple,
+    virtual_closed_apple,
     reads,
     reset,
     akd,
-    K
+    K,
+    open_apple,
+    closed_apple
 );
     
     input            CLK_14M;
     input [10:0]     PS2_Key;		// From PS/2 port
+    input            virtual_active;
+    input            virtual_event;
+    input            virtual_pressed;
+    input [6:0]      virtual_code;
+    input            virtual_open_apple;
+    input            virtual_closed_apple;
     input            reads;		// Read strobe
     input            reset;
     output reg       akd;		// Any key down
     output [7:0]     K;		// Latched, decoded keyboard data
+    output reg       open_apple;
+    output reg       closed_apple;
     
     
     wire [10:0]      rom_addr;
@@ -40,6 +56,10 @@ module keyboard(
     reg              shift;
     reg              caplock;
     reg              old_stb;
+    reg              old_virtual_event;
+    reg              virtual_active_d;
+    reg [6:0]        virtual_code_latched;
+    reg              virtual_data;
     
     reg [22:0]       rep_timer;
     
@@ -78,7 +98,8 @@ module keyboard(
         .q(rom_out)
     );
  */   
-    assign K = {key_pressed, rom_out[6:0]};
+    assign K = virtual_data ? {key_pressed, virtual_code_latched} :
+                              {key_pressed, rom_out[6:0]};
     
     
     always @(posedge CLK_14M or posedge reset)
@@ -99,10 +120,26 @@ module keyboard(
         begin
             shift <= 1'b0;
             ctrl <= 1'b0;
+            open_apple <= 1'b0;
+            closed_apple <= 1'b0;
         end
         else 
         begin
-            if (state == states_HAVE_CODE)
+            if (virtual_active)
+            begin
+                shift <= 1'b0;
+                ctrl <= 1'b0;
+                open_apple <= virtual_open_apple;
+                closed_apple <= virtual_closed_apple;
+            end
+            else if (virtual_active_d)
+            begin
+                shift <= 1'b0;
+                ctrl <= 1'b0;
+                open_apple <= 1'b0;
+                closed_apple <= 1'b0;
+            end
+            else if (state == states_HAVE_CODE)
             begin
                 if (code == LEFT_SHIFT | code == RIGHT_SHIFT)
                     shift <= 1'b1;
@@ -131,36 +168,75 @@ module keyboard(
             latched_code <= {8{1'b0}};
             latched_ext <= 1'b0;
             key_pressed <= 1'b0;
+            akd <= 1'b0;
+            old_stb <= 1'b0;
+            old_virtual_event <= 1'b0;
+            virtual_active_d <= 1'b0;
+            virtual_code_latched <= 7'b0;
+            virtual_data <= 1'b0;
+            rep_timer <= 23'b0;
         end
         else 
         begin
-            state <= next_state;
-            if (reads == 1'b1)
-                key_pressed <= 1'b0;
-            if (state == states_HAVE_CODE)
+            virtual_active_d <= virtual_active;
+            if (reads == 1'b1) key_pressed <= 1'b0;
+            if (virtual_active)
+            begin
+                state <= states_IDLE;
                 old_stb <= PS2_Key[10];
-            if (state == states_GOT_KEY_UP_CODE)
-                akd <= 1'b0;
-            if (state == states_NORMAL_KEY)
-            begin
-                // set up keyboard ROM read address
-                latched_code <= code;
-                latched_ext <= ext;
-            end
-            if (state == states_KEY_READY & junction_code != 8'hFF)
-            begin
-                // key code ready from ROM
-                akd <= 1'b1;
-                key_pressed <= 1'b1;
-                rep_timer <= 7000000;		// 0.5s
-            end
-            if (akd == 1'b1)
-            begin
-                rep_timer <= rep_timer - 1;
-                if (rep_timer == 0)
+                if (!virtual_active_d)
                 begin
-                    rep_timer <= 933333;		// 1/15s
+                    key_pressed <= 1'b0;
+                    akd <= 1'b0;
+                    virtual_data <= 1'b0;
+                    old_virtual_event <= virtual_event;
+                end
+                else if (old_virtual_event != virtual_event)
+                begin
+                    old_virtual_event <= virtual_event;
+                    if (virtual_pressed)
+                    begin
+                        virtual_code_latched <= virtual_code;
+                        virtual_data <= 1'b1;
+                        key_pressed <= 1'b1;
+                        akd <= 1'b1;
+                    end
+                    else akd <= 1'b0;
+                end
+            end
+            else if (virtual_active_d)
+            begin
+                state <= states_IDLE;
+                key_pressed <= 1'b0;
+                akd <= 1'b0;
+                virtual_data <= 1'b0;
+                old_stb <= PS2_Key[10];
+            end
+            else
+            begin
+                state <= next_state;
+                virtual_data <= 1'b0;
+                if (state == states_HAVE_CODE) old_stb <= PS2_Key[10];
+                if (state == states_GOT_KEY_UP_CODE) akd <= 1'b0;
+                if (state == states_NORMAL_KEY)
+                begin
+                    latched_code <= code;
+                    latched_ext <= ext;
+                end
+                if (state == states_KEY_READY & junction_code != 8'hFF)
+                begin
+                    akd <= 1'b1;
                     key_pressed <= 1'b1;
+                    rep_timer <= 7000000;		// 0.5s
+                end
+                if (akd == 1'b1)
+                begin
+                    rep_timer <= rep_timer - 1;
+                    if (rep_timer == 0)
+                    begin
+                        rep_timer <= 933333;		// 1/15s
+                        key_pressed <= 1'b1;
+                    end
                 end
             end
         end

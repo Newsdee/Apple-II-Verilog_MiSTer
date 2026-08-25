@@ -40,6 +40,9 @@ void SimBus::QueueDownload(std::string file, int index, bool restart) {
 bool SimBus::HasQueue() {
 	return downloadQueue.size() > 0;
 }
+bool SimBus::IsDownloading() {
+	return ioctl_file != NULL;
+}
 
 int nextchar = 0;
 void SimBus::BeforeEval()

@@ -42,7 +42,7 @@ public:
 	//void QueueDownload(std::string file, int index);
 	//void QueueDownload(std::string file, int index, bool restart);
 	//bool HasQueue();
-	void MountDisk( std::string file, int index);
+	bool MountDisk(std::string file, int index);
 
 	SimBlockDevice(DebugConsole c);
 	~SimBlockDevice();

@@ -26,6 +26,13 @@ module emu (
 	input reset,
 	input soft_reset,
 	input menu,
+	input [1:0] screen_mode,
+	input [1:0] color_palette,
+	input text_color,
+	input gray_seam_fix,
+	input ntsc_vertical_comb,
+	input pixel_clock_double,
+	input [1:0] virtual_keyboard_mode,
 	
 	input [31:0] joystick_0,
 	input [31:0] joystick_1,
@@ -83,6 +90,7 @@ module emu (
 	output VGA_VB,
 
 	output CE_PIXEL,
+	output virtual_keyboard_active_debug,
 	
 	output	[15:0]	AUDIO_L,
 	output	[15:0]	AUDIO_R,
@@ -92,7 +100,7 @@ module emu (
 	input [24:0]		ioctl_addr,
 	input [7:0]		ioctl_dout,
 	input [7:0]		ioctl_index,
-	output reg		ioctl_wait=1'b0,
+	output			ioctl_wait,
 
 	output [31:0] 		sd_lba[3],
 	output [9:0] 		sd_rd,
@@ -142,9 +150,63 @@ always @(posedge CLK_VIDEO) begin
 	reg div ;
 	
 	div <= ~div;
-	ce_pix <=  &div ;
+	ce_pix <= pixel_clock_double | &div;
 end
 wire [15:0] hdd_sector;
+wire [10:0] filtered_ps2_key;
+wire virtual_keyboard_active;
+wire virtual_keyboard_commands;
+wire [2:0] virtual_keyboard_row;
+wire [3:0] virtual_keyboard_col;
+wire virtual_keyboard_shift;
+wire virtual_keyboard_control;
+wire virtual_keyboard_caps;
+wire virtual_keyboard_shift_active;
+wire virtual_keyboard_control_active;
+wire virtual_open_apple;
+wire virtual_closed_apple;
+wire virtual_keyboard_transparency_cycle;
+wire virtual_keyboard_top;
+wire virtual_keyboard_event;
+wire virtual_keyboard_pressed;
+wire [6:0] virtual_keyboard_code;
+wire virtual_keyboard_reset;
+wire [7:0] core_R, core_G, core_B;
+wire [23:0] virtual_keyboard_rgb;
+wire [6:0] virtual_font_character;
+wire [2:0] virtual_font_row;
+wire [7:0] virtual_font_data;
+wire virtual_font_alternate;
+wire virtual_font_lowercase;
+
+virtual_keyboard_controller virtual_keyboard_controller
+(
+	.clk(clk_sys),
+	.reset(reset),
+	.ps2_key(ps2_key),
+	.joystick({joystick_0[12], joystick_0[5:0]}),
+	.enabled(virtual_keyboard_mode != 0),
+	.filtered_ps2_key(filtered_ps2_key),
+	.active(virtual_keyboard_active),
+	.commands_page(virtual_keyboard_commands),
+	.selected_row(virtual_keyboard_row),
+	.selected_col(virtual_keyboard_col),
+	.shift_latched(virtual_keyboard_shift),
+	.control_latched(virtual_keyboard_control),
+	.caps_latched(virtual_keyboard_caps),
+	.shift_active(virtual_keyboard_shift_active),
+	.control_active(virtual_keyboard_control_active),
+	.open_apple(virtual_open_apple),
+	.closed_apple(virtual_closed_apple),
+	.transparency_cycle(virtual_keyboard_transparency_cycle),
+	.overlay_top(virtual_keyboard_top),
+	.virtual_event(virtual_keyboard_event),
+	.virtual_pressed(virtual_keyboard_pressed),
+	.virtual_code(virtual_keyboard_code),
+	.command_reset(virtual_keyboard_reset)
+);
+
+assign virtual_keyboard_active_debug = virtual_keyboard_active;
 
 assign sd_lba[1] = {16'b0,hdd_sector};
 
@@ -171,26 +233,41 @@ apple2_top apple2_top
 	.cpu_type(1'b0), // 0 6502, 1 65C02
 
 	.reset_cold(reset),
-	.reset_warm(soft_reset),
+	.reset_warm(soft_reset | virtual_keyboard_reset),
 
 	.hblank(VGA_HB),
 	.vblank(VGA_VB),
 	.hsync(VGA_HS),
 	.vsync(VGA_VS),
-	.r(VGA_R),
-	.g(VGA_G),
-	.b(VGA_B),
-	.SCREEN_MODE(2'b00),
-	.TEXT_COLOR(1'b0),
+	.r(core_R),
+	.g(core_G),
+	.b(core_B),
+	.SCREEN_MODE(screen_mode),
+	.TEXT_COLOR(text_color),
+	.COLOR_PALETTE(color_palette),
+	.GRAY_SEAM_FIX(gray_seam_fix),
+	.NTSC_VERTICAL_COMB(ntsc_vertical_comb),
+	.ioctl_addr(ioctl_addr),
+	.ioctl_data(ioctl_dout),
+	.ioctl_index(ioctl_index),
+	.ioctl_download(ioctl_download),
+	.ioctl_wr(ioctl_wr),
+	.ioctl_wait(ioctl_wait),
 
 	.AUDIO_L(audio_l),
 	.AUDIO_R(audio_r),
 	.TAPE_IN(tape_adc_act & tape_adc),
 
-	.PS2_Key(ps2_key),
+	.PS2_Key(filtered_ps2_key),
+	.virtual_keyboard_active(virtual_keyboard_active),
+	.virtual_keyboard_event(virtual_keyboard_event),
+	.virtual_keyboard_pressed(virtual_keyboard_pressed),
+	.virtual_keyboard_code(virtual_keyboard_code),
+	.virtual_open_apple(virtual_open_apple),
+	.virtual_closed_apple(virtual_closed_apple),
 
-	.joy(joyd),
-	.joy_an(joya),
+	.joy(virtual_keyboard_active ? 6'h00 : joyd),
+	.joy_an(virtual_keyboard_active ? 16'h0000 : joya),
 
 	.mb_enabled(1'b1),
 
@@ -243,6 +320,48 @@ apple2_top apple2_top
 
 
 );
+
+apple2_font_rom apple2_font_rom
+(
+	.CLK_14M(clk_sys),
+	.ROMSWITCH(1'b1),
+	.alternate_character(virtual_font_alternate),
+	.lowercase_character(virtual_font_lowercase),
+	.character_code(virtual_font_character),
+	.glyph_row(virtual_font_row),
+	.ioctl_addr(ioctl_addr),
+	.ioctl_data(ioctl_dout),
+	.ioctl_wr(ioctl_wr),
+	.glyph_data(virtual_font_data)
+);
+
+virtual_keyboard_overlay virtual_keyboard_overlay
+(
+	.clk(clk_sys),
+	.reset(reset),
+	.active(virtual_keyboard_active),
+	.commands_page(virtual_keyboard_commands),
+	.selected_row(virtual_keyboard_row),
+	.selected_col(virtual_keyboard_col),
+	.shift_latched(virtual_keyboard_shift_active),
+	.control_latched(virtual_keyboard_control_active),
+	.caps_latched(virtual_keyboard_caps),
+	.open_apple(virtual_open_apple),
+	.closed_apple(virtual_closed_apple),
+	.transparency(virtual_keyboard_mode),
+	.overlay_top(virtual_keyboard_top),
+	.hblank(VGA_HB),
+	.vblank(VGA_VB),
+	.rgb_in({core_R, core_G, core_B}),
+	.font_alternate(virtual_font_alternate),
+	.font_lowercase(virtual_font_lowercase),
+	.font_character(virtual_font_character),
+	.font_row(virtual_font_row),
+	.font_data(virtual_font_data),
+	.rgb_out(virtual_keyboard_rgb)
+);
+
+assign {VGA_R, VGA_G, VGA_B} = virtual_keyboard_rgb;
 
 
 wire [7:0] R,G,B;

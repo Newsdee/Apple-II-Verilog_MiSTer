@@ -35,7 +35,7 @@ QData* img_size=NULL;
 #define bitcheck(byte,nbit) ((byte) &   (1<<(nbit)))
 
 
-void SimBlockDevice::MountDisk( std::string file, int index) {
+bool SimBlockDevice::MountDisk(std::string file, int index) {
 	disk[index].open(file.c_str(), std::ios::out | std::ios::in | std::ios::binary | std::ios::ate);
         if (disk[index]) {
 		fprintf(stderr,"we are here\n");
@@ -45,8 +45,10 @@ void SimBlockDevice::MountDisk( std::string file, int index) {
            disk[index].seekg(0);
            mountQueue[index]=1;
            printf("disk %d inserted (%s)\n",index,file.c_str());
+             return true;
         }else {
 		fprintf(stderr,"some kind of error: %s\n",file.c_str());
+             return false;
 	}
 
 }

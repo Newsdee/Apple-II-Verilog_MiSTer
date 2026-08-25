@@ -38,8 +38,23 @@ module apple2_top(
     b,
     SCREEN_MODE,
     TEXT_COLOR,
+  COLOR_PALETTE,
+  GRAY_SEAM_FIX,
+  NTSC_VERTICAL_COMB,
+  ioctl_addr,
+  ioctl_data,
+  ioctl_index,
+  ioctl_download,
+  ioctl_wr,
+  ioctl_wait,
 
     PS2_Key,
+    virtual_keyboard_active,
+    virtual_keyboard_event,
+    virtual_keyboard_pressed,
+    virtual_keyboard_code,
+    virtual_open_apple,
+    virtual_closed_apple,
     joy,
     joy_an,
     mb_enabled,
@@ -59,6 +74,10 @@ module apple2_top(
 
 	D1_ACTIVE,
 	D2_ACTIVE,
+  D1_MOTOR_ON,
+  D2_MOTOR_ON,
+  D1_IO_ACTIVE,
+  D2_IO_ACTIVE,
 
 	DISK_ACT,
 
@@ -109,8 +128,23 @@ module apple2_top(
     output [7:0]  b;
     input [1:0]   SCREEN_MODE;		// 00: Color, 01: B&W, 10:Green, 11: Amber
     input         TEXT_COLOR;
+  input [1:0]   COLOR_PALETTE;
+  input         GRAY_SEAM_FIX;
+  input         NTSC_VERTICAL_COMB;
+  input [24:0]  ioctl_addr;
+  input [7:0]   ioctl_data;
+  input [7:0]   ioctl_index;
+  input         ioctl_download;
+  input         ioctl_wr;
+  output        ioctl_wait;
     
     input [10:0]  PS2_Key;
+    input         virtual_keyboard_active;
+    input         virtual_keyboard_event;
+    input         virtual_keyboard_pressed;
+    input [6:0]   virtual_keyboard_code;
+    input         virtual_open_apple;
+    input         virtual_closed_apple;
     input [5:0]   joy;
     input [15:0]  joy_an;
     
@@ -132,6 +166,10 @@ input	TRACK2_BUSY;
 
 inout	D1_ACTIVE;
 inout	D2_ACTIVE;
+output	D1_MOTOR_ON;
+output	D2_MOTOR_ON;
+output	D1_IO_ACTIVE;
+output	D2_IO_ACTIVE;
 
 output	DISK_ACT;
 
@@ -274,7 +312,8 @@ input[1:0]	DISK_READY;
     // GAMEPORT input bits:
     //  7    6    5    4    3   2   1    0
     // pdl3 pdl2 pdl1 pdl0 pb3 pb2 pb1 casette
-    assign GAMEPORT = {2'b00, joyy, joyx, 1'b0, joy[5], joy[4], TAPE_IN};
+    assign GAMEPORT = {2'b00, joyy, joyx, 1'b0,
+               joy[5] | closed_apple, joy[4] | open_apple, TAPE_IN};
    
     always @(posedge CLK_14M) begin : P1
     reg [31:0] cx, cy = 0;
@@ -373,6 +412,9 @@ input[1:0]	DISK_READY;
         .VIDEO(VIDEO),
         .COLOR_LINE(COLOR_LINE_CONTROL),
         .SCREEN_MODE(SCREEN_MODE),
+        .COLOR_PALETTE(COLOR_PALETTE),
+        .GRAY_SEAM_FIX(GRAY_SEAM_FIX),
+        .NTSC_VERTICAL_COMB(NTSC_VERTICAL_COMB),
         .HBL(HBL),
         .VBL(VBL),
         .VGA_HS(hsync),
@@ -381,17 +423,31 @@ input[1:0]	DISK_READY;
         .VGA_VBL(vblank),
         .VGA_R(r),
         .VGA_G(g),
-        .VGA_B(b)
+    .VGA_B(b),
+    .ioctl_addr(ioctl_addr),
+    .ioctl_data(ioctl_data),
+    .ioctl_index(ioctl_index),
+    .ioctl_download(ioctl_download),
+    .ioctl_wr(ioctl_wr),
+    .ioctl_wait(ioctl_wait)
     );
     
     
     keyboard keyboard(
         .PS2_Key(PS2_Key),
+      .virtual_active(virtual_keyboard_active),
+      .virtual_event(virtual_keyboard_event),
+      .virtual_pressed(virtual_keyboard_pressed),
+      .virtual_code(virtual_keyboard_code),
+      .virtual_open_apple(virtual_open_apple),
+      .virtual_closed_apple(virtual_closed_apple),
         .CLK_14M(CLK_14M),
         .reset(reset),
         .reads(read_key),
         .K(K),
-        .akd(akd)
+      .akd(akd),
+      .open_apple(open_apple),
+      .closed_apple(closed_apple)
     );
    
     assign DISK_ACT = ~(D1_ACTIVE | D2_ACTIVE);
@@ -409,6 +465,10 @@ input[1:0]	DISK_READY;
         .D_OUT(DISK_DO),
     .D1_ACTIVE(D1_ACTIVE),
     .D2_ACTIVE(D2_ACTIVE),
+    .D1_MOTOR_ON(D1_MOTOR_ON),
+    .D2_MOTOR_ON(D2_MOTOR_ON),
+    .D1_IO_ACTIVE(D1_IO_ACTIVE),
+    .D2_IO_ACTIVE(D2_IO_ACTIVE),
     //-- track buffer interface for disk 1  -- TODO
     .TRACK1(TRACK1),
     .TRACK1_ADDR(TRACK1_ADDR),

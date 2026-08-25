@@ -39,3 +39,8 @@ c5_pin_model_dump.txt
 *_netlist
 *.cdf
 imgui.ini
+/disks/*.dsk
+*.dsk
+*.nib
+*.hdv
+*.zip

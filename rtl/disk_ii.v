@@ -1,6 +1,6 @@
 
 
-module disk_ii(CLK_14M, CLK_2M, PHASE_ZERO, IO_SELECT, DEVICE_SELECT, RESET, DISK_READY, A, D_IN, D_OUT, D1_ACTIVE, D2_ACTIVE, TRACK1, TRACK1_ADDR, TRACK1_DI, TRACK1_DO, TRACK1_WE, TRACK1_BUSY, TRACK2, TRACK2_ADDR, TRACK2_DI, TRACK2_DO, TRACK2_WE, TRACK2_BUSY);
+module disk_ii(CLK_14M, CLK_2M, PHASE_ZERO, IO_SELECT, DEVICE_SELECT, RESET, DISK_READY, A, D_IN, D_OUT, D1_ACTIVE, D2_ACTIVE, D1_MOTOR_ON, D2_MOTOR_ON, D1_IO_ACTIVE, D2_IO_ACTIVE, TRACK1, TRACK1_ADDR, TRACK1_DI, TRACK1_DO, TRACK1_WE, TRACK1_BUSY, TRACK2, TRACK2_ADDR, TRACK2_DI, TRACK2_DO, TRACK2_WE, TRACK2_BUSY);
    input        CLK_14M;
    input        CLK_2M;
    input        PHASE_ZERO;
@@ -13,6 +13,10 @@ module disk_ii(CLK_14M, CLK_2M, PHASE_ZERO, IO_SELECT, DEVICE_SELECT, RESET, DIS
    output [7:0] D_OUT;
    output       D1_ACTIVE;
    output       D2_ACTIVE;
+   output       D1_MOTOR_ON;
+   output       D2_MOTOR_ON;
+   output       D1_IO_ACTIVE;
+   output       D2_IO_ACTIVE;
    output [5:0] TRACK1;
    output [12:0] TRACK1_ADDR;
    output [7:0] TRACK1_DI;
@@ -115,6 +119,10 @@ module disk_ii(CLK_14M, CLK_2M, PHASE_ZERO, IO_SELECT, DEVICE_SELECT, RESET, DIS
    
    assign D1_ACTIVE = drive_real_on & (~drive2_select);
    assign D2_ACTIVE = drive_real_on & drive2_select;
+   assign D1_MOTOR_ON = drive_on & (~drive2_select);
+   assign D2_MOTOR_ON = drive_on & drive2_select;
+   assign D1_IO_ACTIVE = read_disk & drive_real_on & (~drive2_select) & DISK_READY[0];
+   assign D2_IO_ACTIVE = read_disk & drive_real_on & drive2_select & DISK_READY[1];
    assign write_mode = q7;
    
    assign read_disk = (DEVICE_SELECT == 1'b1 & A[3:0] == 4'hC) ? 1'b1 : 
