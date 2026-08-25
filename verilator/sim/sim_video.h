@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #ifndef _MSC_VER
 #include "imgui_impl_sdl.h"

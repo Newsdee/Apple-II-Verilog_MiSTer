@@ -5,7 +5,13 @@
 #include <stdlib.h>
 
 #ifndef _MSC_VER
+#ifdef WIN32
+#undef WIN32
+#endif
 #include <SDL2/SDL.h>
+#ifdef WIN32
+#undef WIN32
+#endif
 int m_keyboardStateCount;
 const Uint8* m_keyboardState;
 Uint8* m_keyboardState_last = NULL;

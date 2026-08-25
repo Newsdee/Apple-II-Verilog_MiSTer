@@ -8,6 +8,7 @@ scaler
 hps_isw_handoff
 vip
 *_sim
+verilator/obj_dir/
 .qsys_edit
 PLLJ_PLLSPE_INFO.txt
 *.bak

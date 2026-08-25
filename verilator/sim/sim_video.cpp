@@ -4,12 +4,18 @@
 #include <string>
 
 #ifndef _MSC_VER
+#ifdef WIN32
+#undef WIN32
+#endif
 #include "imgui_impl_sdl.h"
 #include "imgui_impl_opengl2.h"
 #include <stdio.h>
 #include <SDL.h>
 #include <SDL_opengl.h>
 #include <sys/time.h>
+#ifdef WIN32
+#undef WIN32
+#endif
 #else
 #define WIN32
 #include "imgui_impl_win32.h"

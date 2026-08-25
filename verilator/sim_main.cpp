@@ -4,9 +4,15 @@
 #include "imgui.h"
 #include "implot.h"
 #ifndef _MSC_VER
+#ifdef WIN32
+#undef WIN32
+#endif
 #include <stdio.h>
 #include <SDL.h>
 #include <SDL_opengl.h>
+#ifdef WIN32
+#undef WIN32
+#endif
 #else
 #define WIN32
 #include <dinput.h>
@@ -20,8 +26,8 @@
 #include "sim_input.h"
 #include "sim_clock.h"
 
-#include "../imgui/imgui_memory_editor.h"
-#include "../imgui/ImGuiFileDialog.h"
+#include "imgui_memory_editor.h"
+#include "ImGuiFileDialog.h"
 
 #include <iostream>
 #include <fstream>
@@ -120,7 +126,11 @@ void send_clock() {
 	time(&t);
 
 	struct tm tm;
-        localtime_r(&t,&tm);
+#ifdef _WIN32
+	localtime_s(&tm, &t);
+#else
+	localtime_r(&t, &tm);
+#endif
 
 	
 	rtc[0] = (tm.tm_sec % 10) | ((tm.tm_sec / 10) << 4);

@@ -8,9 +8,8 @@ V_INC = +incdir+$(RTL)
 #V_DEFINE = +define+debug=1 +define+SIMULATION=1   -CFLAGS "-I../sim/imgui -I../sim/vinc -I../sim/ -O3"  --timescale-override 1ps/1ps -Wno-TIMESCALEMOD  \
 	-I../rtl \
 	-I../rtl/tv80
-V_DEFINE = +define+debug=1 +define+SIMULATION=1   -CFLAGS "-I../sim/imgui -I../sim/vinc -I../sim/ -O3"  --timescale-override 1ps/1ps -Wno-TIMESCALEMOD  \
-	-I../rtl \
-	-I../rtl/tv80
+V_DEFINE = +define+debug=1 +define+SIMULATION=1   -CFLAGS "-I../sim/imgui -I../sim/ -O3"  --timescale-override 1ps/1ps -Wno-TIMESCALEMOD  \
+	-I../rtl
 #V_DEFINE = +define+debug=1 +define+SIMULATION=1   -CFLAGS "-g -I../sim/imgui -I../sim/vinc -I../sim/"  --timescale-override 1ps/1ps -Wno-TIMESCALEMOD  \
 	-I../rtl \
 	-I../rtl/tv80
@@ -39,22 +38,27 @@ ifeq ($(UNAME_S), Linux) #LINUX
 	CFLAGS = $(CXXFLAGS)
 endif
 
-ifeq ($(findstring MINGW,$(UNAME_S)),MINGW)
+ifneq ($(filter MINGW% MSYS%,$(UNAME_S)),)
 	ECHO_MESSAGE = "MinGW"
-	LIBS += -lgdi32 -lopengl32 -limm32 `pkg-config --static --libs sdl2`
+	LIBS += -lgdi32 -lopengl32 -limm32 -lSDL2
 
-	CXXFLAGS += `pkg-config --cflags sdl2`
+	CXXFLAGS += -I`/ucrt64/bin/sdl2-config --prefix`/include/SDL2 -DSDL_MAIN_HANDLED
 	CFLAGS = $(CXXFLAGS)
 endif
 
-CFLAGS += $(CC_OPT) $(CC_DEFINE) -Iimgui
+CFLAGS += $(CC_OPT) $(CC_DEFINE)
 LDFLAGS = $(LIBS)
 EXE = ./obj_dir/Vemu
-V_OPT = -O3 --x-assign fast --x-initial fast --noassert 
+V_OPT = -O3 --x-assign fast --x-initial fast --noassert -Wno-fatal
 CC_OPT = -O3
 
 V_SRC = \
         sim.v \
+		$(RTL)/bram.sv \
+		$(RTL)/ramcard.v \
+		$(RTL)/rom.v \
+		$(RTL)/timing_generator.v \
+		$(RTL)/video_generator.v \
 		$(RTL)/super_serial_card.v  \
 		$(RTL)/t65/t65_alu.v  $(RTL)/t65/t65_mcode.v  $(RTL)/t65/t65_pack.v  $(RTL)/t65/t65.v \
 		$(RTL)/hdd.v \
@@ -79,7 +83,7 @@ V_SRC = \
 
 C_SRC = \
 	sim_main.cpp  \
-	sim/sim_bus.cpp sim/sim_blkdevice.cpp sim/sim_clock.cpp sim/sim_console.cpp sim/sim_video.cpp sim/sim_console.cpp sim/sim_input.cpp  sim/sim_audio.cpp \
+	sim/sim_bus.cpp sim/sim_blkdevice.cpp sim/sim_clock.cpp sim/sim_console.cpp sim/sim_video.cpp sim/sim_input.cpp sim/sim_audio.cpp \
 	sim/imgui/imgui_impl_sdl.cpp sim/imgui/imgui_impl_opengl2.cpp sim/imgui/imgui_draw.cpp sim/imgui/imgui_widgets.cpp sim/imgui/imgui_tables.cpp sim/imgui/imgui.cpp sim/imgui/ImGuiFileDialog.cpp sim/imgui/implot.cpp sim/imgui/implot_items.cpp
 
 VOUT = obj_dir/Vemu.cpp
@@ -87,7 +91,7 @@ VOUT = obj_dir/Vemu.cpp
 all: $(EXE)
 
 $(VOUT): $(V_SRC)  Makefile
-	$V -cc $(V_OPT) -LDFLAGS "$(LDFLAGS) " -exe  --Mdir ./obj_dir $(V_DEFINE) $(V_INC) $(TOP) -CFLAGS $(CFLAGS) $(V_SRC) $(C_SRC)
+	$V -cc $(V_OPT) -LDFLAGS "$(LDFLAGS) " -exe  --Mdir ./obj_dir $(V_DEFINE) $(V_INC) $(TOP) -CFLAGS "$(CFLAGS)" $(V_SRC) $(C_SRC)
 
 $(EXE): $(VOUT) $(C_SRC)
 #	(cd obj_dir; make OPT="-fauto-inc-dec -fdce -fdefer-pop -fdse -ftree-ccp -ftree-ch -ftree-fre -ftree-dce -ftree-dse" -f Vemu.mk)
