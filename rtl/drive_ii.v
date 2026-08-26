@@ -1,6 +1,6 @@
 
 
-module drive_ii(CLK_14M, CLK_2M, PHASE_ZERO, RESET, DISK_READY, D_IN, D_OUT, DISK_ACTIVE, MOTOR_PHASE, WRITE_MODE, READ_DISK, WRITE_REG, TRACK, TRACK_ADDR, TRACK_DI, TRACK_DO, TRACK_WE, TRACK_BUSY);
+module drive_ii(CLK_14M, CLK_2M, PHASE_ZERO, RESET, DISK_READY, D_IN, D_OUT, DISK_ACTIVE, MOTOR_PHASE, WRITE_MODE, READ_DISK, WRITE_REG, TRACK_ZERO_STEP, TRACK, TRACK_ADDR, TRACK_DI, TRACK_DO, TRACK_WE, TRACK_BUSY);
    input        CLK_14M;
    input        CLK_2M;
    input        PHASE_ZERO;
@@ -13,6 +13,7 @@ module drive_ii(CLK_14M, CLK_2M, PHASE_ZERO, RESET, DISK_READY, D_IN, D_OUT, DIS
    input        WRITE_MODE;
    input        READ_DISK;
    input        WRITE_REG;
+   output reg   TRACK_ZERO_STEP;
    output [5:0] TRACK;
    output [12:0] TRACK_ADDR;
    output [7:0] TRACK_DI;
@@ -35,10 +36,12 @@ module drive_ii(CLK_14M, CLK_2M, PHASE_ZERO, RESET, DISK_READY, D_IN, D_OUT, DIS
       integer      phase_change;
       integer      new_phase;
       reg [3:0]    rel_phase;
-      if (RESET == 1'b1)
+      if (RESET == 1'b1) begin
          phase <= 70;
-      else 
+         TRACK_ZERO_STEP <= 1'b0;
+      end else 
       begin
+         TRACK_ZERO_STEP <= 1'b0;
          if (DISK_ACTIVE == 1'b1)
          begin
             phase_change = 0;
@@ -120,9 +123,11 @@ module drive_ii(CLK_14M, CLK_2M, PHASE_ZERO, RESET, DISK_READY, D_IN, D_OUT, DIS
                      ;
                endcase
             
-            if (new_phase + phase_change <= 0)
+            if (new_phase + phase_change <= 0) begin
+               if (phase_change < 0)
+                  TRACK_ZERO_STEP <= 1'b1;
                new_phase = 0;
-            else if (new_phase + phase_change > 139)
+            end else if (new_phase + phase_change > 139)
                new_phase = 139;
             else
                new_phase = new_phase + phase_change;

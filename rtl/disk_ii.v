@@ -1,6 +1,6 @@
 
 
-module disk_ii(CLK_14M, CLK_2M, PHASE_ZERO, IO_SELECT, DEVICE_SELECT, RESET, DISK_READY, A, D_IN, D_OUT, D1_ACTIVE, D2_ACTIVE, D1_MOTOR_ON, D2_MOTOR_ON, D1_IO_ACTIVE, D2_IO_ACTIVE, TRACK1, TRACK1_ADDR, TRACK1_DI, TRACK1_DO, TRACK1_WE, TRACK1_BUSY, TRACK2, TRACK2_ADDR, TRACK2_DI, TRACK2_DO, TRACK2_WE, TRACK2_BUSY);
+module disk_ii(CLK_14M, CLK_2M, PHASE_ZERO, IO_SELECT, DEVICE_SELECT, RESET, DISK_READY, A, D_IN, D_OUT, D1_ACTIVE, D2_ACTIVE, D1_MOTOR_ON, D2_MOTOR_ON, D1_IO_ACTIVE, D2_IO_ACTIVE, D1_STEP_ACTIVE, D2_STEP_ACTIVE, D1_TRACK_ZERO_STEP, D2_TRACK_ZERO_STEP, D1_WP, D2_WP, TRACK1, TRACK1_ADDR, TRACK1_DI, TRACK1_DO, TRACK1_WE, TRACK1_BUSY, TRACK2, TRACK2_ADDR, TRACK2_DI, TRACK2_DO, TRACK2_WE, TRACK2_BUSY);
    input        CLK_14M;
    input        CLK_2M;
    input        PHASE_ZERO;
@@ -17,6 +17,12 @@ module disk_ii(CLK_14M, CLK_2M, PHASE_ZERO, IO_SELECT, DEVICE_SELECT, RESET, DIS
    output       D2_MOTOR_ON;
    output       D1_IO_ACTIVE;
    output       D2_IO_ACTIVE;
+   output reg   D1_STEP_ACTIVE;
+   output reg   D2_STEP_ACTIVE;
+   output       D1_TRACK_ZERO_STEP;
+   output       D2_TRACK_ZERO_STEP;
+   input        D1_WP;
+   input        D2_WP;
    output [5:0] TRACK1;
    output [12:0] TRACK1_ADDR;
    output [7:0] TRACK1_DI;
@@ -48,14 +54,16 @@ module disk_ii(CLK_14M, CLK_2M, PHASE_ZERO, IO_SELECT, DEVICE_SELECT, RESET, DIS
    wire         read_disk;
    wire         write_reg;
    wire [7:0]   data_reg;
+   wire [7:0]   write_protect_bits;
    wire         reset_data_reg;
    wire         write_mode;
    
    
    always @(posedge CLK_14M)
    begin: interpret_io
-      
       begin
+         D1_STEP_ACTIVE <= 1'b0;
+         D2_STEP_ACTIVE <= 1'b0;
          if (RESET == 1'b1)
          begin
             motor_phase <= {4{1'b0}};
@@ -67,9 +75,15 @@ module disk_ii(CLK_14M, CLK_2M, PHASE_ZERO, IO_SELECT, DEVICE_SELECT, RESET, DIS
          else
             if (DEVICE_SELECT == 1'b1)
             begin
-               if (A[3] == 1'b0)
+               if (A[3] == 1'b0) begin
+                  if (A[0] == 1'b1 && motor_phase[A[2:1]] == 1'b0) begin
+                     if (drive2_select == 1'b1)
+                        D2_STEP_ACTIVE <= 1'b1;
+                     else
+                        D1_STEP_ACTIVE <= 1'b1;
+                  end
                   motor_phase[(A[2:1])] <= A[0];
-               else
+               end else
                   case (A[2:1])
                      2'b00 :
                         drive_on <= A[0];
@@ -130,17 +144,18 @@ module disk_ii(CLK_14M, CLK_2M, PHASE_ZERO, IO_SELECT, DEVICE_SELECT, RESET, DIS
    assign write_reg = (DEVICE_SELECT == 1'b1 & A[3:2] == 2'b11 & A[0] == 1'b1) ? 1'b1 : 
                       1'b0;
    
-   assign D_OUT = (IO_SELECT == 1'b1) ? rom_dout : 
-                  (q6 == 1'b0) ? data_reg : 
-                  8'h00;
+   assign write_protect_bits = drive2_select ? (D2_WP ? 8'h80 : 8'h00) :
+                                                (D1_WP ? 8'h80 : 8'h00);
+   assign D_OUT = (IO_SELECT == 1'b1) ? rom_dout :
+                  (q6 == 1'b0) ? data_reg : write_protect_bits;
    assign data_reg = (drive2_select == 1'b0) ? d_out1 : 
                      d_out2;
    
    
-   drive_ii drive_1(.CLK_14M(CLK_14M), .CLK_2M(CLK_2M), .PHASE_ZERO(PHASE_ZERO), .RESET(RESET), .DISK_READY(DISK_READY[0]), .D_IN(D_IN), .D_OUT(d_out1), .DISK_ACTIVE(D1_ACTIVE), .MOTOR_PHASE(motor_phase), .WRITE_MODE(write_mode), .READ_DISK(read_disk), .WRITE_REG(write_reg), .TRACK(TRACK1), .TRACK_ADDR(TRACK1_ADDR), .TRACK_DI(TRACK1_DI), .TRACK_DO(TRACK1_DO), .TRACK_WE(TRACK1_WE), .TRACK_BUSY(TRACK1_BUSY));
+   drive_ii drive_1(.CLK_14M(CLK_14M), .CLK_2M(CLK_2M), .PHASE_ZERO(PHASE_ZERO), .RESET(RESET), .DISK_READY(DISK_READY[0]), .D_IN(D_IN), .D_OUT(d_out1), .DISK_ACTIVE(D1_ACTIVE), .MOTOR_PHASE(motor_phase), .WRITE_MODE(write_mode), .READ_DISK(read_disk), .WRITE_REG(write_reg), .TRACK_ZERO_STEP(D1_TRACK_ZERO_STEP), .TRACK(TRACK1), .TRACK_ADDR(TRACK1_ADDR), .TRACK_DI(TRACK1_DI), .TRACK_DO(TRACK1_DO), .TRACK_WE(TRACK1_WE), .TRACK_BUSY(TRACK1_BUSY));
    
    
-   drive_ii drive_2(.CLK_14M(CLK_14M), .CLK_2M(CLK_2M), .PHASE_ZERO(PHASE_ZERO), .RESET(RESET), .DISK_READY(DISK_READY[1]), .D_IN(D_IN), .D_OUT(d_out2), .DISK_ACTIVE(D2_ACTIVE), .MOTOR_PHASE(motor_phase), .WRITE_MODE(write_mode), .READ_DISK(read_disk), .WRITE_REG(write_reg), .TRACK(TRACK2), .TRACK_ADDR(TRACK2_ADDR), .TRACK_DI(TRACK2_DI), .TRACK_DO(TRACK2_DO), .TRACK_WE(TRACK2_WE), .TRACK_BUSY(TRACK2_BUSY));
+   drive_ii drive_2(.CLK_14M(CLK_14M), .CLK_2M(CLK_2M), .PHASE_ZERO(PHASE_ZERO), .RESET(RESET), .DISK_READY(DISK_READY[1]), .D_IN(D_IN), .D_OUT(d_out2), .DISK_ACTIVE(D2_ACTIVE), .MOTOR_PHASE(motor_phase), .WRITE_MODE(write_mode), .READ_DISK(read_disk), .WRITE_REG(write_reg), .TRACK_ZERO_STEP(D2_TRACK_ZERO_STEP), .TRACK(TRACK2), .TRACK_ADDR(TRACK2_ADDR), .TRACK_DI(TRACK2_DI), .TRACK_DO(TRACK2_DO), .TRACK_WE(TRACK2_WE), .TRACK_BUSY(TRACK2_BUSY));
    
   
    rom #(8,8,"rtl/roms/diskii.hex") diskrom (

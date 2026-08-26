@@ -79,6 +79,12 @@ module apple2_top(
   D2_MOTOR_ON,
   D1_IO_ACTIVE,
   D2_IO_ACTIVE,
+  D1_STEP_ACTIVE,
+  D2_STEP_ACTIVE,
+  D1_TRACK_ZERO_STEP,
+  D2_TRACK_ZERO_STEP,
+  D1_WP,
+  D2_WP,
 
 	DISK_ACT,
 
@@ -172,6 +178,12 @@ output	D1_MOTOR_ON;
 output	D2_MOTOR_ON;
 output	D1_IO_ACTIVE;
 output	D2_IO_ACTIVE;
+output	D1_STEP_ACTIVE;
+output	D2_STEP_ACTIVE;
+output	D1_TRACK_ZERO_STEP;
+output	D2_TRACK_ZERO_STEP;
+input	D1_WP;
+input	D2_WP;
 
 output	DISK_ACT;
 
@@ -472,6 +484,12 @@ input[1:0]	DISK_READY;
     .D2_MOTOR_ON(D2_MOTOR_ON),
     .D1_IO_ACTIVE(D1_IO_ACTIVE),
     .D2_IO_ACTIVE(D2_IO_ACTIVE),
+    .D1_STEP_ACTIVE(D1_STEP_ACTIVE),
+    .D2_STEP_ACTIVE(D2_STEP_ACTIVE),
+    .D1_TRACK_ZERO_STEP(D1_TRACK_ZERO_STEP),
+    .D2_TRACK_ZERO_STEP(D2_TRACK_ZERO_STEP),
+    .D1_WP(D1_WP),
+    .D2_WP(D2_WP),
     //-- track buffer interface for disk 1  -- TODO
     .TRACK1(TRACK1),
     .TRACK1_ADDR(TRACK1_ADDR),

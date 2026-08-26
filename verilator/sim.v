@@ -295,6 +295,16 @@ apple2_top apple2_top
 	.DISK_READY(DISK_READY),
 	.D1_ACTIVE(D1_ACTIVE),
 	.D2_ACTIVE(D2_ACTIVE),
+	.D1_MOTOR_ON(D1_MOTOR_ON),
+	.D2_MOTOR_ON(D2_MOTOR_ON),
+	.D1_IO_ACTIVE(D1_IO_ACTIVE),
+	.D2_IO_ACTIVE(D2_IO_ACTIVE),
+	.D1_STEP_ACTIVE(D1_STEP_ACTIVE),
+	.D2_STEP_ACTIVE(D2_STEP_ACTIVE),
+	.D1_TRACK_ZERO_STEP(D1_TRACK_ZERO_STEP),
+	.D2_TRACK_ZERO_STEP(D2_TRACK_ZERO_STEP),
+	.D1_WP(disk_protect[0]),
+	.D2_WP(disk_protect[1]),
 	.DISK_ACT(led),
 
 
@@ -480,17 +490,21 @@ always @(posedge clk_sys) begin
 	if (img_mounted[0]) begin
 		disk_mount[0] <= img_size != 0;
 		DISK_CHANGE[0] <= ~DISK_CHANGE[0];
-		//disk_protect <= img_readonly;
+		disk_protect[0] <= img_readonly;
 	end
 end
 always @(posedge clk_sys) begin
 	if (img_mounted[2]) begin
 		disk_mount[1] <= img_size != 0;
 		DISK_CHANGE[1] <= ~DISK_CHANGE[1];
-		//disk_protect <= img_readonly;
+		disk_protect[1] <= img_readonly;
 	end
 end
 wire D1_ACTIVE,D2_ACTIVE;
+wire D1_MOTOR_ON,D2_MOTOR_ON;
+wire D1_IO_ACTIVE,D2_IO_ACTIVE;
+wire D1_STEP_ACTIVE,D2_STEP_ACTIVE;
+wire D1_TRACK_ZERO_STEP,D2_TRACK_ZERO_STEP;
 wire TRACK1_RAM_BUSY;
 wire [12:0] TRACK1_RAM_ADDR;
 wire [7:0] TRACK1_RAM_DI;
@@ -508,6 +522,7 @@ wire [5:0] TRACK2;
 wire [1:0] DISK_READY;
 reg [1:0] DISK_CHANGE;
 reg [1:0]disk_mount;
+reg [1:0] disk_protect;
 
 
 
