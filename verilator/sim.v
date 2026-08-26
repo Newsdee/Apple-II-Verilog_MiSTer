@@ -92,6 +92,7 @@ module emu (
 
 	output CE_PIXEL,
 	output virtual_keyboard_active_debug,
+	output virtual_keyboard_enabled_toggle,
 	
 	output	[15:0]	AUDIO_L,
 	output	[15:0]	AUDIO_R,
@@ -164,6 +165,7 @@ wire virtual_keyboard_control;
 wire virtual_keyboard_caps;
 wire virtual_keyboard_shift_active;
 wire virtual_keyboard_control_active;
+wire virtual_keyboard_enabled_toggle_int;
 wire virtual_open_apple;
 wire virtual_closed_apple;
 wire virtual_keyboard_transparency_cycle;
@@ -197,6 +199,7 @@ virtual_keyboard_controller virtual_keyboard_controller
 	.caps_latched(virtual_keyboard_caps),
 	.shift_active(virtual_keyboard_shift_active),
 	.control_active(virtual_keyboard_control_active),
+	.enabled_toggle(virtual_keyboard_enabled_toggle_int),
 	.open_apple(virtual_open_apple),
 	.closed_apple(virtual_closed_apple),
 	.transparency_cycle(virtual_keyboard_transparency_cycle),
@@ -208,6 +211,7 @@ virtual_keyboard_controller virtual_keyboard_controller
 );
 
 assign virtual_keyboard_active_debug = virtual_keyboard_active;
+assign virtual_keyboard_enabled_toggle = virtual_keyboard_enabled_toggle_int;
 
 assign sd_lba[1] = {16'b0,hdd_sector};
 
@@ -264,6 +268,7 @@ apple2_top apple2_top
 	.virtual_keyboard_event(virtual_keyboard_event),
 	.virtual_keyboard_pressed(virtual_keyboard_pressed),
 	.virtual_keyboard_code(virtual_keyboard_code),
+	.virtual_control(virtual_keyboard_control_active),
 	.virtual_open_apple(virtual_open_apple),
 	.virtual_closed_apple(virtual_closed_apple),
 

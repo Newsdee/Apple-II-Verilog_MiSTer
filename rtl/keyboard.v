@@ -17,6 +17,7 @@ module keyboard(
     virtual_event,
     virtual_pressed,
     virtual_code,
+    virtual_control,
     virtual_open_apple,
     virtual_closed_apple,
     reads,
@@ -33,6 +34,7 @@ module keyboard(
     input            virtual_event;
     input            virtual_pressed;
     input [6:0]      virtual_code;
+    input            virtual_control;
     input            virtual_open_apple;
     input            virtual_closed_apple;
     input            reads;		// Read strobe
@@ -128,7 +130,7 @@ module keyboard(
             if (virtual_active)
             begin
                 shift <= 1'b0;
-                ctrl <= 1'b0;
+                ctrl <= virtual_control;
                 open_apple <= virtual_open_apple;
                 closed_apple <= virtual_closed_apple;
             end

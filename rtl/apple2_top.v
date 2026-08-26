@@ -53,6 +53,7 @@ module apple2_top(
     virtual_keyboard_event,
     virtual_keyboard_pressed,
     virtual_keyboard_code,
+    virtual_control,
     virtual_open_apple,
     virtual_closed_apple,
     joy,
@@ -143,6 +144,7 @@ module apple2_top(
     input         virtual_keyboard_event;
     input         virtual_keyboard_pressed;
     input [6:0]   virtual_keyboard_code;
+    input         virtual_control;
     input         virtual_open_apple;
     input         virtual_closed_apple;
     input [5:0]   joy;
@@ -439,10 +441,11 @@ input[1:0]	DISK_READY;
       .virtual_event(virtual_keyboard_event),
       .virtual_pressed(virtual_keyboard_pressed),
       .virtual_code(virtual_keyboard_code),
+      .virtual_control(virtual_control),
       .virtual_open_apple(virtual_open_apple),
       .virtual_closed_apple(virtual_closed_apple),
         .CLK_14M(CLK_14M),
-        .reset(reset),
+        .reset(reset_cold),
         .reads(read_key),
         .K(K),
       .akd(akd),

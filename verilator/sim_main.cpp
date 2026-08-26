@@ -93,6 +93,7 @@ bool ntsc_vertical_comb = true;
 int pixel_clock_mode = 0;
 bool virtual_keyboard_enabled = true;
 int virtual_keyboard_visibility = 0;
+bool virtual_keyboard_enabled_toggle_d = false;
 
 // Verilog module
 // --------------
@@ -150,6 +151,7 @@ SimAudio audio(clk_sys_freq, false);
 void resetSim() {
 	main_time = 0;
 	top->reset = 1;
+	virtual_keyboard_enabled_toggle_d = false;
 	clk_sys.Reset();
 }
 
@@ -235,6 +237,11 @@ int verilate() {
 				bus.BeforeEval();
 			}
 			top->eval();
+			if (top->virtual_keyboard_enabled_toggle && !virtual_keyboard_enabled_toggle_d) {
+				virtual_keyboard_enabled = !virtual_keyboard_enabled;
+				top->virtual_keyboard_enabled = virtual_keyboard_enabled;
+			}
+			virtual_keyboard_enabled_toggle_d = top->virtual_keyboard_enabled_toggle;
 			if (clk_sys.clk) { bus.AfterEval(); blockdevice.AfterEval(); }
 		}
 
@@ -320,6 +327,7 @@ int main(int argc, char** argv, char** env) {
 		else if (argument == "--hdd") hddPath = argv[argIndex];
 		else palettePath = argv[argIndex];
 	}
+	if (smokeTest) virtual_keyboard_enabled = false;
 	if (!palettePath.empty()) {
 		ifstream paletteFile(palettePath, ios::binary);
 		if (!paletteFile) {

@@ -1,5 +1,4 @@
 module virtual_keyboard_controller #(
-	parameter integer CONFIRM_CYCLES = 10738635,
 	parameter integer RESET_CYCLES = 1024,
 	parameter integer BUTTON_HOLD_CYCLES = 65536
 ) (
@@ -18,6 +17,7 @@ module virtual_keyboard_controller #(
 	output reg         caps_latched = 1,
 	output wire        shift_active,
 	output wire        control_active,
+	output reg         enabled_toggle = 0,
 	output reg         open_apple = 0,
 	output reg         closed_apple = 0,
 	output reg         transparency_cycle = 0,
@@ -47,7 +47,6 @@ localparam [2:0] CMD_WARM = 1;
 localparam [2:0] CMD_COLD = 2;
 localparam [2:0] CMD_TEST = 3;
 
-localparam integer CONFIRM_BITS = $clog2(CONFIRM_CYCLES + 1);
 localparam integer RESET_BITS = $clog2(RESET_CYCLES + 1);
 localparam integer HOLD_BITS = $clog2(BUTTON_HOLD_CYCLES + 1);
 localparam [RESET_BITS-1:0] RESET_COUNT_VALUE = RESET_CYCLES[RESET_BITS-1:0];
@@ -56,11 +55,11 @@ localparam [HOLD_BITS-1:0] HOLD_COUNT_VALUE = BUTTON_HOLD_CYCLES[HOLD_BITS-1:0];
 reg raw_toggle = 0;
 reg enter_down = 0;
 reg virtual_key_down = 0;
-reg [CONFIRM_BITS-1:0] confirm_counter = 0;
 reg [RESET_BITS-1:0] reset_counter = 0;
 reg [HOLD_BITS-1:0] hold_counter = 0;
 reg [2:0] command = CMD_NONE;
 reg [6:0] joystick_d = 0;
+reg enabled_d = 0;
 reg physical_left_shift = 0;
 reg physical_right_shift = 0;
 reg physical_control = 0;
@@ -83,6 +82,62 @@ function automatic [3:0] row_last_col(input [2:0] row);
 		3: row_last_col = 12;
 		default: row_last_col = 8;
 	endcase
+endfunction
+
+function automatic [3:0] row_accel_right_col(input [2:0] row);
+	case(row)
+		0: row_accel_right_col = 13;
+		1, 2: row_accel_right_col = 13;
+		3: row_accel_right_col = 12;
+		default: row_accel_right_col = 7;
+	endcase
+endfunction
+
+function automatic [3:0] row_accel_down_col(input [2:0] row, input [3:0] col);
+	begin
+		case(row)
+			0: begin
+				if(col <= 1) row_accel_down_col = 0;
+				else if(col == 2) row_accel_down_col = 1;
+				else if(col <= 8) row_accel_down_col = 2;
+				else if(col == 9) row_accel_down_col = 3;
+				else if(col == 10) row_accel_down_col = 4;
+				else if(col == 11) row_accel_down_col = 5;
+				else if(col == 12) row_accel_down_col = 6;
+				else row_accel_down_col = 7;
+			end
+			1: begin
+				if(col <= 1) row_accel_down_col = 0;
+				else if(col == 2) row_accel_down_col = 1;
+				else if(col <= 7) row_accel_down_col = 2;
+				else if(col <= 9) row_accel_down_col = 3;
+				else if(col == 10) row_accel_down_col = 4;
+				else if(col == 11) row_accel_down_col = 5;
+				else if(col == 12) row_accel_down_col = 6;
+				else row_accel_down_col = 7;
+			end
+			2: begin
+				if(col == 0) row_accel_down_col = 0;
+				else if(col <= 2) row_accel_down_col = 1;
+				else if(col <= 7) row_accel_down_col = 2;
+				else if(col == 8) row_accel_down_col = 3;
+				else if(col <= 10) row_accel_down_col = 4;
+				else if(col == 11) row_accel_down_col = 5;
+				else if(col == 12) row_accel_down_col = 6;
+				else row_accel_down_col = 7;
+			end
+			3: begin
+				if(col == 0) row_accel_down_col = 0;
+				else if(col <= 2) row_accel_down_col = 1;
+				else if(col <= 7) row_accel_down_col = 2;
+				else if(col <= 9) row_accel_down_col = 3;
+				else if(col == 10) row_accel_down_col = 4;
+				else if(col == 11) row_accel_down_col = 5;
+				else row_accel_down_col = 7;
+			end
+			default: row_accel_down_col = col > 7 ? 7 : col;
+		endcase
+	end
 endfunction
 
 function automatic [7:0] normal_code(input [2:0] row, input [3:0] col);
@@ -192,7 +247,19 @@ task automatic close_overlay;
 		open_apple <= 0;
 		closed_apple <= 0;
 		enter_down <= 0;
-		confirm_counter <= 0;
+	end
+endtask
+
+task automatic open_overlay;
+	begin
+		active <= 1;
+		commands_page <= 0;
+		selected_row <= 1;
+		selected_col <= 1;
+		shift_latched <= 0;
+		control_latched <= 0;
+		open_apple <= 0;
+		closed_apple <= 0;
 	end
 endtask
 
@@ -203,6 +270,8 @@ task automatic activate_selected_key;
 		if(selected_row == 0 && selected_col == 14) begin
 			commands_page <= 1;
 			selected_col <= 0;
+		end else if(selected_row == 2 && selected_col == 13) begin
+			overlay_top <= ~overlay_top;
 		end else if(selected_row == 2 && selected_col == 0) begin
 			control_latched <= ~control_latched;
 		end else if(selected_row == 3 && (selected_col == 0 || selected_col == 12)) begin
@@ -233,9 +302,22 @@ task automatic activate_selected_key;
 	end
 endtask
 
+task automatic start_selected_command;
+	begin
+		command <= selected_col[2:0];
+		reset_counter <= RESET_COUNT_VALUE;
+		hold_counter <= HOLD_COUNT_VALUE;
+		control_latched <= selected_col != CMD_WARM;
+		open_apple <= selected_col == CMD_COLD;
+		closed_apple <= selected_col == CMD_TEST;
+		enter_down <= 0;
+	end
+endtask
+
 always @(posedge clk) begin
 	command_reset <= 0;
 	transparency_cycle <= 0;
+	enabled_toggle <= 0;
 
 	if(reset) begin
 		raw_toggle <= ps2_key[10];
@@ -247,6 +329,7 @@ always @(posedge clk) begin
 		shift_latched <= 0;
 		control_latched <= 0;
 		caps_latched <= 1;
+		enabled_toggle <= 0;
 		open_apple <= 0;
 		closed_apple <= 0;
 		overlay_top <= 0;
@@ -255,16 +338,17 @@ always @(posedge clk) begin
 		virtual_code <= 0;
 		virtual_key_down <= 0;
 		enter_down <= 0;
-		confirm_counter <= 0;
 		reset_counter <= 0;
 		hold_counter <= 0;
 		command <= CMD_NONE;
 		joystick_d <= joystick;
+		enabled_d <= 0;
 		physical_left_shift <= 0;
 		physical_right_shift <= 0;
 		physical_control <= 0;
 	end else begin
 		joystick_d <= joystick;
+		enabled_d <= enabled;
 		if(new_event) begin
 			raw_toggle <= ps2_key[10];
 			if(!extended && scan_code == SC_LEFT_SHIFT)
@@ -285,21 +369,15 @@ always @(posedge clk) begin
 			end else begin
 				command <= CMD_NONE;
 				close_overlay();
+				if(enabled) enabled_toggle <= 1;
 			end
 		end else if(!enabled && active) begin
 			close_overlay();
-		end else if(enabled && joystick_pressed[6]) begin
+		end else if(enabled && !enabled_d) begin
+			open_overlay();
+		end else if(joystick_pressed[6]) begin
 			if(active) close_overlay();
-			else begin
-				active <= 1;
-				commands_page <= 0;
-				selected_row <= 1;
-				selected_col <= 1;
-				shift_latched <= 0;
-				control_latched <= 0;
-				open_apple <= 0;
-				closed_apple <= 0;
-			end
+			else if(enabled) open_overlay();
 		end else if(active && commands_page && joystick_pressed[1] && selected_col != 0) begin
 			selected_col <= selected_col - 1'd1;
 		end else if(active && commands_page && joystick_pressed[0] && selected_col != 3) begin
@@ -307,12 +385,12 @@ always @(posedge clk) begin
 		end else if(active && !commands_page && joystick[5] && joystick_pressed[1]) begin
 			selected_col <= 0;
 		end else if(active && !commands_page && joystick[5] && joystick_pressed[0]) begin
-			selected_col <= row_last_col(selected_row);
+			selected_col <= row_accel_right_col(selected_row);
 		end else if(active && !commands_page && joystick[5] && joystick_pressed[3]) begin
 			selected_row <= 0;
 		end else if(active && !commands_page && joystick[5] && joystick_pressed[2]) begin
 			selected_row <= 4;
-			if(selected_col > row_last_col(4)) selected_col <= row_last_col(4);
+			selected_col <= row_accel_down_col(selected_row, selected_col);
 		end else if(active && !commands_page && joystick_pressed[1] && selected_col != 0) begin
 			selected_col <= selected_col - 1'd1;
 		end else if(active && !commands_page && joystick_pressed[0] && selected_row == 1 && selected_col == 13) begin
@@ -323,12 +401,11 @@ always @(posedge clk) begin
 			selected_col <= 13;
 		end else if(active && !commands_page && joystick_pressed[0] && selected_col < row_last_col(selected_row)) begin
 			selected_col <= selected_col + 1'd1;
-		end else if(active && !commands_page && selected_row == 2 && selected_col == 13 && joystick_pressed[3]) begin
-			overlay_top <= 1;
-		end else if(active && !commands_page && selected_row == 2 && selected_col == 13 && joystick_pressed[2]) begin
-			overlay_top <= 0;
+		end else if(active && !commands_page && joystick_pressed[3] && selected_row == 2 && selected_col == 13) begin
+			selected_row <= 0;
+			selected_col <= 14;
 		end else if(active && !commands_page && joystick_pressed[3] && selected_row == 4 && selected_col == 8) begin
-			selected_row <= 1;
+			selected_row <= 2;
 			selected_col <= 13;
 		end else if(active && !commands_page && joystick_pressed[3] && selected_row == 4 && selected_col == 2) begin
 			selected_row <= 3;
@@ -365,44 +442,38 @@ always @(posedge clk) begin
 			selected_row <= 4;
 			selected_col <= 2;
 		end else if(active && !commands_page && joystick_pressed[2] && selected_row == 0 && selected_col == 14) begin
-			selected_row <= 1;
+			selected_row <= 2;
 			selected_col <= 13;
+		end else if(active && !commands_page && joystick_pressed[2] && selected_row == 2 && selected_col == 13) begin
+			selected_row <= 4;
+			selected_col <= 8;
 		end else if(active && !commands_page && joystick_pressed[2] && selected_row != 4) begin
 			selected_row <= selected_row + 1'd1;
 			if(selected_col > row_last_col(selected_row + 1'd1)) selected_col <= row_last_col(selected_row + 1'd1);
 		end else if(active && joystick_pressed[4]) begin
-			enter_down <= 1;
-			confirm_counter <= 0;
 			if(commands_page) begin
 				if(selected_col == 0) begin
 					commands_page <= 0;
 					selected_row <= 0;
 					selected_col <= 14;
-				end
+				end else start_selected_command();
 			end else begin
+				enter_down <= 1;
 				activate_selected_key();
 			end
 		end else if(active && joystick_fire_released) begin
 			enter_down <= 0;
-			confirm_counter <= 0;
 			release_virtual_key();
 		end else if(new_event) begin
 			if(!active) begin
-				if(enabled && key_down && !extended && scan_code == SC_F10) begin
-					active <= 1;
-					commands_page <= 0;
-					selected_row <= 1;
-					selected_col <= 1;
-					shift_latched <= 0;
-					control_latched <= 0;
-					open_apple <= 0;
-					closed_apple <= 0;
+				if(key_down && !extended && scan_code == SC_F10) begin
+					enabled_toggle <= 1;
 				end else begin
 					filtered_ps2_key[10] <= ~filtered_ps2_key[10];
 					filtered_ps2_key[9:0] <= ps2_key[9:0];
 				end
 			end else if(key_down && !extended && (scan_code == SC_F10 || scan_code == SC_ESC)) begin
-				close_overlay();
+				enabled_toggle <= 1;
 			end else if(key_down && extended && scan_code == SC_PAGE_UP) begin
 				overlay_top <= 1;
 			end else if(key_down && extended && scan_code == SC_PAGE_DOWN) begin
@@ -413,16 +484,13 @@ always @(posedge clk) begin
 				else if(key_down && extended && scan_code == SC_RIGHT && selected_col != 3)
 					selected_col <= selected_col + 1'd1;
 				else if(key_down && !extended && scan_code == SC_ENTER) begin
-					enter_down <= 1;
-					confirm_counter <= 0;
 					if(selected_col == 0) begin
 						commands_page <= 0;
 						selected_row <= 0;
 						selected_col <= 14;
-					end
+					end else start_selected_command();
 				end else if(!key_down && !extended && scan_code == SC_ENTER) begin
 					enter_down <= 0;
-					confirm_counter <= 0;
 				end
 			end else begin
 				if(key_down && extended && scan_code == SC_LEFT && selected_col != 0)
@@ -437,12 +505,11 @@ always @(posedge clk) begin
 				end
 				else if(key_down && extended && scan_code == SC_RIGHT && selected_col < row_last_col(selected_row))
 					selected_col <= selected_col + 1'd1;
-				else if(key_down && extended && scan_code == SC_UP && selected_row == 2 && selected_col == 13)
-					overlay_top <= 1;
-				else if(key_down && extended && scan_code == SC_DOWN && selected_row == 2 && selected_col == 13)
-					overlay_top <= 0;
-				else if(key_down && extended && scan_code == SC_UP && selected_row == 4 && selected_col == 8) begin
-					selected_row <= 1;
+				else if(key_down && extended && scan_code == SC_UP && selected_row == 2 && selected_col == 13) begin
+					selected_row <= 0;
+					selected_col <= 14;
+				end else if(key_down && extended && scan_code == SC_UP && selected_row == 4 && selected_col == 8) begin
+					selected_row <= 2;
 					selected_col <= 13;
 				end else if(key_down && extended && scan_code == SC_UP && selected_row == 4 && selected_col == 2) begin
 					selected_row <= 3;
@@ -480,8 +547,11 @@ always @(posedge clk) begin
 					selected_row <= 4;
 					selected_col <= 2;
 				end else if(key_down && extended && scan_code == SC_DOWN && selected_row == 0 && selected_col == 14) begin
-					selected_row <= 1;
+					selected_row <= 2;
 					selected_col <= 13;
+				end else if(key_down && extended && scan_code == SC_DOWN && selected_row == 2 && selected_col == 13) begin
+					selected_row <= 4;
+					selected_col <= 8;
 				end else if(key_down && extended && scan_code == SC_DOWN && selected_row != 4) begin
 					selected_row <= selected_row + 1'd1;
 					if(selected_col > row_last_col(selected_row + 1'd1)) selected_col <= row_last_col(selected_row + 1'd1);
@@ -492,19 +562,6 @@ always @(posedge clk) begin
 					enter_down <= 0;
 					release_virtual_key();
 				end
-			end
-		end
-
-		if(commands_page && enter_down && selected_col != 0) begin
-			if(confirm_counter == CONFIRM_CYCLES - 1) begin
-				command <= selected_col[2:0];
-				reset_counter <= RESET_COUNT_VALUE;
-				hold_counter <= HOLD_COUNT_VALUE;
-				open_apple <= selected_col == CMD_COLD;
-				closed_apple <= selected_col == CMD_TEST;
-				enter_down <= 0;
-			end else begin
-				confirm_counter <= confirm_counter + 1'd1;
 			end
 		end
 	end

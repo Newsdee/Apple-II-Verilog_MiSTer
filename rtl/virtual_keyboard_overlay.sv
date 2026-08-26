@@ -40,6 +40,18 @@ localparam [23:0] INACTIVE_TEXT_COLOR = 24'h8F8C84;
 localparam [23:0] ON_HOUSING_COLOR = 24'h656864;
 localparam [23:0] ON_LIGHT_COLOR = 24'hA8D89A;
 localparam [23:0] ON_BORDER_COLOR = 24'h20211F;
+localparam [23:0] SELECT_SHADOW_COLOR = 24'h3B5148;
+localparam [23:0] LATCH_SHADOW_COLOR = 24'h66522F;
+localparam [23:0] BADGE_BEVEL_COLOR = 24'h5B5D57;
+localparam [23:0] BADGE_INNER_BEVEL_COLOR = 24'h484A45;
+localparam [23:0] BADGE_INNER_SHADOW_COLOR = 24'h292A27;
+localparam [23:0] BADGE_SHADOW_COLOR = 24'h161715;
+localparam [23:0] BADGE_GREEN = 24'h63C65A;
+localparam [23:0] BADGE_YELLOW = 24'hF2C84B;
+localparam [23:0] BADGE_ORANGE = 24'hF28B3C;
+localparam [23:0] BADGE_RED = 24'hE9564F;
+localparam [23:0] BADGE_PURPLE = 24'hA64D9B;
+localparam [23:0] BADGE_BLUE = 24'h3D91C9;
 
 reg [9:0] video_x = 0;
 reg [8:0] video_y = 0;
@@ -55,9 +67,14 @@ integer text_slot;
 integer glyph_column;
 integer glyph_y;
 integer panel_y;
+integer badge_x;
+integer badge_y;
 integer pixel_row;
 integer pixel_col;
 reg key_pixel;
+reg key_shadow_pixel;
+reg badge_pixel;
+reg [23:0] badge_color;
 reg panel_pixel;
 reg border_pixel;
 reg well_pixel;
@@ -166,7 +183,7 @@ endfunction
 
 function automatic integer label_length(input integer row, input integer col, input commands);
 	begin
-		if(commands) label_length = 4;
+		if(commands && row == 0 && col <= 3) label_length = 4;
 		else if(row == 0 && (col == 0 || col == 13 || col == 14)) label_length = 3;
 		else if(row == 1 && col == 0) label_length = 2;
 		else if(row == 1 && col == 13) label_length = 1;
@@ -189,7 +206,7 @@ function automatic [7:0] label_character(
 );
 	begin
 		label_character = shown_character(row, col, shift_latched, caps_latched);
-		if(commands) begin
+		if(commands && row == 0 && col <= 3) begin
 			case(col)
 				0: case(slot) 0: label_character="B"; 1: label_character="A"; 2: label_character="C"; default: label_character="K"; endcase
 				1: case(slot) 0: label_character="W"; 1: label_character="A"; 2: label_character="R"; default: label_character="M"; endcase
@@ -243,6 +260,31 @@ function automatic diamond_pixel(
 			(y == 3 && (x == 1 || x == 5)) ||
 			(y == 4 && (x == 2 || x == 4)) ||
 			(y == 5 && x == 3);
+	end
+endfunction
+
+function automatic [9:0] badge_logo_row(input integer row);
+	begin
+		case(row)
+			0: badge_logo_row = 10'b0011110000;
+			1: badge_logo_row = 10'b0111111100;
+			2: badge_logo_row = 10'b1111111110;
+			3: badge_logo_row = 10'b1111110000;
+			4: badge_logo_row = 10'b1111111000;
+			5: badge_logo_row = 10'b1111111110;
+			6: badge_logo_row = 10'b0111111110;
+			7: badge_logo_row = 10'b0011111100;
+			8: badge_logo_row = 10'b0001111000;
+			default: badge_logo_row = 0;
+		endcase
+	end
+endfunction
+
+function automatic badge_logo_pixel(input integer x, input integer y);
+	reg [9:0] row_bits;
+	begin
+		row_bits = badge_logo_row(y);
+		badge_logo_pixel = x >= 0 && x < 10 && y >= 0 && y < 9 && row_bits[9-x];
 	end
 endfunction
 
@@ -307,6 +349,9 @@ end
 
 always @(*) begin
 	key_pixel = 0;
+	key_shadow_pixel = 0;
+	badge_pixel = 0;
+	badge_color = KEY_COLOR;
 	panel_pixel = 0;
 	border_pixel = 0;
 	well_pixel = 0;
@@ -335,6 +380,8 @@ always @(*) begin
 	text_slot = 0;
 	glyph_column = 0;
 	glyph_y = 0;
+	badge_x = 0;
+	badge_y = 0;
 	panel_y = overlay_top ? 0 : PANEL_Y;
 
 	if(active && !hblank && !vblank &&
@@ -349,100 +396,146 @@ always @(*) begin
 		border_pixel = panel_pixel &&
 			(video_y == panel_y + 1 || video_y == panel_y + 96 ||
 			 video_x == PANEL_X + 1 || video_x == PANEL_X + 550);
-		well_pixel = panel_pixel && video_x >= PANEL_X + 6 && video_x < PANEL_X + 479 &&
+		well_pixel = panel_pixel && video_x >= PANEL_X + 11 && video_x < PANEL_X + 487 &&
 			video_y >= panel_y + 6 && video_y < panel_y + 90;
 		separator_pixel = well_pixel && (video_y == panel_y + 22 || video_y == panel_y + 39 ||
 			video_y == panel_y + 56 || video_y == panel_y + 73);
+		if(video_x >= PANEL_X + 499 && video_x < PANEL_X + 539 &&
+			video_y >= panel_y + 75 && video_y < panel_y + 89) begin
+			badge_x = (video_x - PANEL_X - 499) >> 1;
+			badge_y = video_y - panel_y - 75;
+			badge_pixel = !((badge_y == 0 && (badge_x == 0 || badge_x == 19)) ||
+				(badge_x == 0 && badge_y == 13));
+			if(badge_y == 0 || badge_x == 0)
+				badge_color = ON_BORDER_COLOR;
+			else if(badge_y == 1 || badge_x == 1)
+				badge_color = BADGE_INNER_SHADOW_COLOR;
+			else if(badge_y == 13 || badge_x == 19)
+				badge_color = BADGE_BEVEL_COLOR;
+			else if(badge_y == 12 || badge_x == 18)
+				badge_color = BADGE_INNER_BEVEL_COLOR;
+			else
+				badge_color = KEY_COLOR;
+			if(badge_logo_pixel(badge_x - 6, badge_y - 4))
+				badge_color = BADGE_SHADOW_COLOR;
+			if(badge_logo_pixel(badge_x - 5, badge_y - 3)) begin
+				case(badge_y - 3)
+					0, 1: badge_color = BADGE_GREEN;
+					2: badge_color = BADGE_YELLOW;
+					3: badge_color = BADGE_ORANGE;
+					4, 5: badge_color = BADGE_RED;
+					6: badge_color = BADGE_PURPLE;
+					default: badge_color = BADGE_BLUE;
+				endcase
+			end
+			if((badge_y == 1 && (badge_x == 11 || badge_x == 12)) ||
+				(badge_y == 2 && badge_x == 11))
+				badge_color = BADGE_GREEN;
+		end
 		if(commands_page) begin
-			if(video_y >= panel_y + 32 && video_y < panel_y + 58) begin
-				pixel_col = (video_x - (PANEL_X + 16)) >> 7;
-				key_left = PANEL_X + 16 + (pixel_col << 7);
-				key_top = panel_y + 32;
-				key_width = 120;
-				key_height = 26;
-				key_pixel = pixel_col < 4 && video_x >= key_left && video_x < key_left + key_width;
-				selected_pixel = pixel_col == selected_col;
+			if(video_y >= panel_y + 24 && video_y < panel_y + 55 &&
+				video_x >= PANEL_X + 14 && video_x < PANEL_X + 482) begin
+				pixel_row = 0;
+				pixel_col = (video_x - PANEL_X - 14) / 118;
+				key_left = PANEL_X + 14 + pixel_col * 118;
+				key_top = panel_y + 24;
+				key_width = 114;
+				key_height = 31;
+				key_pixel = pixel_col < 4 && video_x < key_left + key_width;
+				selected_pixel = key_pixel && pixel_col == selected_col;
+			end else if(video_x >= PANEL_X + 499 && video_x < PANEL_X + 539 &&
+				video_y >= panel_y + 7 && video_y < panel_y + 21) begin
+				pixel_row = 0; pixel_col = 14; key_left = PANEL_X + 499;
+				key_top = panel_y + 7; key_width = 40; key_height = 14; key_pixel = 1;
+			end else if(video_x >= PANEL_X + 499 && video_x < PANEL_X + 539 &&
+				video_y >= panel_y + 24 && video_y < panel_y + 38) begin
+				pixel_row = 2; pixel_col = 13; key_left = PANEL_X + 499;
+				key_top = panel_y + 24; key_width = 40; key_height = 14; key_pixel = 1;
+			end else if(video_x >= PANEL_X + 499 && video_x < PANEL_X + 539 &&
+				video_y >= panel_y + 41 && video_y < panel_y + 55) begin
+				pixel_row = 4; pixel_col = 8; key_left = PANEL_X + 499;
+				key_top = panel_y + 41; key_width = 40; key_height = 14; key_pixel = 1;
 			end
 		end else if(video_y >= panel_y + 7 && video_y < panel_y + 89) begin
 			key_height = 14;
 			if(video_y >= panel_y + 24 && video_y < panel_y + 55 &&
-				((video_y < panel_y + 39 && video_x >= PANEL_X + 441 && video_x < PANEL_X + 479) ||
-				 (video_y >= panel_y + 39 && video_x >= PANEL_X + 455 && video_x < PANEL_X + 479))) begin
-				pixel_row = 1; pixel_col = 13; key_left = PANEL_X + 441;
+				((video_y < panel_y + 38 && video_x >= PANEL_X + 446 && video_x < PANEL_X + 484) ||
+				 (video_y >= panel_y + 38 && video_x >= PANEL_X + 460 && video_x < PANEL_X + 484))) begin
+				pixel_row = 1; pixel_col = 13; key_left = PANEL_X + 446;
 				key_top = panel_y + 24; key_width = 38; key_height = 31; key_pixel = 1;
 			end else if(video_y < panel_y + 21) begin
 				pixel_row = 0; key_top = panel_y + 7;
-				if(video_x >= PANEL_X + 9 && video_x < PANEL_X + 47) begin
-					pixel_col = 0; key_left = PANEL_X + 9; key_width = 38; key_pixel = 1;
-				end else if(video_x >= PANEL_X + 49 && video_x < PANEL_X + 431) begin
-					pixel_col = 1 + ((video_x - PANEL_X - 49) >> 5);
-					key_left = PANEL_X + 49 + ((pixel_col - 1) << 5);
+				if(video_x >= PANEL_X + 14 && video_x < PANEL_X + 52) begin
+					pixel_col = 0; key_left = PANEL_X + 14; key_width = 38; key_pixel = 1;
+				end else if(video_x >= PANEL_X + 54 && video_x < PANEL_X + 436) begin
+					pixel_col = 1 + ((video_x - PANEL_X - 54) >> 5);
+					key_left = PANEL_X + 54 + ((pixel_col - 1) << 5);
 					key_width = 30; key_pixel = video_x < key_left + key_width;
-				end else if(video_x >= PANEL_X + 433 && video_x < PANEL_X + 479) begin
-					pixel_col = 13; key_left = PANEL_X + 433; key_width = 46; key_pixel = 1;
-				end else if(video_x >= PANEL_X + 504 && video_x < PANEL_X + 544) begin
-					pixel_col = 14; key_left = PANEL_X + 504; key_width = 40; key_pixel = 1;
+				end else if(video_x >= PANEL_X + 438 && video_x < PANEL_X + 484) begin
+					pixel_col = 13; key_left = PANEL_X + 438; key_width = 46; key_pixel = 1;
+				end else if(video_x >= PANEL_X + 499 && video_x < PANEL_X + 539) begin
+					pixel_col = 14; key_left = PANEL_X + 499; key_width = 40; key_pixel = 1;
 				end
 			end else if(video_y >= panel_y + 24 && video_y < panel_y + 38) begin
 				pixel_row = 1; key_top = panel_y + 24;
-				if(video_x >= PANEL_X + 9 && video_x < PANEL_X + 55) begin
-					pixel_col = 0; key_left = PANEL_X + 9; key_width = 46; key_pixel = 1;
-				end else if(video_x >= PANEL_X + 57 && video_x < PANEL_X + 439) begin
-					pixel_col = 1 + ((video_x - PANEL_X - 57) >> 5);
-					key_left = PANEL_X + 57 + ((pixel_col - 1) << 5);
+				if(video_x >= PANEL_X + 14 && video_x < PANEL_X + 60) begin
+					pixel_col = 0; key_left = PANEL_X + 14; key_width = 46; key_pixel = 1;
+				end else if(video_x >= PANEL_X + 62 && video_x < PANEL_X + 444) begin
+					pixel_col = 1 + ((video_x - PANEL_X - 62) >> 5);
+					key_left = PANEL_X + 62 + ((pixel_col - 1) << 5);
 					key_width = 30; key_pixel = video_x < key_left + 30;
+				end else if(video_x >= PANEL_X + 499 && video_x < PANEL_X + 539) begin
+					pixel_row = 2; pixel_col = 13; key_left = PANEL_X + 499; key_width = 40; key_pixel = 1;
 				end
 			end else if(video_y >= panel_y + 41 && video_y < panel_y + 55) begin
 				pixel_row = 2; key_top = panel_y + 41;
-				if(video_x >= PANEL_X + 9 && video_x < PANEL_X + 69) begin
-					pixel_col = 0; key_left = PANEL_X + 9; key_width = 60; key_pixel = 1;
-				end else if(video_x >= PANEL_X + 71 && video_x < PANEL_X + 453) begin
-					pixel_col = 1 + ((video_x - PANEL_X - 71) >> 5);
-					key_left = PANEL_X + 71 + ((pixel_col - 1) << 5);
+				if(video_x >= PANEL_X + 14 && video_x < PANEL_X + 74) begin
+					pixel_col = 0; key_left = PANEL_X + 14; key_width = 60; key_pixel = 1;
+				end else if(video_x >= PANEL_X + 76 && video_x < PANEL_X + 458) begin
+					pixel_col = 1 + ((video_x - PANEL_X - 76) >> 5);
+					key_left = PANEL_X + 76 + ((pixel_col - 1) << 5);
 					key_width = 30; key_pixel = video_x < key_left + 30;
-				end else if(video_x >= PANEL_X + 504 && video_x < PANEL_X + 544) begin
-					pixel_col = 13; key_left = PANEL_X + 504; key_width = 40; key_pixel = 1;
+				end else if(video_x >= PANEL_X + 499 && video_x < PANEL_X + 539) begin
+					pixel_row = 4; pixel_col = 8; key_left = PANEL_X + 499; key_width = 40; key_pixel = 1;
 				end
 			end else if(video_y >= panel_y + 58 && video_y < panel_y + 72) begin
 				pixel_row = 3; key_top = panel_y + 58;
-				if(video_x >= PANEL_X + 9 && video_x < PANEL_X + 53) begin
-					pixel_col = 0; key_left = PANEL_X + 9; key_width = 44; key_pixel = 1;
-				end else if(video_x >= PANEL_X + 54 && video_x < PANEL_X + 404) begin
-					pixel_col = 1 + ((video_x - PANEL_X - 54) >> 5);
-					key_left = PANEL_X + 54 + ((pixel_col - 1) << 5);
+				if(video_x >= PANEL_X + 14 && video_x < PANEL_X + 57) begin
+					pixel_col = 0; key_left = PANEL_X + 14; key_width = 43; key_pixel = 1;
+				end else if(video_x >= PANEL_X + 59 && video_x < PANEL_X + 409) begin
+					pixel_col = 1 + ((video_x - PANEL_X - 59) >> 5);
+					key_left = PANEL_X + 59 + ((pixel_col - 1) << 5);
 					key_width = 30; key_pixel = video_x < key_left + 30;
-				end else if(video_x >= PANEL_X + 406 && video_x < PANEL_X + 479) begin
-					pixel_col = 12; key_left = PANEL_X + 406; key_width = 73; key_pixel = 1;
+				end else if(video_x >= PANEL_X + 411 && video_x < PANEL_X + 484) begin
+					pixel_col = 12; key_left = PANEL_X + 411; key_width = 73; key_pixel = 1;
 				end
 			end else if(video_y >= panel_y + 75 && video_y < panel_y + 89) begin
 				pixel_row = 4; key_top = panel_y + 75;
-				on_light_pixel = video_x >= PANEL_X + 59 && video_x < PANEL_X + 89 &&
+				on_light_pixel = video_x >= PANEL_X + 64 && video_x < PANEL_X + 94 &&
 					video_y >= key_top && video_y < key_top + 14 &&
-					!((video_x == PANEL_X + 59 || video_x == PANEL_X + 88) &&
+					!((video_x == PANEL_X + 64 || video_x == PANEL_X + 93) &&
 					  (video_y == key_top || video_y == key_top + 13));
 				on_light_border_pixel = on_light_pixel &&
-					(video_x == PANEL_X + 59 || video_x == PANEL_X + 88 ||
+					(video_x == PANEL_X + 64 || video_x == PANEL_X + 93 ||
 					 video_y == key_top || video_y == key_top + 13);
-				on_light_lit_pixel = video_x >= PANEL_X + 69 && video_x < PANEL_X + 79 &&
+				on_light_lit_pixel = video_x >= PANEL_X + 74 && video_x < PANEL_X + 84 &&
 					video_y >= key_top + 4 && video_y < key_top + 10;
-				if(video_x >= PANEL_X + 9 && video_x < PANEL_X + 57) begin
-					pixel_col=0; key_left=PANEL_X+9; key_width=48; key_pixel=1;
-				end else if(video_x >= PANEL_X + 91 && video_x < PANEL_X + 121) begin
-					pixel_col=1; key_left=PANEL_X+91; key_width=30; key_pixel=1;
-				end else if(video_x >= PANEL_X + 123 && video_x < PANEL_X + 313) begin
-					pixel_col=2; key_left=PANEL_X+123; key_width=190; key_pixel=1;
-				end else if(video_x >= PANEL_X + 315 && video_x < PANEL_X + 345) begin
-					pixel_col=3; key_left=PANEL_X+315; key_width=30; key_pixel=1;
-				end else if(video_x >= PANEL_X + 347 && video_x < PANEL_X + 378) begin
-					pixel_col=4; key_left=PANEL_X+347; key_width=31; key_pixel=1;
-				end else if(video_x >= PANEL_X + 380 && video_x < PANEL_X + 411) begin
-					pixel_col=5; key_left=PANEL_X+380; key_width=31; key_pixel=1;
-				end else if(video_x >= PANEL_X + 413 && video_x < PANEL_X + 444) begin
-					pixel_col=6; key_left=PANEL_X+413; key_width=31; key_pixel=1;
-				end else if(video_x >= PANEL_X + 446 && video_x < PANEL_X + 479) begin
-					pixel_col=7; key_left=PANEL_X+446; key_width=33; key_pixel=1;
-				end else if(video_x >= PANEL_X + 504 && video_x < PANEL_X + 544) begin
-					pixel_col=8; key_left=PANEL_X+504; key_width=40; key_pixel=1;
+				if(video_x >= PANEL_X + 14 && video_x < PANEL_X + 62) begin
+					pixel_col=0; key_left=PANEL_X+14; key_width=48; key_pixel=1;
+				end else if(video_x >= PANEL_X + 96 && video_x < PANEL_X + 126) begin
+					pixel_col=1; key_left=PANEL_X+96; key_width=30; key_pixel=1;
+				end else if(video_x >= PANEL_X + 128 && video_x < PANEL_X + 318) begin
+					pixel_col=2; key_left=PANEL_X+128; key_width=190; key_pixel=1;
+				end else if(video_x >= PANEL_X + 320 && video_x < PANEL_X + 350) begin
+					pixel_col=3; key_left=PANEL_X+320; key_width=30; key_pixel=1;
+				end else if(video_x >= PANEL_X + 352 && video_x < PANEL_X + 383) begin
+					pixel_col=4; key_left=PANEL_X+352; key_width=31; key_pixel=1;
+				end else if(video_x >= PANEL_X + 385 && video_x < PANEL_X + 416) begin
+					pixel_col=5; key_left=PANEL_X+385; key_width=31; key_pixel=1;
+				end else if(video_x >= PANEL_X + 418 && video_x < PANEL_X + 449) begin
+					pixel_col=6; key_left=PANEL_X+418; key_width=31; key_pixel=1;
+				end else if(video_x >= PANEL_X + 451 && video_x < PANEL_X + 484) begin
+					pixel_col=7; key_left=PANEL_X+451; key_width=33; key_pixel=1;
 				end
 			end
 			selected_pixel = pixel_row == selected_row && pixel_col == selected_col;
@@ -455,9 +548,17 @@ always @(*) begin
 		end
 
 		if(key_pixel && (commands_page || pixel_row != 1 || pixel_col != 13) &&
-			(video_x == key_left || video_x == key_left + key_width - 1) &&
-			(video_y == key_top || video_y == key_top + key_height - 1))
+			((video_y == key_top &&
+				(video_x == key_left || video_x == key_left + key_width - 1)) ||
+			 (video_y == key_top + key_height - 1 && video_x == key_left)))
 			key_pixel = 0;
+		if(key_pixel && !commands_page && pixel_row == 1 && pixel_col == 13 &&
+			((video_y == key_top &&
+				(video_x == key_left || video_x == key_left + key_width - 1)) ||
+			 (video_y == key_top + 13 && video_x == key_left)))
+			key_pixel = 0;
+		key_shadow_pixel = key_pixel && video_x == key_left + key_width - 1 &&
+			video_y == key_top + key_height - 1;
 
 		if(key_pixel) begin
 			if(!commands_page && has_symbol_pair(pixel_row, pixel_col)) begin
@@ -486,8 +587,9 @@ always @(*) begin
 					if(label_pixel) glyph_pixel = font_data[glyph_column];
 				end
 			end else begin
+				glyph_inactive = commands_page && !(pixel_row == 0 && pixel_col <= 3);
 				text_length = label_length(pixel_row, pixel_col, commands_page);
-				if(!commands_page && pixel_row == 1 && pixel_col == 13) begin
+				if(pixel_row == 1 && pixel_col == 13) begin
 					text_left = key_left + ((key_width - (text_length << 3)) >> 1);
 					if(video_y >= key_top + 3 && video_y < key_top + 11) begin
 						glyph_y = video_y - key_top - 3;
@@ -501,12 +603,12 @@ always @(*) begin
 					if(video_y >= key_top + ((key_height - 8) >> 1) &&
 						video_y < key_top + ((key_height - 8) >> 1) + 8) begin
 						glyph_y = video_y - key_top - ((key_height - 8) >> 1);
-						if(!commands_page && pixel_row == 2 && pixel_col == 13 &&
+						if(pixel_row == 2 && pixel_col == 13 &&
 							video_x >= text_left + 2 && video_x < text_left + 10) begin
 							text_slot = 0;
 							glyph_column = video_x - text_left - 2;
 							label_pixel = 1;
-						end else if(!commands_page && pixel_row == 2 && pixel_col == 13 &&
+						end else if(pixel_row == 2 && pixel_col == 13 &&
 							video_x >= text_left + 8 && video_x < text_left + 16) begin
 							text_slot = 1;
 							glyph_column = video_x - text_left - 8;
@@ -528,12 +630,12 @@ always @(*) begin
 					font_character = requested_character[6:0];
 					font_row = glyph_y[2:0];
 					font_lowercase = requested_character >= 8'h60;
-					font_alternate = !commands_page &&
+					font_alternate = !(commands_page && pixel_row == 0 && pixel_col <= 3) &&
 						((pixel_row == 1 && (pixel_col == 0 || pixel_col == 13)) ||
 						 (pixel_row == 2 && pixel_col == 13) ||
 						 (pixel_row == 3 && pixel_col == 0) ||
 						 (pixel_row == 4 && ((pixel_col >= 1 && pixel_col <= 7) && pixel_col != 2)));
-					if(!commands_page && pixel_row == 4 && pixel_col == 8 && label_pixel)
+					if(pixel_row == 4 && pixel_col == 8 && label_pixel)
 						glyph_pixel = diamond_pixel(glyph_column, glyph_y);
 					else if(label_pixel)
 						glyph_pixel = font_alternate ? !font_data[glyph_column] : font_data[glyph_column];
@@ -547,6 +649,8 @@ always @(*) begin
 		rgb_out = blend_color(rgb_in, border_pixel ? BORDER_COLOR : PANEL_COLOR, transparency);
 		if(well_pixel)
 			rgb_out = blend_color(rgb_in, separator_pixel ? LINE_COLOR : WELL_COLOR, transparency);
+		if(badge_pixel)
+			rgb_out = blend_color(rgb_in, badge_color, transparency);
 		if(on_light_pixel) rgb_out = blend_color(rgb_in, ON_HOUSING_COLOR, transparency);
 		if(on_light_border_pixel) rgb_out = blend_color(rgb_in, ON_BORDER_COLOR, transparency);
 		if(on_light_lit_pixel) rgb_out = blend_color(rgb_in, ON_LIGHT_COLOR, transparency);
@@ -557,6 +661,14 @@ always @(*) begin
 				rgb_out = blend_color(rgb_in, LATCH_COLOR, transparency);
 			else
 				rgb_out = blend_color(rgb_in, KEY_COLOR, transparency);
+		end
+		if(key_shadow_pixel) begin
+			if(selected_pixel)
+				rgb_out = blend_color(rgb_in, SELECT_SHADOW_COLOR, transparency);
+			else if(latched_pixel)
+				rgb_out = blend_color(rgb_in, LATCH_SHADOW_COLOR, transparency);
+			else
+				rgb_out = blend_color(rgb_in, LINE_COLOR, transparency);
 		end
 		if(glyph_pixel)
 			rgb_out = blend_color(rgb_in, glyph_inactive ? INACTIVE_TEXT_COLOR : TEXT_COLOR, transparency);
