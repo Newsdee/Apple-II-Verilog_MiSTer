@@ -3,20 +3,32 @@ COSIM = n
 
 TOP = --top-module emu
 RTL = ../rtl
+OSK_DIR ?= $(RTL)
 V_INC = +incdir+$(RTL) 
 
-#V_DEFINE = +define+debug=1 +define+SIMULATION=1   -CFLAGS "-I../sim/imgui -I../sim/vinc -I../sim/ -O3"  --timescale-override 1ps/1ps -Wno-TIMESCALEMOD  \
+#V_DEFINE = +define+debug=1 +define+SIMULATION=1  --prof-exec -CFLAGS "-I../sim/imgui -I../sim/vinc -I../sim/ -O3"  --timescale-override 1ps/1ps -Wno-TIMESCALEMOD  \
 	-I../rtl \
 	-I../rtl/tv80
-V_DEFINE = +define+debug=1 +define+SIMULATION=1   -CFLAGS "-I../sim/imgui -I../sim/ -O3"  --timescale-override 1ps/1ps -Wno-TIMESCALEMOD  \
-	-I../rtl
-#V_DEFINE = +define+debug=1 +define+SIMULATION=1   -CFLAGS "-g -I../sim/imgui -I../sim/vinc -I../sim/"  --timescale-override 1ps/1ps -Wno-TIMESCALEMOD  \
+V_DEFINE = +define+debug=1 +define+SIMULATION=1  --prof-exec -CFLAGS "-I../sim/imgui -I../sim/ -O3 -march=native -mtune=native"  --timescale-override 1ps/1ps -Wno-TIMESCALEMOD  \
+	-I../rtl \
+	-I../rtl/mouse/jt6805
+#V_DEFINE = +define+debug=1 +define+SIMULATION=1  --prof-exec -CFLAGS "-g -I../sim/imgui -I../sim/vinc -I../sim/"  --timescale-override 1ps/1ps -Wno-TIMESCALEMOD  \
 	-I../rtl \
 	-I../rtl/tv80
 
 #V_DEFINE += --converge-limit 2000 -Wno-WIDTH -Wno-IMPLICIT -Wno-MODDUP -Wno-UNSIGNED -Wno-CASEINCOMPLETE -Wno-CASEX -Wno-SYMRSVDWORD -Wno-COMBDLY -Wno-INITIALDLY -Wno-BLKANDNBLK -Wno-UNOPTFLAT -Wno-SELRANGE -Wno-CMPCONST -Wno-CASEOVERLAP -Wno-PINMISSING -Wno-MULTIDRIVEN
 #V_DEFINE += --threads 8  # this slows it way down
-V_DEFINE += 
+
+# SIM_FAST=1: stub the slot peripherals (mockingboard x2, mouse x2,
+# superserial, clock card, hdd) with tie-offs for faster interactive sim.
+# Default 0 = full machine. Switching requires a clean (handled by
+# build_verilator_manual.sh).
+SIM_FAST ?= 0
+ifeq ($(SIM_FAST),1)
+V_DEFINE += +define+SIM_FAST
+endif
+
+V_DEFINE +=
 
 UNAME_S := $(shell uname -s)
 
@@ -55,6 +67,10 @@ CC_OPT = -O3
 V_SRC = \
         sim.v \
 		$(RTL)/bram.sv \
+		$(RTL)/dpram.v \
+		$(RTL)/joystick_input.sv \
+		$(RTL)/drive_status_overlay.sv \
+		$(RTL)/floppy_sound.sv \
 		$(RTL)/ramcard.v \
 		$(RTL)/rom.v \
 		$(RTL)/timing_generator.v \
@@ -68,19 +84,26 @@ V_SRC = \
 		$(RTL)/R65Cx2.sv \
 		$(RTL)/vga_controller.v  \
 		$(RTL)/apple2_font_rom.v  \
-		$(RTL)/virtual_keyboard_controller.sv  \
-		$(RTL)/virtual_keyboard_overlay.sv  \
+		$(OSK_DIR)/virtual_keyboard_controller.sv  \
+		$(OSK_DIR)/virtual_keyboard_overlay.sv  \
 		$(RTL)/mockingboard/mockingboard.v  \
 		$(RTL)/mockingboard/via6522.v  \
 		$(RTL)/mockingboard/YM2149.sv  \
 		$(RTL)/disk_ii.v  \
 		$(RTL)/drive_ii.v  \
+		$(RTL)/mouse/pia6821.v  \
+		$(RTL)/mouse/applemouse.v  \
+		$(RTL)/mouse/applemouse_rom.v  \
+		$(RTL)/mouse/applemouse_mcu_rom.v  \
+		$(RTL)/mouse/jt6805/jt6805.v  \
+		$(RTL)/mouse/jt6805/jt6805_alu.v  \
+		$(RTL)/mouse/jt6805/jt6805_ctrl.v  \
+		$(RTL)/mouse/jt6805/jt6805_regs.v  \
+		$(RTL)/mouse/jt6805/jtframe_6805mcu.v  \
 		$(RTL)/floppy_track.sv  \
 		$(RTL)/clock_card.v  \
 		$(RTL)/apple2_top.v  \
 		$(RTL)/apple2.v  \
-		$(RTL)/gfloppy.v  \
-		$(RTL)/track_loader.v  \
 		$(RTL)/keyboard.v 
 
 

@@ -8,6 +8,7 @@
 #undef WIN32
 #endif
 #include <stdio.h>
+#include <chrono>
 #include <SDL.h>
 #include <SDL_opengl.h>
 #ifdef WIN32
@@ -310,6 +311,10 @@ int main(int argc, char** argv, char** env) {
 			mountFloppy = false;
 			continue;
 		}
+		// +verilator+... plusargs pass through to Verilated::commandArgs
+		if (!argument.empty() && argument[0] == '+') {
+			continue;
+		}
 		if (argument != "--floppy" && argument != "--floppy2" && argument != "--hdd" && argument != "--palette") {
 			cerr << "Unknown argument: " << argument << endl;
 			return 2;
@@ -444,6 +449,7 @@ int main(int argc, char** argv, char** env) {
 		}
 #else
 	bool done = false;
+	const auto t_sim_start = std::chrono::steady_clock::now();
 	while (!done)
 	{
 		SDL_Event event;
@@ -737,6 +743,7 @@ fprintf(stderr,"filePath: %s\n",filePath.c_str());
 				<< " reset_triggered=" << smokeResetTriggered
 				<< " screen_mode=" << screen_mode
 				<< " palette=" << color_palette
+				<< " sim_ms=" << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t_sim_start).count()
 				<< " sharp=" << gray_seam_fix
 				<< " vertical_blend=" << ntsc_vertical_comb
 				<< " shortcuts_tested=" << smokeVideoShortcutsTested

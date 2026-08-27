@@ -511,7 +511,6 @@ input[1:0]	DISK_READY;
 `ifdef NO
     hdd hdd(
         .CLK_14M(CLK_14M),
-        .PHASE_ZERO(PHASE_ZERO),
         .IO_SELECT(IO_SELECT[7]),
         .DEVICE_SELECT(DEVICE_SELECT[7]),
         .RESET(reset),

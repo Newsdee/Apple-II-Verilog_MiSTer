@@ -139,13 +139,71 @@ wire UART_DSR;
 wire CLK_VIDEO = clk_sys;
 
 wire  [7:0] pdl  = {~paddle_0[7], paddle_0[6:0]};
-wire [15:0] joys = joystick_a0;
-wire [15:0] joya = {joys[15:8], joys[7:0]};
-wire  [5:0] joyd = joystick_0[5:0] & {2'b11, {2{~|joys[7:0]}}, {2{~|joys[15:8]}}};
+wire [15:0] joya;
+wire  [5:0] joyd;
+
+joystick_input joystick_input
+(
+	.clk(clk_sys),
+	.reset(reset | soft_reset | virtual_keyboard_reset),
+	.joystick_digital(joystick_0[15:0]),
+	.joystick_analog(joystick_a0),
+	.paddle(pdl),
+	.swap_axes(1'b0),
+	.paddle_as_x(1'b0),
+	.paddle_as_y(1'b0),
+	.x_center(3'b000),
+	.relative_mode(1'b0),
+	.joy_an(joya),
+	.joy(joyd)
+);
 
 assign AUDIO_L = {audio_l,6'b0};
 assign AUDIO_R = {audio_r,6'b0};
-wire [9:0] audio_l, audio_r;
+wire [9:0] core_audio_l, core_audio_r;
+wire [9:0] floppy_audio;
+wire [10:0] audio_l_sum = {1'b0, core_audio_l} + {1'b0, floppy_audio};
+wire [10:0] audio_r_sum = {1'b0, core_audio_r} + {1'b0, floppy_audio};
+wire [9:0] audio_l = audio_l_sum[10] ? 10'h3FF : audio_l_sum[9:0];
+wire [9:0] audio_r = audio_r_sum[10] ? 10'h3FF : audio_r_sum[9:0];
+
+floppy_sound floppy_sound
+(
+	.clk(clk_sys),
+	.reset(reset | soft_reset | virtual_keyboard_reset),
+	.enable(1'b1),
+	.gain(2'd1),
+	.drive1_motor(D1_MOTOR_ON),
+	.drive2_motor(D2_MOTOR_ON),
+	.drive1_io(D1_IO_ACTIVE),
+	.drive2_io(D2_IO_ACTIVE),
+	.drive1_step(D1_STEP_ACTIVE),
+	.drive2_step(D2_STEP_ACTIVE),
+	.drive1_track_zero_step(D1_TRACK_ZERO_STEP),
+	.drive2_track_zero_step(D2_TRACK_ZERO_STEP),
+	.sample(floppy_audio)
+);
+
+// keyboard-driven screen mode / palette cycling (same logic as newsdee Apple-II.sv)
+reg [1:0] screen_mode_int;
+reg [1:0] palette_int;
+reg video_toggle_d = 0;
+reg palette_toggle_d = 0;
+
+always @(posedge clk_sys) begin
+	if (reset) begin
+		screen_mode_int <= screen_mode;
+		palette_int     <= color_palette;
+	end
+	else begin
+		video_toggle_d   <= video_switch_core;
+		palette_toggle_d <= palette_switch_core;
+		if (video_switch_core != video_toggle_d)
+			screen_mode_int <= screen_mode_int + 2'd1;
+		if (palette_switch_core != palette_toggle_d)
+			palette_int <= palette_int + 2'd1;
+	end
+end
 
 reg ce_pix;
 always @(posedge CLK_VIDEO) begin
@@ -218,6 +276,16 @@ assign sd_lba[1] = {16'b0,hdd_sector};
 assign CE_PIXEL=ce_pix;
 wire led;
 wire hbl,vbl;
+
+// from apple2_top (keyboard-generated)
+wire soft_reset_core;
+wire video_switch_core;
+wire palette_switch_core;
+
+// Apple mouse card strobe (same logic as MiSTer Apple-II.sv)
+wire mouse_strobe = (old_stb != ps2_mouse[24]);
+reg  old_stb = 0;
+always @(posedge clk_sys) old_stb <= ps2_mouse[24];
 wire fd_write;
 wire	fd_write_disk;
 wire	fd_read_disk;
@@ -237,8 +305,13 @@ apple2_top apple2_top
 	.CPU_WAIT(cpu_wait_hdd  ),
 	.cpu_type(1'b0), // 0 6502, 1 65C02
 
+	.soft_reset(soft_reset_core),
 	.reset_cold(reset),
-	.reset_warm(soft_reset | virtual_keyboard_reset),
+	.reset_warm(soft_reset | virtual_keyboard_reset | soft_reset_core),
+	.video_switch(video_switch_core),
+	.palette_switch(palette_switch_core),
+	.PALMODE(1'b0),
+	.ROMSWITCH(1'b0),
 
 	.hblank(VGA_HB),
 	.vblank(VGA_VB),
@@ -247,9 +320,9 @@ apple2_top apple2_top
 	.r(core_R),
 	.g(core_G),
 	.b(core_B),
-	.SCREEN_MODE(screen_mode),
+	.SCREEN_MODE(screen_mode_int),
 	.TEXT_COLOR(text_color),
-	.COLOR_PALETTE(color_palette),
+	.COLOR_PALETTE(palette_int),
 	.GRAY_SEAM_FIX(gray_seam_fix),
 	.NTSC_VERTICAL_COMB(ntsc_vertical_comb),
 	.ioctl_addr(ioctl_addr),
@@ -259,8 +332,8 @@ apple2_top apple2_top
 	.ioctl_wr(ioctl_wr),
 	.ioctl_wait(ioctl_wait),
 
-	.AUDIO_L(audio_l),
-	.AUDIO_R(audio_r),
+	.AUDIO_L(core_audio_l),
+	.AUDIO_R(core_audio_r),
 	.TAPE_IN(tape_adc_act & tape_adc),
 
 	.PS2_Key(filtered_ps2_key),
@@ -275,7 +348,15 @@ apple2_top apple2_top
 	.joy(virtual_keyboard_active ? 6'h00 : joyd),
 	.joy_an(virtual_keyboard_active ? 16'h0000 : joya),
 
-	.mb_enabled(1'b1),
+	.mb_4_inslot(1'b1),
+	.mb_5_inslot(1'b0),
+	.mouse_4_inslot(1'b0),
+	.mouse_5_inslot(1'b1),
+	.saturn_5_inslot(1'b0),
+	.mouse_strobe(virtual_keyboard_active ? 1'b0 : mouse_strobe),
+	.mouse_x(virtual_keyboard_active ? 9'sd0 : {ps2_mouse[4],ps2_mouse[15:8]}),
+	.mouse_y(virtual_keyboard_active ? 9'sd0 : {ps2_mouse[5],ps2_mouse[23:16]}),
+	.mouse_button(virtual_keyboard_active ? 1'b0 : ps2_mouse[0]),
 
 
 	.TRACK1(TRACK1),
@@ -337,6 +418,25 @@ apple2_top apple2_top
 
 );
 
+wire [23:0] drive_overlay_rgb;
+
+drive_status_overlay drive_status_overlay
+(
+	.clk(clk_sys),
+	.reset(reset),
+	.enable(1'b1),
+	.hblank(VGA_HB),
+	.vblank(VGA_VB),
+	.rgb_in({core_R, core_G, core_B}),
+	.drive1_motor(D1_ACTIVE),
+	.drive1_activity(D1_IO_ACTIVE),
+	.drive2_motor(D2_ACTIVE),
+	.drive2_activity(D2_IO_ACTIVE),
+	.hdd_mounted(hdd_mounted),
+	.hdd_activity(hdd_read | hdd_write),
+	.rgb_out(drive_overlay_rgb)
+);
+
 apple2_font_rom apple2_font_rom
 (
 	.CLK_14M(clk_sys),
@@ -368,7 +468,7 @@ virtual_keyboard_overlay virtual_keyboard_overlay
 	.overlay_top(virtual_keyboard_top),
 	.hblank(VGA_HB),
 	.vblank(VGA_VB),
-	.rgb_in({core_R, core_G, core_B}),
+	.rgb_in(drive_overlay_rgb),
 	.font_alternate(virtual_font_alternate),
 	.font_lowercase(virtual_font_lowercase),
 	.font_character(virtual_font_character),
