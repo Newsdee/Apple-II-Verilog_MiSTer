@@ -93,11 +93,12 @@ module MOCKINGBOARD(
     
     via6522 m6522_left(
         .clk(CLK_14M),
-        .ce(VIA_CE_R),
+        .ce(VIA_CE_F),
         //.falling(VIA_CE_F),
         .reset(~I_RESET_L),
         
         .addr(I_ADDR[3:0]),
+        .strobe((~I_IOSEL_L) & I_ENA_H & (~I_ADDR[7])),
         .we((~I_RW_L) & (~I_ADDR[7]) & (~I_IOSEL_L) & I_ENA_H),
         //.ren(I_RW_L & (~I_ADDR[7]) & (~I_IOSEL_L) & I_ENA_H),
         .data_in(I_DATA),
@@ -111,7 +112,7 @@ module MOCKINGBOARD(
         
         .portb_out(o_pb_l),
         //.portb_t(),
-        .portb_in(1'b1),
+        .portb_in(8'hFF),
         
         .ca1_in(1'b1),
         .ca2_out(),
@@ -156,11 +157,12 @@ module MOCKINGBOARD(
     
     via6522 m6522_right(
         .clk(CLK_14M),
-        .ce(VIA_CE_R),
+        .ce(VIA_CE_F),
         //.falling(VIA_CE_F),
         .reset(~I_RESET_L),
         
         .addr(I_ADDR[3:0]),
+        .strobe((~I_IOSEL_L) & I_ENA_H & I_ADDR[7]),
         .we((~I_RW_L) & I_ADDR[7] & (~I_IOSEL_L) & I_ENA_H),
         //.ren(I_RW_L & I_ADDR[7] & (~I_IOSEL_L) & I_ENA_H),
         .data_in(I_DATA),
@@ -174,7 +176,7 @@ module MOCKINGBOARD(
         
         .portb_out(o_pb_r),
         //.port_b_t(),
-        .portb_in(10'b1),
+        .portb_in(8'hFF),
         
         .ca1_in(1'b1),
         .ca2_out(),

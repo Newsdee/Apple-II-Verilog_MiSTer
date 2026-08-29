@@ -367,13 +367,13 @@ use `shared/spram_sim.vhd` while the documented GHDL defect remains.
 | video_generator | video_generator.vhd + spram_const shim | video_generator.v + video2.hex | PASS 2026-08-29; ports-only trace, ROM parity checked |
 | hdd | hdd.vhd + hdd ROM | hdd.v + rom.v + hdd.hex | PASS 2026-08-29; rows=6416, fields=102387, gate_checks=63 |
 | timing_generator | timing_generator.vhd | timing_generator.v | PASS 2026-08-29; NTSC and PAL, 26937 rows each |
-| keyboard | keyboard.vhd + spram_const shim | keyboard.v + keyboard.hex | PASS 2026-08-28; rows=316, fields=2528 |
-| via6522 | mockingboard/via6522.vhd | mockingboard/via6522.v | Not recorded |
-| mockingboard | mockingboard + via6522 + stub PSG | mockingboard + via6522 + stub PSG | Planned; real YM2149 implementations differ and are outside this comparison |
+| keyboard | keyboard.vhd + spram_const shim | keyboard.v + keyboard.hex | PASS 2026-08-28; re-verified 2026-08-29 (rows=316, fields=2528) |
+| via6522 | mockingboard/via6522.vhd | mockingboard/via6522.v | PASS 2026-08-29; rows=794, fields=14292, gate_checks=7; candidate aligned to golden per user decision (pre-alignment FAIL profile and fix list in module_tests/via6522/README.md) |
+| mockingboard | mockingboard + via6522 + stub PSG | mockingboard + via6522 + stub PSG | PASS 2026-08-30; rows=488, fields=5856, gate_checks=10; candidate aligned per user decision (6-line glue fix: .ce(VIA_CE_F), side-select .strobe ≡ golden wen|ren, .portb_in 8'hFF; pre-alignment FAIL profile and harness bring-up fixes in module_tests/mockingboard/README.md). Real YM2149.sv differs only in volTable init syntax (64/64 values verified identical 2026-08-29); test glue uses a bit-identical stub PSG on both sides |
 | t65 | t65/T65*.vhd | t65*.v | In progress; isolates CPU behavior for apple2 |
 | apple2 | apple2.vhd and VHDL dependencies | apple2.v and Verilog dependencies | In progress; integration-level harness |
-| apple2_font_rom | apple2_font_rom.vhd + spram_const shim | apple2_font_rom.v + video2.hex | Planned; read-during-write difference expected |
-| vga_controller | vga_controller.vhd | vga_controller.v | Planned; power-up and palette-download differences documented locally |
+| apple2_font_rom | apple2_font_rom.vhd + spram_const shim | apple2_font_rom.v + video2.hex | PASS 2026-08-29; rows=4228, fields=38052, writes=37 (36 divergent probes aligned write-first, 1 equal), 64/64 readbacks; candidate aligned per user decision (one-line glyph_data fix; pre-alignment FAIL profile in module_tests/apple2_font_rom/README.md) |
+| vga_controller | vga_controller.vhd | vga_controller.v | DIVERGENCE (expected palette-download signature) 2026-08-29; rows=163248, fields=3226938, ignored_metavalues=38022, mismatched_fields=57261 all in VGA_R/G/B on lines 114-130+171-179 only; all timing/control paths (HS/VS/HBL/VBL/IOCTL_WAIT) cycle-equivalent; two real RTL differences (beat-4 new-vs-old latch, 3-beat vs 4-beat color_addr wrap -> candidate LUT scrambled + colors 0-4 second-pass overwrite); power-up artifacts classified (line-0 VGA_HBL U-vs-0 hcount init, cycle-17 U island); full profile in module_tests/vga_controller/README.md; candidate fix pending user decision |
 
 Verilog-to-Verilog synchronized files such as `ramcard.v`, `clock_card.v`, and
 `floppy_track.sv` may be certified by a byte comparison when the requirement is

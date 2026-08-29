@@ -20,7 +20,7 @@ initial $readmemh("rtl/roms/video2.hex", font_rom);
 
 always @(posedge CLK_14M) begin
 	if(ioctl_wr) font_rom[rom_addr] <= ioctl_data;
-	glyph_data <= font_rom[rom_addr];
+	glyph_data <= ioctl_wr ? ioctl_data : font_rom[rom_addr];
 end
 
 endmodule
