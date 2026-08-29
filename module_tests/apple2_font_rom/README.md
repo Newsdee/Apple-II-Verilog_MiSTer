@@ -1,11 +1,50 @@
-# apple2_font_rom equivalence — TEST PLAN (not yet implemented)
+# apple2_font_rom equivalence
 
 Black-box differential test: Verilog `rtl/apple2_font_rom.v` must behave
 identically, cycle for cycle, to golden VHDL
 `../Apple-II_MiSTer_newsdee/rtl/apple2_font_rom.vhd`.
 
-Status: **PLANNED**. No files exist yet besides this plan. Implement by
-copying the `disk_ii/` structure (TBs + `run_equivalence.ps1` + `build/`).
+Status: **PASS - 2026-08-29 (candidate aligned per user decision)**
+
+```
+APPLE2_FONT_ROM EQUIVALENCE PASS rows=4228 fields=38052 ignored_metavalues=0
+writes=37 divergent_write_probes=36 equal_writes=1 readbacks_ok=64 rom_values=103
+```
+
+- All 36 new != old read-during-write probes now match: both sides show the
+  NEW value on the write cycle (golden write-first `spram` semantics).
+  The one equal write (B2 probe 0) matches as designed.
+- All 38,052 fields match; 64/64 readback checks pass (both sides show the
+  written value from the first pure-read cycle after the write).
+
+## Alignment (2026-08-29, per user decision)
+
+Pre-alignment result (retained for reference):
+
+```
+APPLE2_FONT_ROM DIVERGENCE (expected write-first signature) first=cycle 4104,
+GLYPH_DATA: VHDL=A5, Verilog=1C rows=4228 fields=38052 ignored_metavalues=0
+divergent_writes=36 equal_writes=1 readbacks_ok=64
+```
+
+- Every new != old ioctl write cycle (36 of 37 writes) diverged on
+  `GLYPH_DATA` for exactly that one cycle: golden showed the NEW value
+  (continuous `glyph_data <= rom_out` from write-first `q`), candidate showed
+  the PRE-WRITE value (registered `glyph_data <= font_rom[rom_addr]` reads
+  the pre-edge memory). Real RTL difference, not a harness artifact.
+- Fix applied to `rtl/apple2_font_rom.v` (one line):
+  `glyph_data <= ioctl_wr ? ioctl_data : font_rom[rom_addr];`
+- Runner updated from signature-enforcement mode to strict equivalence:
+  on divergent writes both sides must now show the NEW value; any other
+  combination is a hard failure. Full harness re-run (GHDL + Verilator):
+  PASS, identical result via `-CompareOnly`.
+
+Implementation: `gen_stim.ps1` (identical 4228-cycle table + stim_meta.csv
+for the runner's memory tracking), `apple2_font_rom_vhdl_tb.vhd`,
+`apple2_font_rom_verilog_tb.sv`, `run_equivalence.ps1` (strict comparison
+that classifies write-cycle GLYPH_DATA mismatches against the tracked
+memory model; any non-signature mismatch is an error). Golden copy
+adds only the explicit `entity` keyword to the spram instantiation.
 
 ## What the module is
 
@@ -47,10 +86,9 @@ Read-during-write divergence:
 
 Every cycle of this module is a read, and an ioctl write always targets the
 read address, so **any write with new != old diverges on `GLYPH_DATA` for that
-one cycle**. Per rule 1: the runner reports it as the first divergence and
-stops — do not fix either side in this harness. Anticipated (pending user
-approval) one-line candidate fix:
-`glyph_data <= ioctl_wr ? ioctl_data : font_rom[rom_addr];`
+one cycle**. This was confirmed by the first run (2026-08-29) and resolved
+by the one-line candidate fix recorded above (applied per user decision);
+the runner now enforces strict equivalence.
 
 The stimulus therefore contains deliberate read-during-write probes, plus one
 write with new == old (must NOT diverge — sanity check on the signature).

@@ -7,6 +7,11 @@
       "compareOnly": true
     },
     {
+      "name": "apple2_font_rom",
+      "runner": "apple2_font_rom/run_equivalence.ps1",
+      "compareOnly": true
+    },
+    {
       "name": "disk_ii",
       "runner": "disk_ii/run_equivalence.ps1",
       "compareOnly": true
@@ -27,8 +32,18 @@
       "compareOnly": true
     },
     {
+      "name": "mockingboard",
+      "runner": "mockingboard/run_equivalence.ps1",
+      "compareOnly": true
+    },
+    {
       "name": "timing_generator",
       "runner": "timing_generator/run_equivalence.ps1",
+      "compareOnly": true
+    },
+    {
+      "name": "via6522",
+      "runner": "via6522/run_equivalence.ps1",
       "compareOnly": true
     },
     {

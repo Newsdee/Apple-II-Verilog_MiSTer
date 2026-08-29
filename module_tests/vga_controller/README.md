@@ -1,11 +1,84 @@
-# vga_controller equivalence — TEST PLAN (not yet implemented)
+# vga_controller equivalence — RESULTS (2026-08-29, parent-built)
 
 Black-box differential test: Verilog `rtl/vga_controller.v` must behave
 identically, cycle for cycle, to golden VHDL
 `../Apple-II_MiSTer_newsdee/rtl/vga_controller.vhd`.
 
-Status: **PLANNED**. No files exist yet besides this plan. Implement by
-copying the `disk_ii/` structure (TBs + `run_equivalence.ps1` + `build/`).
+Status: **COMPLETE — DIVERGENCE (expected palette-download signature)**.
+
+```
+VGA_CONTROLLER DIVERGENCE (expected palette-download signature)
+  first=cycle 103971 (VGA_R: VHDL=01 Verilog=cd; VGA_G: VHDL=02 Verilog=9e;
+  VGA_B: VHDL=03 Verilog=87) context: SM=00 CP=11 GSF=0 NVC=0 CL=0 VBL=0
+  HBL=1 line=114
+  rows=163248 fields=3226938 ignored_metavalues=38022
+  mismatched_fields=57261 columns=VGA_R+VGA_G+VGA_B
+  lines=114..130, 171..179 powerup_line0=1/VGA_HBL early_islands=1 inputs_ok=true
+```
+
+### What this means
+
+- **All timing/control paths are cycle-equivalent** across 163,248 cycles
+  (179 lines x 912): VGA_HS, VGA_VS, VGA_VBL, IOCTL_WAIT — zero mismatches
+  after metavalue skipping; VGA_HBL identical from line 1 onward (line-1
+  edge at cycle 1284 on both sides).
+- The **only** divergence is the documented palette-download RTL difference,
+  surfacing exactly on CP=11 lines (P2 k=12..15 = lines 114-129 + seam
+  carryover 130; P3 = lines 171-178 + carryover 179):
+  1. Beat-4 latch: golden `BUFFER_COLx <= palette_rgb_in` (OLD value =
+     {d0,d1,d2}); candidate `BUFFER_COLx <= {palette_rgb_in[23:8],
+     ioctl_data}` (NEW value = {d0,d1,d3}).
+  2. Beat wrap: golden wraps `color_addr` after beat 3 (4 beats/color);
+     candidate wraps after beat 2 (`color_addr < 2'b10`, 3 beats/color).
+     Under the 64-beat host protocol the candidate consumes 48 beats for
+     16 colors, then beats 48-62 OVERWRITE colors 0-4 a second time
+     (candidate color 0 = {205,158,135} = stream beats 48,49,50 — matches
+     the trace exactly: R=cd G=9e B=87).
+- First mismatch line 114 (P2, CP=11), not P3: P2's k=12..15 combos also
+  use CP=11, and the download happened at line 2 — correct per schedule.
+
+### Power-up artifacts (classified, not divergences)
+
+- `powerup_line0=1/VGA_HBL`: golden `hcount` starts U (no init) so its
+  line-0 `raw_active` is 1 cycle late; candidate starts 0 (Verilog
+  semantics = Cyclone V power-up default). Line-0 VGA_HBL edge differs by
+  exactly 1 cycle (372 vs 371); all later lines identical.
+- `early_islands=1`: golden VGA_HBL has one 1-cycle U island at cycle 17
+  (uninit seam_timing_active/ctq/fta crossing the delay chain; the
+  timing_active_delay and seam_valid_window vectors ARE zero-initialized).
+- Leading U runs (skipped, counted in ignored_metavalues=38022): VGA_VBL
+  until 351, VGA_HS until 1046, IOCTL_WAIT until 1823 (first download
+  beat), VGA_VS until ~34790 (vcount stays U until the first VBL=0 falling
+  edge at line 3; VGA_VS is only assigned at vcount=33/36 — no else).
+
+### Golden-copy transformations (strictly verified, behavior-identical)
+
+1. 4x `end process <label>;` -> `end process;` (GHDL rejects labeled ends
+   on unlabeled processes).
+2. All vector cases -> `case to_integer(...)` with integer choices +
+   inserted `when others => null;` (GHDL 6.0.0 enforces strict case
+   coverage; `to_integer` returns unbounded integer). SCREEN_MODE (a
+   std_logic_vector port) gets `to_integer(unsigned(SCREEN_MODE))`. The
+   `shift_reg(3 downto 2)` case keeps its string choices (it has `when
+   others` already). Unreachable `when others` branches cannot fire:
+   2/4-bit expressions, and the download path is metastable-free because
+   the else branch resets color_addr/palette_index/palette_rgb_in every
+   cycle.
+
+### Files
+
+- `vga_controller_vhdl_tb.vhd`, `vga_controller_verilog_tb.sv` — mirrored
+  procedural stimulus (schedule + pattern functions in the headers), 21-column
+  CSV trace, 163,248 cycles.
+- `run_equivalence.ps1` — golden-copy generation, GHDL + Verilator builds,
+  sims (CWD=project root), comparison with the classification above.
+  `-CompareOnly` rechecks existing traces.
+
+---
+
+# TEST PLAN (original, for reference)
+
+## What the module is
 
 ## What the module is
 
@@ -119,8 +192,10 @@ color i").
    12 (custom palette path works end-to-end). Note: if risk 2 fires, the first
    divergence is reported before gates are evaluated.
 7. COLOR_LINE=0 active lines >= 4 (monochrome path).
-8. `ignored_metavalues` <= 200 (power-up + ioctl_wait only; if much larger,
-   something else is unclean at t=0 — investigate before trusting the pass).
+8. `ignored_metavalues` <= 45000 (plan said 200; the actual leading U runs
+   are dominated by VGA_VS staying U until vcount=33 at line 37 — the
+   vcount U period plus the no-else VGA_VS assignment make ~35k the floor).
+   Plus the island gate: U-after-known allowed only at cycle <= 100.
 
 ## Runner contract
 
