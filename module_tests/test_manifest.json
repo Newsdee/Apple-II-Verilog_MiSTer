@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "name": "apple2",
+      "runner": "apple2/run_equivalence.ps1",
+      "compareOnly": true
+    },
+    {
+      "name": "disk_ii",
+      "runner": "disk_ii/run_equivalence.ps1",
+      "compareOnly": true
+    },
+    {
+      "name": "dpram",
+      "runner": "dpram/run_equivalence.ps1",
+      "compareOnly": true
+    },
+    {
+      "name": "hdd",
+      "runner": "hdd/run_equivalence.ps1",
+      "compareOnly": true
+    },
+    {
+      "name": "keyboard",
+      "runner": "keyboard/run_equivalence.ps1",
+      "compareOnly": true
+    },
+    {
+      "name": "timing_generator",
+      "runner": "timing_generator/run_equivalence.ps1",
+      "compareOnly": true
+    },
+    {
+      "name": "video_generator",
+      "runner": "video_generator/run_equivalence.ps1",
+      "compareOnly": true
+    },
+    {
+      "name": "virtual_keyboard_overlay",
+      "runner": "virtual_keyboard_overlay/run_equivalence.ps1",
+      "compareOnly": false
+    }
+  ]
+}

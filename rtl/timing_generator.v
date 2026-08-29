@@ -15,6 +15,7 @@
 
 module timing_generator(
 input wire CLK_14M,
+input wire PALMODE,    // PAL/NTSC selection
 output reg VID7M,
 output reg Q3,
 output reg RAS_N,
@@ -22,6 +23,8 @@ output reg CAS_N,
 output reg AX,
 output reg PHI0,
 output reg COLOR_REF,
+output wire PHI0_EN_R,  // next clock is PHI0=1
+output wire PHI0_EN_F,  // next clock is PHI0=0
 input wire TEXT_MODE,
 input wire PAGE2,
 input wire HIRES_MODE,
@@ -54,6 +57,7 @@ output reg LDPS_N
 
 reg [6:0] H = 7'b0000000;
 reg [8:0] V = 9'b011111010;
+wire [8:0] V_RESET;
 wire COLOR_DELAY_N;
 reg CLK_7M;
 wire RAS_N_PRE; wire AX_PRE; wire CAS_N_PRE; wire Q3_PRE; wire PHI0_PRE; wire VID7M_PRE; wire LDPS_N_PRE;
@@ -79,6 +83,9 @@ wire HBL; wire VBL;
   assign PHI0_PRE =  ~((PHI0 & RAS_N &  ~Q3) | ( ~PHI0 &  ~RAS_N) | ( ~PHI0 & Q3));
   assign VID7M_PRE =  ~((GR2_G & SEGB) | ( ~GR2_G & COL80) | ( ~GR2_G & CLK_7M) | ( ~VID7 &  ~PHI0 &  ~Q3 &  ~AX) | ( ~H0 & COLOR_REF &  ~PHI0 &  ~Q3 &  ~AX) | (VID7M & AX) | (VID7M & PHI0) | (VID7M & Q3));
   assign LDPS_N_PRE =  ~(( ~Q3 &  ~AX & COL80 &  ~GR2_G) | ( ~Q3 &  ~AX &  ~PHI0 &  ~GR2_G) | ( ~Q3 &  ~AX &  ~PHI0 & SEGB) | ( ~Q3 &  ~AX &  ~PHI0 &  ~VID7) | ( ~Q3 &  ~AX &  ~PHI0 & COLOR_REF &  ~H0) | ( ~Q3 & AX &  ~RAS_N &  ~PHI0 & VID7 &  ~SEGB & GR2_G));
+
+  assign PHI0_EN_R = ~PHI0 & PHI0_PRE;
+  assign PHI0_EN_F = PHI0 & ~PHI0_PRE;
   always @(posedge CLK_14M) begin
     RAS_N <= RAS_N_PRE;
     AX <= AX_PRE;
@@ -117,6 +124,8 @@ wire HBL; wire VBL;
   end
 
   // Horizontal and vertical counters
+  assign V_RESET = PALMODE ? 9'b011001000 : 9'b011111010;
+
   always @(posedge CLK_14M) begin
     if(RASRISE1 == 1'b1) begin
       if(H[6] == 1'b0) begin
@@ -126,9 +135,9 @@ wire HBL; wire VBL;
         H <= H + 1;
         if(H == 7'b1111111) begin
           V <= V + 1;
-        end
-        if(V == 9'b111111111) begin
-          V <= 9'b011111010;
+          if(V == 9'b111111111) begin
+            V <= V_RESET;
+          end
         end
       end
     end

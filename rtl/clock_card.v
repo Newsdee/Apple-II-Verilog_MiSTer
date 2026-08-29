@@ -9,7 +9,7 @@ module clock_card(
     input         IO_STROBE_N,
     //output        RDY,
     //input       DMA,
-    output        IRQ_N,
+    //output        IRQ_N,
     //output        NMI_N,
     input         RESET,
     //input         INH_N,
@@ -20,13 +20,15 @@ module clock_card(
     input         DEVICE_SELECT_N,
     input  [7:0]  DATA_IN,
     output [7:0]  DATA_OUT,
-    output   ROM_EN,
+    //output   ROM_EN,
+	 output        OE,
 
     input [64:0]  RTC
 
 
 );
 
+assign OE = ~IO_SELECT_N | ~DEVICE_SELECT_N;
 
 reg [20:0] second_div;
 reg TICK;
@@ -34,17 +36,6 @@ reg V_SYNC;
 
 always @(posedge CLK_2M)
 begin
-	if (DEVICE_SELECT_N == 0 ) 
-          $display("DS_N=0 SLOT_4IO: %x addr %x CLK_IN %x", SLOT_4IO,ADDRESS[3:0],CLK_IN);
-
-        if ({SLOT_IO, ADDRESS[3:0]}== 5'b10100)
-	  $display("MONTHS_10 : ADDR %x CLK_IN %x",ADDRESS[3:0],CLK_IN);
-
-	if (IO_SELECT_N == 0 ) 
-          $display("IOS_N=0 SLOT_4IO: %x", SLOT_4IO);
-	if (SLOT_4IO== 1 ) 
-          $display("SLOT_4IO=1 DS_N: %x IOS_N %x", DEVICE_SELECT_N,IO_SELECT_N);
-
 	second_div<=second_div+1'b1;
 	V_SYNC<=1'b0;
 	//$display("second_div %d",second_div);
@@ -52,7 +43,7 @@ begin
 	begin
 		second_div<=1'b0;
 		V_SYNC<=1'b1;
-		//$display("V_SYNC is now 1");
+		$display("V_SYNC is now 1");
 	end
 end
 
@@ -72,7 +63,7 @@ reg     [3:0]           SECONDS_ONES;
 reg     [5:0]           DEB_COUNTER;
 
 
-wire SLOT_4IO = (ADDRESS[15:4]        == 12'hC0C)   ?  1'b1: 1'b0;
+//wire SLOT_IO = (ADDRESS[15:4]        == 12'hC0C)   ?  1'b1: 1'b0;
 wire SLOT_IO = ~DEVICE_SELECT_N;
 
 /*****************************************************************************
@@ -199,12 +190,12 @@ begin
 								if(MINUTES_TENS == 3'd5)
 								begin
 									MINUTES_TENS <= 3'd0;
-									if((HOURS_ONES == 3'd9) || ((HOURS_ONES == 3'd3)&&(HOURS_TENS == 3'd2)))
+									if((HOURS_ONES == 4'd9) || ((HOURS_ONES == 4'd3)&&(HOURS_TENS == 3'd2)))
 									begin
 										HOURS_ONES <= 3'd0;
 										if(HOURS_TENS == 3'd2)
 										begin
-											HOURS_TENS <= 3'd0;
+											HOURS_TENS <= 2'd0;
 											if(DAYS_ONES == 4'd9)
 											begin
 												DAYS_ONES <= 4'd0;
@@ -255,7 +246,7 @@ begin
 				end
 				else
 				begin
-					//$display("increment deb_counter seconds %d SECONDS_ONES %d",DEB_COUNTER,SECONDS_ONES);
+					$display("increment deb_counter seconds %d SECONDS_ONES %d",DEB_COUNTER,SECONDS_ONES);
 					DEB_COUNTER <= DEB_COUNTER + 1'b1;
 				end
 			end
@@ -267,9 +258,7 @@ wire [7:0] DOA_CS;
 wire [7:0] ROM_ADDR = ADDRESS[7:0];
 assign DATA_OUT = ~IO_SELECT_N ? DOA_CS :  CLK_IN;
 
-
-
-   rom #(8,8,"rtl/roms/clock2.hex") roms (
+   rom #(8,8,"rtl/roms/clock.hex") roms (
            .clock(CLK_14M),
            .ce(1'b1),
            .a(ROM_ADDR),

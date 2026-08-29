@@ -14,9 +14,12 @@
 module MOCKINGBOARD(
     CLK_14M,
     PHASE_ZERO,
+    PHASE_ZERO_R,
+    PHASE_ZERO_F,
     I_ADDR,
     I_DATA,
     O_DATA,
+    OE,
     I_RW_L,
     O_IRQ_L,
     O_NMI_L,
@@ -28,9 +31,12 @@ module MOCKINGBOARD(
 );
     input        CLK_14M;
     input        PHASE_ZERO;
+    input        PHASE_ZERO_R;
+    input        PHASE_ZERO_F;
     input [7:0]  I_ADDR;
     input [7:0]  I_DATA;
     output [7:0] O_DATA;
+    output       OE;
     
     input        I_RW_L;
     output       O_IRQ_L;
@@ -70,7 +76,6 @@ module MOCKINGBOARD(
     wire         PSG_EN;
     wire         VIA_CE_F;
     wire         VIA_CE_R;
-    reg          PHASE_ZERO_D;
     
     // Bus Direction (0 - read , 1 - write)
     // Bus control
@@ -78,14 +83,11 @@ module MOCKINGBOARD(
     assign O_DATA = (I_ADDR[7] == 1'b0) ? o_data_l : o_data_r;
     assign O_IRQ_L = (~lirq) | (~I_ENA_H);
     assign O_NMI_L = (~rirq) | (~I_ENA_H);
+    assign OE = ~I_IOSEL_L;
     
-    assign PSG_EN = (PHASE_ZERO == 1'b0 & PHASE_ZERO_D == 1'b1) ? 1'b1 : 1'b0;
-    assign VIA_CE_R = (PHASE_ZERO == 1'b1 & PHASE_ZERO_D == 1'b0) ? 1'b1 : 1'b0;
-    assign VIA_CE_F = (PHASE_ZERO == 1'b0 & PHASE_ZERO_D == 1'b1) ? 1'b1 : 1'b0;
-    
-    
-    always @(posedge CLK_14M)
-       PHASE_ZERO_D <= PHASE_ZERO;
+    assign PSG_EN = PHASE_ZERO_F;
+    assign VIA_CE_R = PHASE_ZERO_F;
+    assign VIA_CE_F = PHASE_ZERO_R;
     
     // Left Channel Combo
     

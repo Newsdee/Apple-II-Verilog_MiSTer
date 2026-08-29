@@ -25,7 +25,10 @@ module keyboard(
     akd,
     K,
     open_apple,
-    closed_apple
+    closed_apple,
+    soft_reset,
+    video_toggle,
+    palette_toggle
 );
     
     input            CLK_14M;
@@ -43,6 +46,9 @@ module keyboard(
     output [7:0]     K;		// Latched, decoded keyboard data
     output reg       open_apple;
     output reg       closed_apple;
+    output reg       soft_reset;
+    output reg       video_toggle;   // signal to control change of video modes
+    output reg       palette_toggle; // signal to control change of paleetes
     
     
     wire [10:0]      rom_addr;
@@ -70,6 +76,11 @@ module keyboard(
     parameter [7:0]  RIGHT_SHIFT = 8'h59;
     parameter [7:0]  LEFT_CTRL = 8'h14;
     parameter [7:0]  CAPS_LOCK = 8'h58;
+    parameter [7:0]  WINDOWS = 8'h1F;
+    parameter [7:0]  ALT = 8'h11;
+    parameter [7:0]  F2 = 8'h06;
+    parameter [7:0]  F8 = 8'h0A;
+    parameter [7:0]  F9 = 8'h01;
     
     parameter [3:0]  states_IDLE = 0,
                      states_HAVE_CODE = 1,
@@ -124,6 +135,9 @@ module keyboard(
             ctrl <= 1'b0;
             open_apple <= 1'b0;
             closed_apple <= 1'b0;
+            soft_reset <= 1'b0;
+            video_toggle <= 1'b0;
+            palette_toggle <= 1'b0;
         end
         else 
         begin
@@ -133,6 +147,9 @@ module keyboard(
                 ctrl <= virtual_control;
                 open_apple <= virtual_open_apple;
                 closed_apple <= virtual_closed_apple;
+                soft_reset <= 1'b0;
+                video_toggle <= 1'b0;
+                palette_toggle <= 1'b0;
             end
             else if (virtual_active_d)
             begin
@@ -147,6 +164,16 @@ module keyboard(
                     shift <= 1'b1;
                 else if (code == LEFT_CTRL)
                     ctrl <= 1'b1;
+                else if (code == WINDOWS)
+                    open_apple <= 1'b1;
+                else if (code == ALT)
+                    closed_apple <= 1'b1;
+                else if (code == F2)
+                    soft_reset <= 1'b1;
+                else if (code == F8)
+                    palette_toggle <= 1'b1;
+                else if (code == F9)
+                    video_toggle <= 1'b1;
             end
             else if (state == states_KEY_UP)
             begin
@@ -154,6 +181,16 @@ module keyboard(
                     shift <= 1'b0;
                 else if (code == LEFT_CTRL)
                     ctrl <= 1'b0;
+                else if (code == WINDOWS)
+                    open_apple <= 1'b0;
+                else if (code == ALT)
+                    closed_apple <= 1'b0;
+                else if (code == F2)
+                    soft_reset <= 1'b0;
+                else if (code == F8)
+                    palette_toggle <= 1'b0;
+                else if (code == F9)
+                    video_toggle <= 1'b0;
             end
         end
     end

@@ -1,5 +1,3 @@
-`timescale 1ns / 1ps
-
 // taken from the Apple II project by Alex Freed
 // and modified for own use
 

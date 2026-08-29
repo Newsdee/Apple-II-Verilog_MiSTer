@@ -114,7 +114,7 @@ module disk_ii(CLK_14M, CLK_2M, PHASE_ZERO, IO_SELECT, DEVICE_SELECT, RESET, DIS
       begin
          if (spindown_delay != 0)
          begin
-            spindown_delay = spindown_delay - 1;
+            spindown_delay = spindown_delay - 24'd1;
             if (spindown_delay == 0)
                drive_real_on <= 1'b0;
          end
@@ -125,7 +125,7 @@ module disk_ii(CLK_14M, CLK_2M, PHASE_ZERO, IO_SELECT, DEVICE_SELECT, RESET, DIS
             drive_real_on <= 1'b1;
          end
          else if (drive_on_old == 1'b1)
-            spindown_delay = 14000000;
+            spindown_delay = 24'd14000000;
          
          drive_on_old = drive_on;
       end

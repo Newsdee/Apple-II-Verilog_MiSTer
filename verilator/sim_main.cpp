@@ -95,6 +95,7 @@ int pixel_clock_mode = 0;
 bool virtual_keyboard_enabled = true;
 int virtual_keyboard_visibility = 0;
 bool virtual_keyboard_enabled_toggle_d = false;
+bool virtual_keyboard_transparency_cycle_d = false;
 
 // Verilog module
 // --------------
@@ -153,6 +154,7 @@ void resetSim() {
 	main_time = 0;
 	top->reset = 1;
 	virtual_keyboard_enabled_toggle_d = false;
+	virtual_keyboard_transparency_cycle_d = false;
 	clk_sys.Reset();
 }
 
@@ -242,7 +244,12 @@ int verilate() {
 				virtual_keyboard_enabled = !virtual_keyboard_enabled;
 				top->virtual_keyboard_enabled = virtual_keyboard_enabled;
 			}
+			if (top->virtual_keyboard_transparency_cycle && !virtual_keyboard_transparency_cycle_d) {
+				virtual_keyboard_visibility = (virtual_keyboard_visibility + 1) & 3;
+				top->virtual_keyboard_visibility = virtual_keyboard_visibility;
+			}
 			virtual_keyboard_enabled_toggle_d = top->virtual_keyboard_enabled_toggle;
+			virtual_keyboard_transparency_cycle_d = top->virtual_keyboard_transparency_cycle;
 			if (clk_sys.clk) { bus.AfterEval(); blockdevice.AfterEval(); }
 		}
 

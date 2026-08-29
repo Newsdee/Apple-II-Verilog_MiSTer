@@ -45,7 +45,7 @@ module drive_ii(CLK_14M, CLK_2M, PHASE_ZERO, RESET, DISK_READY, D_IN, D_OUT, DIS
          if (DISK_ACTIVE == 1'b1)
          begin
             phase_change = 0;
-            new_phase = phase;
+            new_phase = {24'd0, phase};
             rel_phase = MOTOR_PHASE;
             case (phase[2:1])
                2'b00 :
@@ -131,7 +131,7 @@ module drive_ii(CLK_14M, CLK_2M, PHASE_ZERO, RESET, DISK_READY, D_IN, D_OUT, DIS
                new_phase = 139;
             else
                new_phase = new_phase + phase_change;
-            phase <= new_phase;
+            phase <= new_phase[7:0];
          end
       end
    end
@@ -155,7 +155,7 @@ module drive_ii(CLK_14M, CLK_2M, PHASE_ZERO, RESET, DISK_READY, D_IN, D_OUT, DIS
          CLK_2M_D <= CLK_2M;
          if (CLK_2M == 1'b1 & CLK_2M_D == 1'b0 & DISK_READY == 1'b1 & DISK_ACTIVE == 1'b1)
          begin
-            byte_delay = byte_delay - 1;
+            byte_delay = byte_delay - 6'd1;
             
             if (WRITE_MODE == 1'b0)
             begin
@@ -171,7 +171,7 @@ module drive_ii(CLK_14M, CLK_2M, PHASE_ZERO, RESET, DISK_READY, D_IN, D_OUT, DIS
                   if (track_byte_addr == 13'h19FF)
                      track_byte_addr <= {13{1'b0}};
                   else
-                     track_byte_addr <= track_byte_addr + 1;
+                     track_byte_addr <= track_byte_addr + 13'd1;
                end
                if (READ_DISK == 1'b1 & PHASE_ZERO == 1'b1)
                   reset_data_reg <= 1'b1;
@@ -186,7 +186,7 @@ module drive_ii(CLK_14M, CLK_2M, PHASE_ZERO, RESET, DISK_READY, D_IN, D_OUT, DIS
                   if (track_byte_addr == 13'h19FF)
                      track_byte_addr <= {13{1'b0}};
                   else
-                     track_byte_addr <= track_byte_addr + 1;
+                     track_byte_addr <= track_byte_addr + 13'd1;
                end
             end
          end

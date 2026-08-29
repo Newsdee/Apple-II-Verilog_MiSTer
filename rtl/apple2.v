@@ -11,8 +11,12 @@
 module apple2(
     CLK_14M,
     CLK_2M,
+    PALMODE,
+    ROMSWITCH,
     CPU_WAIT,
     PHASE_ZERO,
+    PHASE_ZERO_R,
+    PHASE_ZERO_F,
     FLASH_CLK,
     reset,
     cpu,
@@ -28,6 +32,7 @@ module apple2(
     ram_we,
     VIDEO,
     COLOR_LINE,
+    TEXT_MODE,
     HBL,
     VBL,
     K,
@@ -40,12 +45,22 @@ module apple2(
     IO_SELECT,
     DEVICE_SELECT,
     IO_STROBE,
+    ioctl_addr,
+    ioctl_data,
+    ioctl_index,
+    ioctl_download,
+    ioctl_wr,
+    saturn_5_inslot,
     speaker
 );
     input         CLK_14M;		// 14.31818 MHz master clock
     output        CLK_2M;
+    input         PALMODE;		// PAL/NTSC selection
+    input         ROMSWITCH;
     input         CPU_WAIT;
     output        PHASE_ZERO;
+    output        PHASE_ZERO_R;	// next clock is PHI0=1
+    output        PHASE_ZERO_F;	// next clock is PHI0=0
     input         FLASH_CLK;		// approx. 2 Hz flashing char clock
     input         reset;
     input         cpu;		// 0 - 6502, 1 - 65C02
@@ -61,6 +76,7 @@ module apple2(
     output        ram_we;		// RAM write enable
     output        VIDEO;
     output        COLOR_LINE;
+    output        TEXT_MODE;
     output        HBL;
     output        VBL;
     input [7:0]   K;		// Keyboard data
@@ -76,21 +92,15 @@ module apple2(
     output [7:0]  IO_SELECT;
     output [7:0]  DEVICE_SELECT;
     output reg    IO_STROBE;
+    // load different video roms
+    input  [24:0] ioctl_addr;
+    input  [7:0]  ioctl_data;
+    input  [7:0]  ioctl_index;
+    input         ioctl_download;
+    input         ioctl_wr;
+    input         saturn_5_inslot;
     output        speaker;		// One-bit speaker output
-    
-    
-    // 14.31818 MHz master clock
-    // Data from RAM
-    // Low-frequency flashing text clock
-    // 14.31818 MHz master clock
-    // 2 MHz signal in phase with PHI0
-    // 1.0 MHz processor clock
-    // 3.579545 MHz colorburst
-    
-    // Horizontal blanking
-    // Vertical blanking
-    // Composite blanking
-    
+
     // Clocks
     wire          CLK_7M;
     wire          Q3;
@@ -100,8 +110,7 @@ module apple2(
     reg           PHASE_ZERO_D;
     wire          COLOR_REF;
     wire          CPU_EN;
-    reg           CPU_EN_POST;
-    
+
     // From the timing generator
     wire [15:0]   VIDEO_ADDRESS;
     wire          LDPS_N;
@@ -110,15 +119,14 @@ module apple2(
     wire          SEGA;
     wire          SEGB;
     wire          SEGC;
-    
+
     // Soft switches
     reg [7:0]     soft_switches;
-    wire          TEXT_MODE;
     wire          MIXED_MODE;
     wire          PAGE2;
     wire          HIRES_MODE;
     wire          DHIRES_MODE;
-    
+
     // ][e auxilary switches
     reg           RAMRD;
     reg           RAMWRT;
@@ -130,7 +138,7 @@ module apple2(
     reg           ALTCHAR;
     reg           COL80;
     reg           SF_D;
-    
+
     // CPU signals
     wire [7:0]    D_IN;
     wire [7:0]    D_OUT;
@@ -143,11 +151,11 @@ module apple2(
     wire [7:0]    R65C02_DO;
     wire          R65C02_WE_N;
     wire          we;
-    
+
     // Main ROM signals
     wire [7:0]    rom_out;
     wire [13:0]   rom_addr;
-    
+
     // Address decoder signals
     reg           RAM_SELECT;
     reg           KEYBOARD_SELECT;
@@ -156,17 +164,16 @@ module apple2(
     reg           SOFTSWITCH_SELECT;
     reg           ROM_SELECT;
     reg           GAMEPORT_SELECT;
-    //signal IO_STROBE : std_logic;
     reg           HRAM_CONTROL;
     reg           C01X_SELECT;
-    
+
     // Speaker signal
     reg           speaker_sig;
-    
+
     reg [7:0]     CPU_DL;		// Latched RAM data
     wire [7:0]    VIDEO_DL;
     reg [15:0]    VIDEO_DL_LATCH;
-    
+
     // Bank Switched RAM signals
     wire          Dxxx;
     reg           HRAM_READ;
@@ -174,15 +181,13 @@ module apple2(
     reg           HRAM_WR_N;
     reg           HRAM_BANK1;
     wire [17:0]   CPU_RAM_ADDR;
-    
+
     wire          HRAM_READ_EN;
     wire          HRAM_WRITE_EN;
-    
+
     reg [7:0]     ioselect;
     reg [7:0]     devselect;
-    
-    wire          R_W_n;
-    
+
     // ramcard
     wire [17:0]   card_addr;
     wire          card_ram_rd;
@@ -190,17 +195,19 @@ module apple2(
     wire          ram_card_read;
     wire          ram_card_write;
     wire          ram_card_sel;
-    
+
+    wire          video_rom_select;
+
     assign CLK_2M = Q3;
-    
-    assign ram_addr = (PHASE_ZERO == 1'b1) ? CPU_RAM_ADDR : 
+
+    assign ram_addr = (PHASE_ZERO == 1'b1) ? CPU_RAM_ADDR :
                       {2'b00, VIDEO_ADDRESS};
-    assign ram_we = (PHASE_ZERO == 1'b1) ? ((we & RAM_SELECT) | (we & (HRAM_WRITE_EN | ram_card_write))) : 
+    assign ram_we = (PHASE_ZERO == 1'b1) ? ((we & RAM_SELECT) | (we & (HRAM_WRITE_EN | ram_card_write))) :
                     1'b0;
     assign CPU_WE = we;
-    
-    // ramcard  
-    
+
+    // ramcard
+
     ramcard ram_card_D(
         .clk(CLK_14M),
         .reset_in(reset),
@@ -209,44 +216,38 @@ module apple2(
         .card_ram_we(card_ram_we),
         .card_ram_rd(card_ram_rd)
     );
-    
-    assign ram_card_read = ROM_SELECT & card_ram_rd;
-    assign ram_card_write = ROM_SELECT & card_ram_we;
-    assign ram_card_sel = (we == 1'b1) ? ram_card_write : 
+
+    assign ram_card_read = ROM_SELECT & card_ram_rd & saturn_5_inslot;
+    assign ram_card_write = ROM_SELECT & card_ram_we & saturn_5_inslot;
+    assign ram_card_sel = (we == 1'b1) ? ram_card_write :
                           ram_card_read;
-    
-    
+
+
     always @(posedge CLK_14M)
     begin: RAM_data_latch
-        
+        if (AX == 1'b1 & CAS_N == 1'b0 & RAS_N == 1'b1 & Q3 == 1'b0)
         begin
-            if (AX == 1'b1 & CAS_N == 1'b0 & RAS_N == 1'b1 & Q3 == 1'b0)
-            begin
-                // Latch video data at Phase 1, CPU data at Phase 0
-                if (PHASE_ZERO == 1'b0)
-                    VIDEO_DL_LATCH <= ram_do;
-                else if (aux == 1'b0)
-                    CPU_DL <= ram_do[7:0];
-                else
-                    CPU_DL <= ram_do[15:8];
-            end
+            // Latch video data at Phase 1, CPU data at Phase 0
+            if (PHASE_ZERO == 1'b0)
+                VIDEO_DL_LATCH <= ram_do;
+            else if (aux == 1'b0)
+                CPU_DL <= ram_do[7:0];
+            else
+                CPU_DL <= ram_do[15:8];
         end
     end
-    assign VIDEO_DL = (PHASE_ZERO == 1'b0) ? VIDEO_DL_LATCH[7:0] : 
+    assign VIDEO_DL = (PHASE_ZERO == 1'b0) ? VIDEO_DL_LATCH[7:0] :
                       VIDEO_DL_LATCH[15:8];
-    
+
     assign ADDR = A;
     assign D = D_OUT;
-    
+
     assign IO_SELECT = ioselect;
     assign DEVICE_SELECT = devselect;
-    
+
     // Address decoding
-    //  rom_addr <= (A(13) and A(12)) & (not A(12)) & A(11 downto 0);
     assign rom_addr = A[13:0];
-    
-    
-    //always @(A or C3ROM or C8ROM or CXROM)
+
     always @(*)
     begin: address_decoder
         ROM_SELECT = 1'b0;
@@ -306,13 +307,10 @@ module apple2(
                                 else
                                     ioselect[(A[10:8])] = 1'b1;
                             4'h8, 4'h9, 4'hA, 4'hB, 4'hC, 4'hD, 4'hE, 4'hF :		// C800 - CFFF
-begin
-//$display("inside C800-CFFF");
                                 if (CXROM == 1'b1 | C8ROM == 1'b1)
                                     ROM_SELECT = 1'b1;
                                 else
                                     IO_STROBE = 1'b1;
-end
                             default :
                                 ;
                         endcase
@@ -325,9 +323,7 @@ end
                 ;
         endcase
     end
-    
-    
-    //always @(A or we or RAMRD or RAMWRT or STORE80 or HIRES_MODE or PAGE2 or ALTZP or ram_card_sel)
+
     always @(*)
     begin: aux_ctrl
         aux = 1'b0;
@@ -342,36 +338,28 @@ end
         else
             aux = (RAMRD & (~we)) | (RAMWRT & we);
     end
-    
-    
+
     always @(posedge CLK_14M)
     begin: speaker_ctrl
-        
-        begin
-            if (CPU_EN_POST == 1'b1 & SPEAKER_SELECT == 1'b1)
-                speaker_sig <= (~speaker_sig);
-        end
+        if (PHASE_ZERO_R == 1'b1 & SPEAKER_SELECT == 1'b1)
+            speaker_sig <= (~speaker_sig);
     end
-    
-    
+
     always @(posedge CLK_14M)
     begin: softswitches
-        
-        begin
-            if (CPU_EN_POST == 1'b1 & SOFTSWITCH_SELECT == 1'b1)
-                soft_switches[(A[3:1])] <= A[0];
-        end
+        if (PHASE_ZERO_R == 1'b1 & SOFTSWITCH_SELECT == 1'b1)
+            soft_switches[(A[3:1])] <= A[0];
     end
-    
+
     assign TEXT_MODE = soft_switches[0];
     assign MIXED_MODE = soft_switches[1];
     assign PAGE2 = soft_switches[2];
     assign HIRES_MODE = soft_switches[3];
     assign AN = soft_switches[7:4];
     assign DHIRES_MODE = AN[3];
-    
-    
-    always @(posedge CLK_14M )
+
+
+    always @(posedge CLK_14M)
     begin: hram_ctrl
         if (reset == 1'b1)
         begin
@@ -380,9 +368,9 @@ end
             HRAM_WR_N <= 1'b0;
             HRAM_BANK1 <= 1'b0;
         end
-        else 
+        else
         begin
-            if (CPU_EN_POST == 1'b1 & HRAM_CONTROL == 1'b1)
+            if (PHASE_ZERO_R == 1'b1 & HRAM_CONTROL == 1'b1)
             begin
                 HRAM_BANK1 <= A[3];
                 HRAM_PRE_WR <= A[0] & (~we);
@@ -394,16 +382,16 @@ end
             end
         end
     end
-    
-    assign Dxxx = (A[15:12] == 4'hD) ? 1'b1 : 
+
+    assign Dxxx = (A[15:12] == 4'hD) ? 1'b1 :
                   1'b0;
-    assign CPU_RAM_ADDR = (ram_card_sel == 1'b1) ? card_addr : 
+    assign CPU_RAM_ADDR = (ram_card_sel == 1'b1) ? card_addr :
                           {2'b00, A[15:13], (A[12] & (~(HRAM_BANK1 & Dxxx))), A[11:0]};
     assign HRAM_READ_EN = HRAM_READ & A[15] & A[14] & (A[13] | A[12]);		// Dxxx-Fxxx
     assign HRAM_WRITE_EN = (~HRAM_WR_N) & A[15] & A[14] & (A[13] | A[12]);		// Dxxx-Fxxx
-    
-    
-    always @(posedge CLK_14M )
+
+
+    always @(posedge CLK_14M)
     begin: softswitches_IIe
         if (reset == 1'b1)
         begin
@@ -417,14 +405,14 @@ end
             COL80 <= 1'b0;
             ALTCHAR <= 1'b0;
         end
-        else 
+        else
         begin
             READ_KEY <= 1'b0;
             if (A[15:8] == 8'hC3 & C3ROM == 1'b0)
                 C8ROM <= 1'b1;
             else if (A == 16'hCFFF)
                 C8ROM <= 1'b0;
-            if (CPU_EN_POST == 1'b1 & KEYBOARD_SELECT == 1'b1 & we == 1'b1)
+            if (PHASE_ZERO_R == 1'b1 & KEYBOARD_SELECT == 1'b1 & we == 1'b1)
                 case (A[3:1])
                     3'b000 :
                         STORE80 <= A[0];
@@ -489,9 +477,9 @@ end
                 READ_KEY <= 1'b1;
         end
     end
-    
+
     assign speaker = speaker_sig;
-    
+
     assign D_IN = (RAM_SELECT == 1'b1 | HRAM_READ_EN == 1'b1 | ram_card_read == 1'b1) ? CPU_DL : 		// RAM
                   (KEYBOARD_SELECT == 1'b1) ? K : 		// Keyboard
                   (C01X_SELECT == 1'b1) ? {SF_D, K[6:0]} : 		// ][e softswitches
@@ -499,21 +487,18 @@ end
                   (ROM_SELECT == 1'b1) ? rom_out : 		// ROMs
                   (TAPE_OUT == 1'b1 | SPEAKER_SELECT == 1'b1 | STB == 1'b1 | SOFTSWITCH_SELECT == 1'b1 | PDL_STROBE == 1'b1 | HRAM_CONTROL == 1'b1 | A == 16'hCFFF) ? VIDEO_DL : 		// Floating bus
                   PD;		// Peripherals
-  /* 
- always @( posedge CLK_14M)
- begin
-   if (CPU_PRINT)
-	   $display("PRINT: RAM_SELECT %x ROM_SELECT %x rom_out %x D_IN %x PD %x GAME %x c01x %x Keyboard %x CPU_DL %x ram_card_read %x hram_read %x HRAM_BANK1 %x HRAM_READ %x ALTZP %x",RAM_SELECT,ROM_SELECT,rom_out,D_IN,PD,GAMEPORT_SELECT,C01X_SELECT,KEYBOARD_SELECT,CPU_DL,ram_card_read,HRAM_READ_EN,HRAM_BANK1,HRAM_READ,ALTZP);
- end
- */
+
     timing_generator timing(
         .CLK_14M(CLK_14M),
+        .PALMODE(PALMODE),
         .VID7M(CLK_7M),
         .CAS_N(CAS_N),
         .RAS_N(RAS_N),
         .Q3(Q3),
         .AX(AX),
         .PHI0(PHASE_ZERO),
+        .PHI0_EN_R(PHASE_ZERO_R),
+        .PHI0_EN_F(PHASE_ZERO_F),
         .COLOR_REF(COLOR_REF),
         .TEXT_MODE(TEXT_MODE),
         .PAGE2(PAGE2),
@@ -534,8 +519,9 @@ end
         .WNDW_N(WNDW_N),
         .LDPS_N(LDPS_N)
     );
-    
-    
+
+    assign video_rom_select = (ioctl_download == 1'b1 & ioctl_wr == 1'b1 & ioctl_index == 8'h01) ? 1'b1 : 1'b0;
+
     video_generator video_display(
         .CLK_14M(CLK_14M),
         .CLK_7M(CLK_7M),
@@ -544,58 +530,50 @@ end
         .SEGB(SEGB),
         .SEGC(SEGC),
         .ALTCHAR(ALTCHAR),
+        .ROMSWITCH(ROMSWITCH),
         .WNDW_N(WNDW_N),
         .DL(VIDEO_DL),
         .LDPS_N(LDPS_N),
         .FLASH_CLK(FLASH_CLK),
+        .ioctl_addr(ioctl_addr),
+        .ioctl_data(ioctl_data),
+        .ioctl_wr(video_rom_select),
         .VIDEO(VIDEO)
     );
-    
+
     assign we = (cpu == 1'b0) ? (~T65_WE_N) : (~R65C02_WE_N);
     assign A = (cpu == 1'b0) ? (T65_A[15:0]) : R65C02_A;
     assign D_OUT = (cpu == 1'b0) ? T65_DO : R65C02_DO;
     assign T65_DI = (T65_WE_N == 1'b0) ? D_OUT : D_IN;
+    //CPU_EN <= PHASE_ZERO_F; -- not sure why this isn't working??
     assign CPU_EN = (PHASE_ZERO_D == 1'b1 & PHASE_ZERO == 1'b0) ? 1'b1 : 1'b0;
-    
-    
+
     always @(posedge CLK_14M)
     begin: cpu_enable
-        
-        begin
-            PHASE_ZERO_D <= PHASE_ZERO;
-            CPU_EN_POST <= CPU_EN;
-        end
+        PHASE_ZERO_D <= PHASE_ZERO;
     end
-   
-    
-    //always @(posedge CLK_14M)
-	    //if (DEVICE_SELECT[7]) $display("T64_DO: %x",T65_DO);
-	    //if (CPU_EN & CPU_WAIT) $display("CPU HALTED");
-	  // $display("CPU_EN: %x",CPU_EN);
-  
-    
+
+    wire CPU_PRINT;
+
     T65 cpu6502(
-        .Mode(2'b01),
+        .Mode(2'b00),
         .Clk(CLK_14M),
         .Enable(CPU_EN & ~CPU_WAIT),
         .Res_n(~reset),
-        
+
         .Rdy(1'b1),
         .Abort_n(1'b1),
         .SO_n(1'b1),
-        
+
         .IRQ_n(IRQ_n),
         .NMI_n(NMI_n),
         .R_W_n(T65_WE_N),
         .A(T65_A),
         .DI(T65_DI),
         .DO(T65_DO),
-	.PRINT(CPU_PRINT)
+        .PRINT(CPU_PRINT)
     );
-   wire CPU_PRINT; 
-//`ifdef VERILATOR
-	// we don't have a working version of this CHIP yet in verilog
-//`else  
+
     R65C02 cpu65c02(
         .reset((~reset)),
         .clk(CLK_14M),
@@ -607,23 +585,13 @@ end
         .addr(R65C02_A),
         .nwe(R65C02_WE_N)
     );
-//`endif 
-    
+
     // Original Apple had asynchronous ROMs.  We use a synchronous ROM
     // that needs its address earlier, hence the odd clock.
-   /* 
-    spram #(14, 8, "rtl/roms/apple2e.mif") roms(
-        .address(rom_addr),
+    rom #(8,14,"rtl/roms/apple2e.hex") roms (
         .clock(CLK_14M),
-        .data(1'b0),
-        .wren(1'b0),
-        .q(rom_out)
+        .ce(1'b1),
+        .a(rom_addr),
+        .data_out(rom_out)
     );
-    */
-   rom #(8,14,"rtl/roms/apple2e.hex") roms (
-	   .clock(CLK_14M),
-	   .ce(1'b1),
-	   .a(rom_addr),
-	   .data_out(rom_out)
-   );  
 endmodule

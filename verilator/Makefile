@@ -3,16 +3,16 @@ COSIM = n
 
 TOP = --top-module emu
 RTL = ../rtl
-OSK_DIR ?= $(RTL)
+OSK_DIR ?= $(RTL)/osk
 V_INC = +incdir+$(RTL) 
 
-#V_DEFINE = +define+debug=1 +define+SIMULATION=1  --prof-exec -CFLAGS "-I../sim/imgui -I../sim/vinc -I../sim/ -O3"  --timescale-override 1ps/1ps -Wno-TIMESCALEMOD  \
+#V_DEFINE = +define+debug=1 +define+SIMULATION=1 -CFLAGS "-I../sim/imgui -I../sim/vinc -I../sim/ -O3"  --timescale-override 1ps/1ps -Wno-TIMESCALEMOD  \
 	-I../rtl \
 	-I../rtl/tv80
-V_DEFINE = +define+debug=1 +define+SIMULATION=1  --prof-exec -CFLAGS "-I../sim/imgui -I../sim/ -O3 -march=native -mtune=native"  --timescale-override 1ps/1ps -Wno-TIMESCALEMOD  \
+V_DEFINE = +define+debug=1 +define+SIMULATION=1 -CFLAGS "-I../sim/imgui -I../sim/ -O3 -march=native -mtune=native"  --timescale-override 1ps/1ps -Wno-TIMESCALEMOD  \
 	-I../rtl \
 	-I../rtl/mouse/jt6805
-#V_DEFINE = +define+debug=1 +define+SIMULATION=1  --prof-exec -CFLAGS "-g -I../sim/imgui -I../sim/vinc -I../sim/"  --timescale-override 1ps/1ps -Wno-TIMESCALEMOD  \
+#V_DEFINE = +define+debug=1 +define+SIMULATION=1 -CFLAGS "-g -I../sim/imgui -I../sim/vinc -I../sim/"  --timescale-override 1ps/1ps -Wno-TIMESCALEMOD  \
 	-I../rtl \
 	-I../rtl/tv80
 

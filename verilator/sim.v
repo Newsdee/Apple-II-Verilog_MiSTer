@@ -93,6 +93,7 @@ module emu (
 	output CE_PIXEL,
 	output virtual_keyboard_active_debug,
 	output virtual_keyboard_enabled_toggle,
+	output virtual_keyboard_transparency_cycle,
 	
 	output	[15:0]	AUDIO_L,
 	output	[15:0]	AUDIO_R,
@@ -161,12 +162,18 @@ joystick_input joystick_input
 assign AUDIO_L = {audio_l,6'b0};
 assign AUDIO_R = {audio_r,6'b0};
 wire [9:0] core_audio_l, core_audio_r;
+`ifdef SIM_FAST
+// SIM_FAST: no floppy sound generator
+wire [9:0] floppy_audio = 10'b0;
+`else
 wire [9:0] floppy_audio;
+`endif
 wire [10:0] audio_l_sum = {1'b0, core_audio_l} + {1'b0, floppy_audio};
 wire [10:0] audio_r_sum = {1'b0, core_audio_r} + {1'b0, floppy_audio};
 wire [9:0] audio_l = audio_l_sum[10] ? 10'h3FF : audio_l_sum[9:0];
 wire [9:0] audio_r = audio_r_sum[10] ? 10'h3FF : audio_r_sum[9:0];
 
+`ifndef SIM_FAST
 floppy_sound floppy_sound
 (
 	.clk(clk_sys),
@@ -183,6 +190,7 @@ floppy_sound floppy_sound
 	.drive2_track_zero_step(D2_TRACK_ZERO_STEP),
 	.sample(floppy_audio)
 );
+`endif
 
 // keyboard-driven screen mode / palette cycling (same logic as newsdee Apple-II.sv)
 reg [1:0] screen_mode_int;
@@ -226,7 +234,7 @@ wire virtual_keyboard_control_active;
 wire virtual_keyboard_enabled_toggle_int;
 wire virtual_open_apple;
 wire virtual_closed_apple;
-wire virtual_keyboard_transparency_cycle;
+wire virtual_keyboard_transparency_cycle_int;
 wire virtual_keyboard_top;
 wire virtual_keyboard_event;
 wire virtual_keyboard_pressed;
@@ -245,7 +253,7 @@ virtual_keyboard_controller virtual_keyboard_controller
 	.clk(clk_sys),
 	.reset(reset),
 	.ps2_key(ps2_key),
-	.joystick({joystick_0[12], joystick_0[5:0]}),
+	.joystick({joystick_0[9:8], joystick_0[13:12], joystick_0[5:0]}),
 	.enabled(virtual_keyboard_enabled),
 	.filtered_ps2_key(filtered_ps2_key),
 	.active(virtual_keyboard_active),
@@ -260,7 +268,7 @@ virtual_keyboard_controller virtual_keyboard_controller
 	.enabled_toggle(virtual_keyboard_enabled_toggle_int),
 	.open_apple(virtual_open_apple),
 	.closed_apple(virtual_closed_apple),
-	.transparency_cycle(virtual_keyboard_transparency_cycle),
+	.transparency_cycle(virtual_keyboard_transparency_cycle_int),
 	.overlay_top(virtual_keyboard_top),
 	.virtual_event(virtual_keyboard_event),
 	.virtual_pressed(virtual_keyboard_pressed),
@@ -270,6 +278,7 @@ virtual_keyboard_controller virtual_keyboard_controller
 
 assign virtual_keyboard_active_debug = virtual_keyboard_active;
 assign virtual_keyboard_enabled_toggle = virtual_keyboard_enabled_toggle_int;
+assign virtual_keyboard_transparency_cycle = virtual_keyboard_transparency_cycle_int;
 
 assign sd_lba[1] = {16'b0,hdd_sector};
 
@@ -418,6 +427,10 @@ apple2_top apple2_top
 
 );
 
+`ifdef SIM_FAST
+// SIM_FAST: no drive status overlay - core RGB passes straight through
+wire [23:0] drive_overlay_rgb = {core_R, core_G, core_B};
+`else
 wire [23:0] drive_overlay_rgb;
 
 drive_status_overlay drive_status_overlay
@@ -436,6 +449,7 @@ drive_status_overlay drive_status_overlay
 	.hdd_activity(hdd_read | hdd_write),
 	.rgb_out(drive_overlay_rgb)
 );
+`endif
 
 apple2_font_rom apple2_font_rom
 (
@@ -466,6 +480,7 @@ virtual_keyboard_overlay virtual_keyboard_overlay
 	.closed_apple(virtual_closed_apple),
 	.transparency(virtual_keyboard_visibility),
 	.overlay_top(virtual_keyboard_top),
+	.pixel_clock_double(pixel_clock_double),
 	.hblank(VGA_HB),
 	.vblank(VGA_VB),
 	.rgb_in(drive_overlay_rgb),

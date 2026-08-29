@@ -55,10 +55,10 @@ reg   [3:0] rel_lba;
 
 always @(posedge clk) begin
 	reg old_ack;
-	reg [5:0] cur_track ;
+	reg [5:0] cur_track = 0;
 	reg old_change;
-	reg saving ;
-	reg dirty ;
+	reg saving = 0;
+	reg dirty = 0;
 
 	old_change <= change;
 	old_ack <= sd_ack;
@@ -131,7 +131,7 @@ always @(posedge clk) begin
 		end
 end
 
-/*
+
 dpram #(13,8) floppy_dpram
 (
         .clock_a(clk),
@@ -147,23 +147,6 @@ dpram #(13,8) floppy_dpram
         .q_b(ram_do)
 
 );
-*/
-
-bram #(8,13) floppy_dpram 
-(
-        .clock_a(clk),
-        .address_a({rel_lba, sd_buff_addr}),
-        .wren_a(sd_buff_wr & sd_ack),
-        .data_a(sd_buff_dout),
-        .q_a(sd_buff_din),
-
-        .clock_b(clk),
-        .address_b(ram_addr),
-        .wren_b(ram_we),
-        .data_b(ram_di),
-        .q_b(ram_do)
-);
-
 
 /*
 // Dual port track buffer
