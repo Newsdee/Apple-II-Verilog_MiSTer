@@ -263,29 +263,29 @@ always @(posedge CLK_14M) begin
             case (color_addr)
                 2'b00: palette_rgb_in <= {ioctl_data, palette_rgb_in[15:0]};
                 2'b01: palette_rgb_in <= {palette_rgb_in[23:16], ioctl_data, palette_rgb_in[7:0]};
-                default: begin
-                    palette_rgb_in <= {palette_rgb_in[23:8], ioctl_data};
-                    case (palette_index)
-                        4'h0: BUFFER_COL0 <= {palette_rgb_in[23:8], ioctl_data};
-                        4'h1: BUFFER_COL1 <= {palette_rgb_in[23:8], ioctl_data};
-                        4'h2: BUFFER_COL2 <= {palette_rgb_in[23:8], ioctl_data};
-                        4'h3: BUFFER_COL3 <= {palette_rgb_in[23:8], ioctl_data};
-                        4'h4: BUFFER_COL4 <= {palette_rgb_in[23:8], ioctl_data};
-                        4'h5: BUFFER_COL5 <= {palette_rgb_in[23:8], ioctl_data};
-                        4'h6: BUFFER_COL6 <= {palette_rgb_in[23:8], ioctl_data};
-                        4'h7: BUFFER_COL7 <= {palette_rgb_in[23:8], ioctl_data};
-                        4'h8: BUFFER_COL8 <= {palette_rgb_in[23:8], ioctl_data};
-                        4'h9: BUFFER_COL9 <= {palette_rgb_in[23:8], ioctl_data};
-                        4'hA: BUFFER_COL10 <= {palette_rgb_in[23:8], ioctl_data};
-                        4'hB: BUFFER_COL11 <= {palette_rgb_in[23:8], ioctl_data};
-                        4'hC: BUFFER_COL12 <= {palette_rgb_in[23:8], ioctl_data};
-                        4'hD: BUFFER_COL13 <= {palette_rgb_in[23:8], ioctl_data};
-                        4'hE: BUFFER_COL14 <= {palette_rgb_in[23:8], ioctl_data};
-                        default: BUFFER_COL15 <= {palette_rgb_in[23:8], ioctl_data};
-                    endcase
-                end
+                default: palette_rgb_in <= {palette_rgb_in[23:8], ioctl_data};
             endcase
-            if (color_addr < 2'b10)
+            // Golden writes the buffer from the pre-cycle palette_rgb_in on every
+            // beat; on beat 4 (color_addr=3) that value is {d0,d1,d2}.
+            case (palette_index)
+                4'h0: BUFFER_COL0 <= palette_rgb_in;
+                4'h1: BUFFER_COL1 <= palette_rgb_in;
+                4'h2: BUFFER_COL2 <= palette_rgb_in;
+                4'h3: BUFFER_COL3 <= palette_rgb_in;
+                4'h4: BUFFER_COL4 <= palette_rgb_in;
+                4'h5: BUFFER_COL5 <= palette_rgb_in;
+                4'h6: BUFFER_COL6 <= palette_rgb_in;
+                4'h7: BUFFER_COL7 <= palette_rgb_in;
+                4'h8: BUFFER_COL8 <= palette_rgb_in;
+                4'h9: BUFFER_COL9 <= palette_rgb_in;
+                4'hA: BUFFER_COL10 <= palette_rgb_in;
+                4'hB: BUFFER_COL11 <= palette_rgb_in;
+                4'hC: BUFFER_COL12 <= palette_rgb_in;
+                4'hD: BUFFER_COL13 <= palette_rgb_in;
+                4'hE: BUFFER_COL14 <= palette_rgb_in;
+                default: BUFFER_COL15 <= palette_rgb_in;
+            endcase
+            if (color_addr < 2'b11)
                 color_addr <= color_addr + 1'b1;
             else begin
                 color_addr <= 0;

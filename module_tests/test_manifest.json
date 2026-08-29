@@ -47,6 +47,11 @@
       "compareOnly": true
     },
     {
+      "name": "vga_controller",
+      "runner": "vga_controller/run_equivalence.ps1",
+      "compareOnly": true
+    },
+    {
       "name": "video_generator",
       "runner": "video_generator/run_equivalence.ps1",
       "compareOnly": true

@@ -1,10 +1,56 @@
-# vga_controller equivalence — RESULTS (2026-08-29, parent-built)
+# vga_controller equivalence — RESULTS (2026-08-30)
 
 Black-box differential test: Verilog `rtl/vga_controller.v` must behave
 identically, cycle for cycle, to golden VHDL
 `../Apple-II_MiSTer_newsdee/rtl/vga_controller.vhd`.
 
-Status: **COMPLETE — DIVERGENCE (expected palette-download signature)**.
+Status: **PASS** (candidate aligned to golden 2026-08-30, per user decision).
+
+```
+VGA_CONTROLLER EQUIVALENCE PASS rows=163248 fields=3226938
+  ignored_metavalues=38022 early_islands=1 hs_edges=177 vs_high=2736
+  combos=16 p3_triples=9
+```
+
+### Alignment (2026-08-30, candidate `rtl/vga_controller.v` only)
+
+The pre-alignment run below exposed two real RTL differences in the
+candidate's palette-download process. The user ordered the candidate aligned
+to golden; both fixes are inside the `ioctl_wr` branch of the download state
+machine (22+/22− lines, CRLF preserved):
+
+1. **Buffer write on all 4 beats with the pre-cycle value.** Golden executes
+   `BUFFER_COLx <= palette_rgb_in` on every download beat; the RHS samples
+   the pre-cycle register, so after beat 4 the buffer holds {d0,d1,d2}.
+   The candidate only wrote in its `default:` case arm (addr 2,3) and used
+   the NEW value `{palette_rgb_in[23:8], ioctl_data}` = {d0,d1,d3}. Fixed by
+   moving a separate `case (palette_index)` above the addr case, each arm
+   `BUFFER_COLx <= palette_rgb_in;`.
+2. **Wrap after beat 3, not beat 2.** Golden: `if color_addr < "11"` →
+   addr cycles 0,1,2,3 (4 beats/color). Candidate: `color_addr < 2'b10` →
+   3 beats/color; under the 64-beat host protocol it consumed 48 beats for
+   16 colors and beats 48–62 overwrote colors 0–4 a second time (candidate
+   color 0 became {cd,9e,87} = stream beats 48,49,50 — matched the trace).
+   Fixed to `color_addr < 2'b11`.
+
+Post-alignment: zero divergences across all 163,248 cycles × 21 columns.
+Gate 6 was rewritten from "≥12 distinct P3 triples" to an explicit
+membership check: the implemented P3 patterns settle into exactly 8 LUT
+entries {0,2,5,8,9,11,14,15} (Coverage below), so the gate now requires all
+8 known downloaded colors to be present (blanking carryover adds a 9th,
+`000000`, triple — deterministic, identical both sides).
+
+### Coverage (observed on P3 lines 171–178)
+
+Distinct {R,G,B} under the gate filter (input HBL=0, VBL=0): 9 triples =
+the 8 downloaded colors for LUT entries {0,2,5,8,9,11,14,15}
+(`010203 231C19 56433A 896A5B 9A7766 BC917C EFB89D 00C5A8`) plus `000000`
+from blanking-boundary carryover. Note color 15 = {0,0xC5,0xA8} — the beat
+formula wraps at 256 (17·15+1 = 256 ≡ 0). Each P3 line shows one constant
+color over its active window; the plan's "hit all 16 LUT entries" was not
+achieved by the implemented patterns, hence the membership gate.
+
+### Pre-alignment result (2026-08-29, retained for reference)
 
 ```
 VGA_CONTROLLER DIVERGENCE (expected palette-download signature)
@@ -171,9 +217,10 @@ Scale: ~160k rows total (~3-4 MB CSV); comparable to timing_generator's run.
 ## Trace schema (both TBs, sampled at posedge + 1 ns)
 
 ```
-CYCLE,VIDEO,HBL,VBL,SM,CP,GSF,NVC,IOCTL_DL,IOCTL_IDX,IOCTL_WR,IOCTL_DATA,VGA_HS,VGA_VS,VGA_HBL,VGA_VBL,VGA_R,VGA_G,VGA_B,IOCTL_WAIT
+CYCLE,VIDEO,HBL,VBL,SM,CP,GSF,NVC,CL,IOCTL_DL,IOCTL_IDX,IOCTL_WR,IOCTL_DATA,VGA_HS,VGA_VS,VGA_HBL,VGA_VBL,VGA_R,VGA_G,VGA_B,IOCTL_WAIT
 ```
 
+21 columns (the implemented TBs added CL after NVC vs the original plan).
 Hex; IOCTL_IDX = 2 digits, VGA_R/G/B = 2 digits each. Inputs traced so the
 comparator can annotate divergence context (e.g. "during download beat 4 of
 color i").
