@@ -51,6 +51,7 @@ struct Settings {
     int color_line_start = 1;     // N for kCLTextGraphics (0..191)
     std::string image_path;       // empty = synthetic pattern
     int threshold = 128;          // luminance threshold for images
+    int phase = 0;                // feed phase 0..3 (color-phase offset)
 };
 
 int color_line_for(const Settings& s, int active_line);
@@ -63,8 +64,16 @@ int video_bit(int line, int col);
 // pattern.
 struct VideoSource {
     const Image1Bit* image = nullptr;  // non-null when an image is loaded
+    // Feed phase: circular shift of the 560-sample row before feeding.
+    // The artifact-color rotation (shift_color = rotl(sr[4:1], hcount[1:0]))
+    // depends on which sample phase the content sits at relative to the HBL
+    // falling edge, so a wrong phase rotates the palette (e.g. red<->blue).
+    int phase = 0;
     int bit(int line, int col) const {
-        if (image) return image->at(line, col);
+        if (image) {
+            const int c = (col - phase + Image1Bit::kWidth) % Image1Bit::kWidth;
+            return image->at(line, c);
+        }
         return video_bit(line, col);
     }
 };

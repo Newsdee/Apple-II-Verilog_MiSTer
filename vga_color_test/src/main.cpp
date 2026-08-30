@@ -156,6 +156,14 @@ bool parse_args(int argc, char** argv, Cli* c) {
                 return false;
             }
             s->threshold = t;
+        } else if (a == "--phase") {
+            const char* v = next(a.c_str()); if (!v) return false;
+            int p = atoi(v);
+            if (p < 0 || p > 3) {
+                fprintf(stderr, "--phase out of range 0..3\n");
+                return false;
+            }
+            s->phase = p;
         } else if (a == "--color-line") {
             const char* v = next(a.c_str()); if (!v) return false;
             if (!strcmp(v, "none")) s->color_line_mode = kCLNoColor;
@@ -193,9 +201,11 @@ int run_headless(const Cli& c) {
             return 1;
         }
         vs.image = &image;
-        printf("image: %s src=%dx%d profile=%s threshold=%d\n",
+        vs.phase = c.settings.phase;
+        printf("image: %s src=%dx%d profile=%s threshold=%d phase=%d\n",
                c.settings.image_path.c_str(), image.src_width,
-               image.src_height, image.profile.c_str(), c.settings.threshold);
+               image.src_height, image.profile.c_str(), c.settings.threshold,
+               vs.phase);
     }
 
     VgaSim sim;
@@ -264,6 +274,7 @@ int main(int argc, char** argv) {
             c.settings.image_path.clear();
         }
         vs.image = &image;
+        vs.phase = c.settings.phase;
     }
     VgaGui gui(c.settings, image, vs);
     return gui.run();

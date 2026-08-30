@@ -178,6 +178,9 @@ int VgaGui::run() {
         }
         ImGui::Text("Luminance threshold");
         ImGui::SliderInt("##threshold", &s_.threshold, 0, 255);
+        ImGui::Text("Feed phase (color offset)");
+        if (ImGui::SliderInt("##phase", &s_.phase, 0, 3))
+            vs_.phase = s_.phase;  // live: no DUT rebuild needed
         if (s_.image_path.empty())
             ImGui::TextDisabled("(no image: synthetic pattern)");
 
@@ -186,8 +189,14 @@ int VgaGui::run() {
         // effect on the next simulated line (Decision Q3).
         ImGui::Text("Display");
         ImGui::SetNextItemWidth(-1);
-        ImGui::Combo("##display", &s_.screen_mode,
-                     "Color\0B&W\0Green\0Amber\0");
+        if (ImGui::Combo("##display", &s_.screen_mode,
+                         "Color\0B&W\0Green\0Amber\0")) {
+            // B&W / Green / Amber force COLOR_LINE off (user decision
+            // 2026-08-30): the DUT otherwise still shows artifact colors on
+            // color lines even in these display modes. The user can move the
+            // COLOR_LINE combo afterwards if they want to investigate that.
+            if (s_.screen_mode != 0) s_.color_line_mode = kCLNoColor;
+        }
         ImGui::Text("Palette");
         ImGui::SetNextItemWidth(-1);
         ImGui::Combo("##palette", &s_.color_palette,
