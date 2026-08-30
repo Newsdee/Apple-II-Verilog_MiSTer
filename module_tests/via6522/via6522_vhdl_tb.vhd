@@ -1,6 +1,6 @@
 -- via6522_vhdl_tb.vhd - golden-side testbench for the via6522 equivalence harness.
 --
--- DUT: Apple-II_MiSTer_newsdee/rtl/mockingboard/via6522.vhd (golden, VHDL).
+-- DUT: Apple-II_MiSTer_newsdee/rtl/old/via6522.vhd (golden, VHDL).
 -- Cycle model: see gen_stim.ps1 header. Even cycles are F slots (falling=1),
 -- odd cycles are R slots (rising=1). All bus accesses occur in F slots; the
 -- golden timer clocks on falling edges, so its decrements align edge-for-edge

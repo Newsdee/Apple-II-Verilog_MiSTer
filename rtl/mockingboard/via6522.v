@@ -298,6 +298,8 @@ always @(posedge clk) begin
 		irq_flags      <= 7'h00;
 		acr            <= 8'h00;
 		pcr            <= 8'h00;
+		timer_a_latch  <= 16'h5550;
+		timer_b_latch  <= 16'h5550;
 		trigger_serial <= 1'b0;
 	end
 end
@@ -370,7 +372,6 @@ always @(posedge clk) begin
 	if (reset) begin
 		timer_a_toggle       <= 1'b1;
 		timer_a_count        <= 16'h5550; // golden latch_reset_pattern
-		timer_a_latch        <= 16'h5550;
 		timer_a_reload       <= 1'b0;
 		timer_a_oneshot_trig <= 1'b0;
 	end
@@ -432,7 +433,6 @@ always @(posedge clk) begin
 
 	if (reset) begin
 		timer_b_count        <= 16'h5550; // golden latch_reset_pattern
-		timer_b_latch        <= 16'h5550;
 		timer_b_reload_lo    <= 1'b0;
 		timer_b_oneshot_trig <= 1'b0;
 	end

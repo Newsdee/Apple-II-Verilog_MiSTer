@@ -1,7 +1,7 @@
 # video_generator equivalence harness
 
 Cycle-equivalence test for the Apple II video generator, proving the VHDL
-golden (`Apple-II_MiSTer_newsdee/rtl/video_generator.vhd`) and the Verilog
+golden (`Apple-II_MiSTer_newsdee/rtl/old/video_generator.vhd`) and the Verilog
 candidate (`rtl/video_generator.v`) behave identically on their full port
 interface.
 

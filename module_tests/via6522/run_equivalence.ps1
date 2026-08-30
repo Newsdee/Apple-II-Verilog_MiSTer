@@ -28,7 +28,7 @@ if (!$CompareOnly) {
     # All are normalized to to_int_vec(...) subjects (shim package, see
     # via6522_shim.vhd) and integer choices. The copy also gains one use
     # clause: use work.via6522_shim.all;
-    $goldenSrc = Join-Path $referenceRoot 'rtl\mockingboard\via6522.vhd'
+    $goldenSrc = Join-Path $referenceRoot 'rtl\old\via6522.vhd'
     $goldenCopy = Join-Path $vhdlBuild 'via6522_golden.vhd'
     $srcBytes = [System.IO.File]::ReadAllBytes($goldenSrc)
     $hasBom = ($srcBytes.Length -ge 3 -and $srcBytes[0] -eq 0xEF -and $srcBytes[1] -eq 0xBB -and $srcBytes[2] -eq 0xBF)

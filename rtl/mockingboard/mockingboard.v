@@ -75,7 +75,6 @@ module MOCKINGBOARD(
     
     wire         PSG_EN;
     wire         VIA_CE_F;
-    wire         VIA_CE_R;
     
     // Bus Direction (0 - read , 1 - write)
     // Bus control
@@ -86,7 +85,6 @@ module MOCKINGBOARD(
     assign OE = ~I_IOSEL_L;
     
     assign PSG_EN = PHASE_ZERO_F;
-    assign VIA_CE_R = PHASE_ZERO_F;
     assign VIA_CE_F = PHASE_ZERO_R;
     
     // Left Channel Combo
@@ -144,10 +142,10 @@ module MOCKINGBOARD(
         
         .ACTIVE(),
         
-        .IOA_in(1'b0),
+        .IOA_in(8'h00),
         .IOA_out(),
         
-        .IOB_in(1'b0),
+        .IOB_in(8'h00),
         .IOB_out()
     );
     
@@ -206,10 +204,10 @@ module MOCKINGBOARD(
         
         .ACTIVE(),
         
-        .IOA_in(10'b0),
+        .IOA_in(8'h00),
         .IOA_out(),
         
-        .IOB_in(10'b0),
+        .IOB_in(8'h00),
         .IOB_out()
     );
     

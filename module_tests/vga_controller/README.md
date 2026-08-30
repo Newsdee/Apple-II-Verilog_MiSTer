@@ -2,7 +2,7 @@
 
 Black-box differential test: Verilog `rtl/vga_controller.v` must behave
 identically, cycle for cycle, to golden VHDL
-`../Apple-II_MiSTer_newsdee/rtl/vga_controller.vhd`.
+`../Apple-II_MiSTer_newsdee/rtl/old/vga_controller.vhd`.
 
 Status: **PASS** (candidate aligned to golden 2026-08-30, per user decision).
 

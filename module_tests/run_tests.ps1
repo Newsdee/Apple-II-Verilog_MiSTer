@@ -3,12 +3,16 @@ param(
     [string]$Tests = 'all',
     [switch]$CompareOnly,
     [switch]$ContinueOnFailure,
+    [switch]$SummaryOnly,
     [switch]$List
 )
 
 $ErrorActionPreference = 'Stop'
 
 $manifestPath = Join-Path $PSScriptRoot 'test_manifest.json'
+$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+Set-Location -LiteralPath $projectRoot
+
 if (!(Test-Path $manifestPath)) {
     throw "Test manifest not found: $manifestPath"
 }
@@ -52,6 +56,10 @@ if ($requestedNames.Count -eq 0 -or ($requestedNames.Count -eq 1 -and $requested
 $powershell = (Get-Process -Id $PID).Path
 $results = @()
 $suiteStart = Get-Date
+$logRoot = Join-Path $PSScriptRoot 'logs'
+if ($SummaryOnly) {
+    New-Item -ItemType Directory -Force -Path $logRoot | Out-Null
+}
 
 foreach ($test in $selectedTests) {
     $name = [string]$test.name
@@ -70,8 +78,29 @@ foreach ($test in $selectedTests) {
         $arguments += '-CompareOnly'
     }
 
-    & $powershell @arguments
-    $exitCode = $LASTEXITCODE
+    if ($SummaryOnly) {
+        $logPath = Join-Path $logRoot "$name.log"
+        $savedErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        $output = @(& $powershell @arguments 2>&1)
+        $exitCode = $LASTEXITCODE
+        $ErrorActionPreference = $savedErrorActionPreference
+        [System.IO.File]::WriteAllLines(
+            $logPath,
+            [string[]]@($output | ForEach-Object { $_.ToString() }),
+            (New-Object System.Text.UTF8Encoding($false))
+        )
+        $passLines = @($output | Where-Object { $_.ToString() -match 'EQUIVALENCE PASS' })
+        if ($passLines.Count -ne 0) {
+            $passLines | ForEach-Object { Write-Host $_ }
+        } elseif ($exitCode -ne 0) {
+            $output | Select-Object -Last 40 | ForEach-Object { Write-Host $_ }
+        }
+        Write-Host "Log: $logPath"
+    } else {
+        & $powershell @arguments
+        $exitCode = $LASTEXITCODE
+    }
     $elapsed = [math]::Round(((Get-Date) - $testStart).TotalSeconds, 2)
 
     if ($exitCode -eq 0) {

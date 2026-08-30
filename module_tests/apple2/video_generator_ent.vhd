@@ -1,4 +1,4 @@
--- TEST-SIDE COPY of Apple-II_MiSTer_newsdee/rtl/video_generator.vhd for GHDL.
+-- TEST-SIDE COPY of Apple-II_MiSTer_newsdee/rtl/old/video_generator.vhd for GHDL.
 -- Only change vs the reference file: 'videorom : work.spram' became
 -- 'videorom : entity work.spram' (standard VHDL direct entity instantiation;
 -- Quartus accepts the keyword-less form, GHDL does not). No behavioral change.

@@ -132,9 +132,9 @@ wire HBL; wire VBL;
         H <= 7'b1000000;
       end
       else begin
-        H <= H + 1;
+        H <= H + 7'd1;
         if(H == 7'b1111111) begin
-          V <= V + 1;
+          V <= V + 9'd1;
           if(V == 9'b111111111) begin
             V <= V_RESET;
           end

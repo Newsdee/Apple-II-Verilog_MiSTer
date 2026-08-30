@@ -1,7 +1,7 @@
 # vga_controller alignment — WORK-IN-PROGRESS (2026-08-30)
 
 Task: user ordered "fix vga_controller" = align candidate `rtl/vga_controller.v`
-to golden `../../Apple-II_MiSTer_newsdee/rtl/vga_controller.vhd`, then re-run the
+to golden `../../Apple-II_MiSTer_newsdee/rtl/old/vga_controller.vhd`, then re-run the
 harness to PASS and update records. Same workflow as via6522 / apple2_font_rom /
 mockingboard alignments.
 

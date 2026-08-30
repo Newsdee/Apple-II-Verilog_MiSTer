@@ -1,7 +1,7 @@
 -------------------------------------------------------------------------------
 -- Apple2 equivalence harness: simulation-initialization shim for timing_generator.
 --
--- This is a copy of ../Apple-II_MiSTer_newsdee/rtl/timing_generator.vhd with
+-- This is a copy of ../Apple-II_MiSTer_newsdee/rtl/old/timing_generator.vhd with
 -- ONLY one difference: explicit zero initial values on state signals that the
 -- original leaves uninitialized (buffer/out ports and internal registers).
 --

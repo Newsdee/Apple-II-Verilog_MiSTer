@@ -1,7 +1,7 @@
 # mockingboard equivalence harness
 
 Board-level VHDL/Verilog differential test for the Mockingboard clone:
-golden `Apple-II_MiSTer_newsdee/rtl/mockingboard/mockingboard.vhd` (+
+golden `Apple-II_MiSTer_newsdee/rtl/old/mockingboard.vhd` (+
 `via6522.vhd`) vs candidate `Apple-II-Verilog_MiSTer/rtl/mockingboard/
 mockingboard.v` (+ `via6522.v`). The board is tested as a whole — address
 decoding, L/R VIA selection, IRQ/NMI routing, OE, PSG bus wiring, and audio

@@ -66,7 +66,6 @@ reg raw_active = 0;
 reg raw_vbl = 0;
 reg raw_color_mode = 0;
 reg raw_color_line = 0;
-reg seam_active = 0;
 reg seam_timing_active = 0;
 reg seam_vbl = 0;
 reg seam_color_mode = 0;
@@ -161,30 +160,6 @@ function integer rgb_saturation;
     end
 endfunction
 
-function [23:0] custom_palette_color;
-    input [3:0] color;
-    begin
-        case (color)
-            4'b0000: custom_palette_color = CURRENT_COL0;
-            4'b0010: custom_palette_color = CURRENT_COL1;
-            4'b0100: custom_palette_color = CURRENT_COL2;
-            4'b0110: custom_palette_color = CURRENT_COL3;
-            4'b1000: custom_palette_color = CURRENT_COL4;
-            4'b1010: custom_palette_color = CURRENT_COL5;
-            4'b1100: custom_palette_color = CURRENT_COL6;
-            4'b1110: custom_palette_color = CURRENT_COL7;
-            4'b0001: custom_palette_color = CURRENT_COL8;
-            4'b0011: custom_palette_color = CURRENT_COL9;
-            4'b0101: custom_palette_color = CURRENT_COL10;
-            4'b0111: custom_palette_color = CURRENT_COL11;
-            4'b1001: custom_palette_color = CURRENT_COL12;
-            4'b1011: custom_palette_color = CURRENT_COL13;
-            4'b1101: custom_palette_color = CURRENT_COL14;
-            default: custom_palette_color = CURRENT_COL15;
-        endcase
-    end
-endfunction
-
 function [23:0] palette_color;
     input [1:0] palette;
     input [3:0] color;
@@ -250,7 +225,7 @@ function [23:0] palette_color;
                     default: palette_color = 24'hFFFFFF;
                 endcase
             end
-            default: palette_color = custom_palette_color(color);
+            default: palette_color = 24'h000000;
         endcase
     end
 endfunction
@@ -375,7 +350,28 @@ always @(posedge CLK_14M) begin: pixel_generator
               (shift_reg[1:0] == 2'b00 && shift_reg[5:4] == 2'b11)))) begin
             shift_color = (shift_reg[4:1] << hcount[1:0]) |
                           (shift_reg[4:1] >> (4 - hcount[1:0]));
-            selected_color = palette_color(COLOR_PALETTE, shift_color);
+            if (COLOR_PALETTE == 2'b11) begin
+                case (shift_color)
+                    4'b0000: selected_color = CURRENT_COL0;
+                    4'b0010: selected_color = CURRENT_COL1;
+                    4'b0100: selected_color = CURRENT_COL2;
+                    4'b0110: selected_color = CURRENT_COL3;
+                    4'b1000: selected_color = CURRENT_COL4;
+                    4'b1010: selected_color = CURRENT_COL5;
+                    4'b1100: selected_color = CURRENT_COL6;
+                    4'b1110: selected_color = CURRENT_COL7;
+                    4'b0001: selected_color = CURRENT_COL8;
+                    4'b0011: selected_color = CURRENT_COL9;
+                    4'b0101: selected_color = CURRENT_COL10;
+                    4'b0111: selected_color = CURRENT_COL11;
+                    4'b1001: selected_color = CURRENT_COL12;
+                    4'b1011: selected_color = CURRENT_COL13;
+                    4'b1101: selected_color = CURRENT_COL14;
+                    default: selected_color = CURRENT_COL15;
+                endcase
+            end else begin
+                selected_color = palette_color(COLOR_PALETTE, shift_color);
+            end
             r = selected_color[23:16];
             g = selected_color[15:8];
             b = selected_color[7:0];
@@ -437,7 +433,6 @@ always @(posedge CLK_14M) begin: seam_cleanup
     seam_color_line_window[4] <= raw_color_line;
 
     seam_rgb <= raw_rgb;
-    seam_active <= raw_active;
     timing_active_delay <= {timing_active_delay[12:0], seam_valid_window[3]};
     seam_timing_active <= timing_active_delay[13];
     seam_vbl <= raw_vbl;
@@ -454,6 +449,7 @@ always @(posedge CLK_14M) begin: vertical_line_buffer
     seam_active_d <= seam_timing_active;
     if (seam_vbl) begin
         previous_line_valid <= 1'b0;
+        line_valid_q <= 1'b0;
         comb_hcount <= 0;
     end else if (seam_timing_active) begin
         previous_rgb_q <= previous_line_rgb[comb_hcount];
@@ -515,7 +511,5 @@ assign VGA_G = filtered_rgb[15:8];
 assign VGA_B = filtered_rgb[7:0];
 assign VGA_VBL = vbl_delayed;
 assign VGA_HBL = ~filtered_timing_active;
-
-wire unused_ioctl_addr = &{1'b0, ioctl_addr};
 
 endmodule

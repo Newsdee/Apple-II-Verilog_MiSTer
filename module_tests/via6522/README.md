@@ -4,7 +4,7 @@ Standalone VHDL-vs-Verilog equivalence test for the VIA 6522 used by the
 Mockingboard. Built before the `mockingboard` harness so that any VIA-level
 divergence is isolated from board glue and PSG interaction.
 
-- Golden:   `Apple-II_MiSTer_newsdee/rtl/mockingboard/via6522.vhd`
+- Golden:   `Apple-II_MiSTer_newsdee/rtl/old/via6522.vhd`
 - Candidate: `Apple-II-Verilog_MiSTer/rtl/mockingboard/via6522.v`
 - Rule: this harness reports divergences; it never edits RTL.
 

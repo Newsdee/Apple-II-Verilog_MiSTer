@@ -30,7 +30,7 @@ if (!$CompareOnly) {
     # video2.mif segment via the init_file generic.
     #
     # GHDL 6.0.0 also rejects the LRM-legal shorthand entity instantiation
-    # 'videorom : work.spram' in rtl/video_generator.vhd ("component name
+    # 'videorom : work.spram' in rtl/old/video_generator.vhd ("component name
     # expected, found entity"); Quartus accepts it. The golden RTL is left
     # untouched: a parse-normalized copy is generated under build/ that adds
     # the explicit 'entity' keyword only (a semantic no-op), with strict
@@ -40,7 +40,7 @@ if (!$CompareOnly) {
     # (verified with minimal repros), so the testbench traces ports only and
     # recovers internal state behaviorally via the shift-register walkout
     # (see video_generator_vhdl_tb.vhd header).
-    $goldenSrc = Join-Path $referenceRoot 'rtl\video_generator.vhd'
+    $goldenSrc = Join-Path $referenceRoot 'rtl\old\video_generator.vhd'
     $goldenCopy = Join-Path $vhdlBuild 'video_generator_golden.vhd'
     $srcBytes = [System.IO.File]::ReadAllBytes($goldenSrc)
     $hasBom = ($srcBytes.Length -ge 3 -and $srcBytes[0] -eq 0xEF -and $srcBytes[1] -eq 0xBB -and $srcBytes[2] -eq 0xBF)

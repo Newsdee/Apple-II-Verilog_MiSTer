@@ -1,7 +1,7 @@
 -- mockingboard_vhdl_tb.vhd - golden-side testbench for the mockingboard
 -- equivalence harness.
 --
--- DUT: Apple-II_MiSTer_newsdee/rtl/mockingboard/mockingboard.vhd (golden,
+-- DUT: Apple-II_MiSTer_newsdee/rtl/old/mockingboard.vhd (golden,
 -- VHDL) with its YM2149 component declaration stripped in the build/ copy so
 -- that the psg_left/psg_right instantiations bind to work.YM2149 - the
 -- deterministic stub (ym2149_stub.vhd). The golden via6522.vhd is the

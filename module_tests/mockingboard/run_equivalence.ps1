@@ -23,7 +23,7 @@ if (!$CompareOnly) {
     # (1) mockingboard_golden.vhd: strip the YM2149 component declaration so
     #     psg_left/psg_right bind to entity work.YM2149 - the deterministic
     #     stub analyzed from ym2149_stub.vhd (GHDL cannot compile YM2149.sv).
-    $boardSrc = Join-Path $referenceRoot 'rtl\mockingboard\mockingboard.vhd'
+    $boardSrc = Join-Path $referenceRoot 'rtl\old\mockingboard.vhd'
     $boardCopy = Join-Path $vhdlBuild 'mockingboard_golden.vhd'
     $srcBytes = [System.IO.File]::ReadAllBytes($boardSrc)
     $hasBom = ($srcBytes.Length -ge 3 -and $srcBytes[0] -eq 0xEF -and $srcBytes[1] -eq 0xBB -and $srcBytes[2] -eq 0xBF)
@@ -61,7 +61,7 @@ if (!$CompareOnly) {
     #     The golden uses Quartus-legal but strict-VHDL-illegal case/with-select
     #     choices on std_logic_vector; all are normalized to to_int_vec(...)
     #     subjects (shim package) and integer choices. One use clause added.
-    $viaSrc = Join-Path $referenceRoot 'rtl\mockingboard\via6522.vhd'
+    $viaSrc = Join-Path $referenceRoot 'rtl\old\via6522.vhd'
     $viaCopy = Join-Path $vhdlBuild 'via6522_golden.vhd'
     $vBytes = [System.IO.File]::ReadAllBytes($viaSrc)
     $vHasBom = ($vBytes.Length -ge 3 -and $vBytes[0] -eq 0xEF -and $vBytes[1] -eq 0xBB -and $vBytes[2] -eq 0xBF)

@@ -21,7 +21,7 @@ New-Item -ItemType Directory -Force -Path $vhdlBuild | Out-Null
 if (!$CompareOnly) {
     # Golden copy: GHDL rejects `end process <label>;` for unlabeled
     # processes (Quartus-legal, not strict VHDL). Strip the 4 end labels.
-    $goldenSrc = Join-Path $referenceRoot 'rtl\vga_controller.vhd'
+    $goldenSrc = Join-Path $referenceRoot 'rtl\old\vga_controller.vhd'
     $goldenCopy = Join-Path $vhdlBuild 'vga_controller_golden.vhd'
     $srcBytes = [System.IO.File]::ReadAllBytes($goldenSrc)
     $hasBom = ($srcBytes.Length -ge 3 -and $srcBytes[0] -eq 0xEF -and $srcBytes[1] -eq 0xBB -and $srcBytes[2] -eq 0xBF)

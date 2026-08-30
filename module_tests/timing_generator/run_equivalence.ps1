@@ -26,7 +26,7 @@ if (!$CompareOnly) {
     # is byte-identical EXCEPT for explicit zero initial values on the state
     # signals the original leaves uninitialized (matches Verilator power-on
     # state exactly; no logic changed). Strictly verified below.
-    $goldenSrc = Join-Path $referenceRoot 'rtl\timing_generator.vhd'
+    $goldenSrc = Join-Path $referenceRoot 'rtl\old\timing_generator.vhd'
     $goldenCopy = Join-Path $vhdlBuild 'timing_generator_golden.vhd'
     $srcBytes = [System.IO.File]::ReadAllBytes($goldenSrc)
     $hasBom = ($srcBytes.Length -ge 3 -and $srcBytes[0] -eq 0xEF -and $srcBytes[1] -eq 0xBB -and $srcBytes[2] -eq 0xBF)
