@@ -1,186 +1,219 @@
-# Apple-II full-core harness — investigation progress
+# Apple-II full-core harness — status
 
-Status as of this handoff: **T65 harness PASS, suite 12/13 pass; `apple2` is the only failure.**
-The `apple2` failure is a **coverage-gate failure, not a field-level mismatch**: GHDL and
-Verilator traces still match field-for-field. The gate that throws:
-
-```text
-Coverage failure: normal park at $0580 was never reached (program did not complete)
-(run_equivalence.ps1 line 154)
-```
-
-Everything below is from the instrumented debug runs. No commits were made; the user manages git.
-
-## Where the CPU actually goes
-
-Boot walk reaches the TB override at `$5857` (JMP $C100 intended), but then:
-
-1. Fetch windows at `$5857/$5858/$5859` — DI shows `4C/00/C1` on the **last** row of each
-   window (rows 413/427/441). Early rows of each window still show the *previous* window's
-   byte (one-cycle ROM/settling latency: e.g. row 428 of the $5859 window shows DI=00, the
-   $5858 byte).
-2. Three stack writes: `58`→$01FD, `5A`→$01FC, `B4`→$01FB (rows 442–483). S: FFFD→FFFA.
-3. Vector reads: A=$FFFE (rows 484–497) then A=$FFFF (rows 498–511).
-4. PC := **$C3FA** from row 512; CPU then executes real ROM code at $C3xx/ROM[03xx] and
-   never returns to main RAM → park at $0580 never reached → gate fails.
-
-The pushed return address is $585A (hi 58 @01FD, lo 5A @01FC), i.e. the CPU behaved as if a
-BRK sat at **$5859** — but DI on the latch row of the $5857 window was 4C. See "Mystery 1".
-
-## The ROM_ADDR anomaly (Mystery 2) — the big one
-
-New debug columns (this session): `ROM_ADDR` = DUT `rom_addr` wire, `ROM_OUT` = DUT
-`rom_out`. Trace rows 478–516:
+**Status: PASS.** The `apple2` GHDL-vs-Verilator equivalence harness is green and the full
+`module_tests` suite is **13/13 pass, 0 fail, 0 skip** (299 s):
 
 ```text
-478-483 A=01FB ROM_ADDR=01FB ROM_OUT=24   (correct: ROM[0x01FB]=24)
-484     A=FFFE ROM_ADDR=3FFE ROM_OUT=24   (stale, 1-cycle latency)
-485-497 A=FFFE ROM_ADDR=3FFE ROM_OUT=FA   (FA = ROM[0x3FFE])
-498     A=FFFF ROM_ADDR=3FFF ROM_OUT=FA   (stale)
-499-511 A=FFFF ROM_ADDR=3FFF ROM_OUT=C3   (C3 = ROM[0x3FFF])
-512+    A=C3FA ROM_ADDR=03FA ROM_OUT=...  (normal slice again)
+APPLE2 EQUIVALENCE PASS rows=22624 fields=429840 ignored_metavalues=16 park=0580 aux_write=1 io_strobe=1 nmi=1 romswitch_01=1 palmode_0=1
+
+Test                     Result Seconds
+apple2                   PASS     62.43
+apple2_font_rom          PASS      6.77
+disk_ii                  PASS    111.66
+dpram                    PASS      7.45
+hdd                      PASS      4.04
+keyboard                 PASS      2.39
+mockingboard             PASS      3.44
+timing_generator         PASS     21.84
+t65                      PASS     14.45
+via6522                  PASS      4.34
+vga_controller           PASS     54.41
+video_generator          PASS      2.43
+virtual_keyboard_overlay PASS      3.42
 ```
 
-So the simulated ROM address is **$3FFE/$3FFF when A=$FFFE/$FFFF**, but a plain A(13:0)
-slice for $C3FA→$03FA and $01FB→$01FB. Both GHDL and Verilator show identical values.
+The previous failure was a **coverage-gate failure** (`normal park at $0580 was never
+reached`), not an RTL divergence — field comparison was always clean because both DUTs
+received identical (broken) stimulus. The root cause turned out to be three stacked TB
+program/model bugs, all now fixed in BOTH testbenches. No RTL behavior was changed; the
+`DBG_*` debug ports added during diagnosis are still present (see "Remaining work").
 
-### Ruled out (verified this session)
+## Root-cause chain (three layers)
 
-- ROM file contents: `apple2e.mif`/`apple2e.hex` byte-identical; [0x0FFE]=CF,
-  [0x0FFF]=DF, [0x3FFE]=FA, [0x3FFF]=C3, [0x01FB]=24.
-- `module_tests/shared/spram_const.vhd`: clean shim, `q <= mem(base + to_integer(unsigned(address)))`,
-  base=10240 for apple2e; entries[14334]=CF verified in file.
-- `rtl/rom.v`: clean `data_out <= d[a]`.
-- `HRAM_READ_EN`/`CPU_DL` path: at $FFFE, `HRAM_READ_EN = HRAM_READ and A(15) and A(14) and (A(13) or A(12))`
-  (apple2_ent.vhd line 376) could route D_IN to CPU_DL, but the TB RAM byte functions give
-  main_byte($FFFE)=0x39/($FFFF)=0x3A and aux=(ai*7+165)%256 → 0x97/0x9E — none equal FA/C3.
-- Multiple drivers: `grep -i rom_addr` in `rtl/apple2.v` → single `wire [13:0] rom_addr;`
-  (line 165), single `assign rom_addr = A[13:0];` (line 257), single use `.a(rom_addr)` (606).
-  `A` single-driven: line 553 `assign A = (cpu == 1'b0) ? (T65_A[15:0]) : R65C02_A;`,
-  `assign ADDR = A;` (line 250). VHDL copy: single `A <= ...` (line 508), single
-  `rom_addr <= A(13 downto 0);` (line 231), `ADDR <= A` (line 226).
-- Stale build: the new debug ports appear in the traces, so both simulators compiled the
-  current edited files.
+### Layer 1 — boot handoff address (T65 RTS +1)
 
-### The paradox
+The ROM boot path ends with `JSR $FE84` / `RTS`. T65 JSR pushes PC+2 and RTS adds +1 to the
+popped value, so the deterministic pattern walk lands at **$5858**, not $5857. The TB
+override originally put `JMP $C100` at $5857, so the CPU hit a pattern byte (BRK) at $5858
+and vector-faulted to $C3FA before Phase A ever ran — which is why "Phase A never executed"
+was the original symptom. Fix: boot handoff override now occupies
+$5857=$EA (NOP guard), $5858–$585A=`4C 00 C1` (JMP $C100), $585B=$EA.
 
-Measured same-instant values: `ADDR`=FFFE and `ROM_ADDR`=3FFE, with `rom_addr = A[13:0]` as
-the only driver. Under standard Verilog semantics that requires A=$F3FE (or similar) at that
-instant — which ADDR should then also show. **Not yet explained.**
+### Layer 2 — softswitch values come from the ADDRESS, not the data bus
 
-## Instrumentation added this session (all uncommitted)
+Two separate softswitch mechanisms exist in `rtl/apple2.v`:
 
-- `rtl/apple2.v`: ports `DBG_T65_REGS [63:0]`, `DBG_DI [7:0]` (previous session) plus
-  `DBG_ROM_ADDR [13:0]`, `DBG_ROM_OUT [7:0]` (this session); assigns from `rom_addr`/`rom_out`;
-  `.Regs(DBG_T65_REGS)` on the cpu6502 instance.
-- `module_tests/apple2/apple2_ent.vhd`: same four ports (**entity port list uses semicolons** —
-  hit the GHDL "interfaces must be separated by ';'" error twice with commas); assignments at
-  end of arch.
-- Both TBs: debug signals/wires, DUT port-map entries, CSV header now ends
-  `...,NMI_N,T65_REGS,T65_DI,ROM_ADDR,ROM_OUT`, per-cycle writes (SV format `%016h,%02h,%04h,%02h`).
+- **$C050–$C05F** (`SOFTSWITCH_SELECT`): any access latches
+  `soft_switches[A[3:1]] <= A[0]` at PHASE_ZERO_R (no write required).
+  $C054/$C055 → `soft_switches[2]` = **PAGE2**; $C050/$C051 = TEXT_MODE;
+  $C052/$C053 = MIXED_MODE; $C056/$C057 = HIRES_MODE; $C058–$C05F = AN.
+- **$C000–$C00F** (`KEYBOARD_SELECT`): write-only latch (PHASE_ZERO_R & we), value = A[0]:
+  $C001=STORE80, $C003=RAMRD, $C005=RAMWRT, $C007=CXROM, $C009=ALTZP, $C00B=C3ROM,
+  $C00D=COL80, $C00F=ALTCHAR (each pair's low address clears, high sets).
 
-### Trace column map (24 columns, 1-based)
+The old Phase A wrote `$C001` intending RAMRD (actually sets STORE80) and ended with
+`STA $C000` intending STORE80=1 (actually **clears** STORE80, because the value is A[0]=0).
+Corrected Phase A uses STA $C055 (PAGE2=1), STA $C003 (RAMRD=1), STA $C001 (STORE80=1),
+STA $C00C (COL80=0), plus harmless coverage writes to $C0FF (devselect) and main RAM.
 
-1 CYCLE, 2 ADDR, 3 D(D_OUT), 4 RAM_ADDR, 5 RAM_WE, 6 AUX, 7 CPU_WE, 8 PD, 9 IO_SELECT,
-10 DEVICE_SELECT, 11 IO_STROBE, 12 SPEAKER, 13 VIDEO, 14 PHASE_ZERO, 15 PHASE_ZERO_R,
-16 PHASE_ZERO_F, 17 ROMSWITCH, 18 PALMODE, 19 CPU_WAIT, 20 NMI_N, 21 T65_REGS (16 hex:
-PC[0:4] S[4:8] P[8:10] Y[10:12] X[12:14] A[14:16]), 22 T65_DI, 23 ROM_ADDR, 24 ROM_OUT.
+### Layer 3 — the AUX RAM bank model (the big one)
 
-Traces: `module_tests/apple2/build/vhdl_trace.csv` and `build/verilog_trace.csv`.
+`rtl/apple2.v` `RAM_data_latch`:
 
-## Timing model facts (verified earlier)
+```verilog
+if (AX & ~CAS_N & RAS_N & ~Q3) begin
+    if (PHASE_ZERO == 0)      VIDEO_DL_LATCH <= ram_do;   // 16-bit video latch
+    else if (aux == 0)        CPU_DL <= ram_do[7:0];      // MAIN RAM half
+    else                      CPU_DL <= ram_do[15:8];     // AUX RAM half
+end
+```
 
-- `CPU_EN` = 1-cycle pulse on the cycle where PHASE_ZERO just fell (`PHASE_ZERO_D='1' and
-  PHASE_ZERO='0'`). In the $FFFE window PZ falls at **row 497** (last row); T65's clocked
-  process latches at the rising edge with enable high, so the latched byte = DI on the
-  PZ-fall row.
-- **PZ timing is address-dependent** (timing generator), so the latch row differs per window.
-  Earlier dumps sampled fixed rows (c%14===3) and misread which byte was latched.
-- ROM is synchronous, 1-cycle latency (first row of each window shows previous address's data).
+The TB models both banks in one 16-bit `ram_do`. With STORE80=1 and PAGE2=1 (Layer 2 fix),
+pages 04–07 route to **AUX** (`aux = (STORE80 & PAGE2) | ...`), so Phase B at $0540, the
+parks at $0580/$05A0, and page-03 reads with RAMRD=1 (the NMI trampoline) all come from
+`ram_do[15:8]`. The TB had modeled that half as a bare formula `(addr*7+0xA5)` — Phase B
+therefore executed formula garbage. (The pre-fix runs only "worked" because the broken
+softswitches kept everything on MAIN RAM.)
 
-## Next steps (in order)
+**Fix:** both banks are preloaded with the SAME image in both TBs:
+`ram_do[15:8] = main_byte(addr)` (Verilog) / `ram_do(15 downto 8) <= unsigned(main_byte(addr))`
+(VHDL). Writes remain non-persistent (stateless model), which is fine — the program never
+checks write-back values.
 
-1. **Re-dump trace rows ~395–520 with column 14 (PHASE_ZERO)**; for each 14-cycle window find
-   the PZ-fall row (CPU_EN) and record DI on that exact row → reconstruct the true latched
-   instruction stream. This may dissolve Mystery 1 (the "BRK at $5859" reading came from a
-   fixed-row sample; the real latch row may show a different byte).
-2. **Resolve the A vs rom_addr paradox**: zero-cost pre-checks first —
-   - `grep -rn "module apple2"` over all Verilog sources in the Verilator build list (rule out
-     a shadowing second definition / stale copy); confirm the runner's exact source list.
-   Then add debug ports `DBG_T65_A` (full 24 bits), `DBG_R65C02_A`, `DBG_CPU` to both DUTs +
-   TBs, re-run, and compare against ADDR/ROM_ADDR during the $FFFE window: is A really FFFE
-   when rom_addr=3FFE, or is A=$F3FE with ADDR sampled stale?
-3. Apply the fix (likely TB program/gate-side once root cause is known; only touch RTL if a
-   genuine common bug is proven — remember both sides match, so prefer shared-environment causes).
-4. Re-run harness to green; then decide keep-vs-remove for the debug ports (document choice).
-5. Update `module_tests/README.md` roster + this file's status. Do **not** commit.
+## What Phase A now does (C100–C14F, 80 code bytes + EA padding to $C1FF)
 
-## Comparison-tool audit (all 13 harnesses)
+```text
+CLE | STA $C00C (COL80=0) | STA $C0FF (devselect, harmless)
+STA $0100 / LDA $0100 (main-RAM write+read coverage)
+STA $C055 (PAGE2=1)
+LDA $C01C (dummy: latches SF_D := PAGE2) | LDA #0 (normalize A/flags; clears VHDL 'U')
+LDA $C01C (test 1: bit7 = SF_D = PAGE2 = 1) | AND #$80 | BNE ok / JMP $05A0 error park
+STA $C003 (RAMRD=1)
+LDA $C013 (dummy: latches SF_D := RAMRD) | LDA #0
+LDA $C013 (test 2: bit7 = SF_D = RAMRD = 1) | AND #$80 | BNE ok / JMP $05A0 error park
+LDA $C100 (PD feedback) | LDA $C800 (IO_STROBE read, MUST precede $C300)
+LDA $C300 (ROM read; latches C8ROM=1)
+STA $C001 (STORE80=1)
+JMP $0540 (Phase B)
+```
 
-After the overlapping-slice bug in my ad-hoc `decode_trace.js` (this session only — never
-part of any harness, affected no results), all harness comparison scripts were audited for
-the same defect classes:
+Key core facts the program relies on (all verified in `rtl/apple2.v`):
 
-- Column access: all header-driven by name, no positional offsets.
-- Case: all ToUpperInvariant both sides.
-- Metavalue skip: only on VHDL/golden side `[UXWZ-]`, always counted.
-- Row counts: all throw on mismatch; t65 enforces exact expected rows; dpram checks CYCLE per row.
-- Anti-vacuous gates: apple2 ≥50k fields+8 behavioral · disk_ii ≥40k+flags · hdd ≥90k ·
-  keyboard ≥1.5k+8 behavioral · video_generator ≥4k+ROM/transition · t65 exact rows+17 gates ·
-  timing_generator VBLANK/PHI0/per-column · vga_controller ≥163k rows+HS≥170 · via6522
-  transition/IRQ/DOUT · mockingboard rw counts · apple2_font_rom ≥4200 rows+glyphs ·
-  dpram INIT zero-readback (no min-fields gate — optional hardening).
-- virtual_keyboard_overlay: not a GHDL/Verilator equivalence harness (single Verilator build,
-  reference vs candidate modules).
+- **SF_D one-read latency**: SF_D latches at PHASE_ZERO_R (end of PZ=0), but T65 samples DI
+  at CPU_EN (start of PZ=0) — a C01x read returns the value latched by the PREVIOUS C01x
+  read. Hence each test is preceded by a dummy C01x read. $C01C source = PAGE2, $C013 =
+  RAMRD, $C018 = STORE80.
+- **SF_D initial state**: VHDL 'U', Verilog 0 — the first read's stale value is never
+  checked and LDA #0 normalizes A/flags afterwards (V flag may stay 'U' in VHDL; nothing
+  branches on V).
+- **C8ROM side effect**: any C3xx access with C3ROM=0 latches C8ROM=1, routing later
+  C8xx–CFxx reads to ROM — so $C800 is read before $C300.
+- **C1xx PD slot** is `io_select[1]` (decoder bit from A[10:8]), not [0].
 
-Independent re-check of apple2 match via `decode_trace.js --diff` (mirrors harness rules):
-compared_fields=535761 ignored_metavalues=1071 mismatches=0.
+## Phase B and park/trampoline layout (main RAM overrides, mirrored in aux bank)
 
-## decode_trace.js (this session, new tool)
+- $0540–$056E: PHASE_B (47 bytes): LDA #$37; STA $0660 (AUX write — auxRamWriteObserved
+  gate); LDA $0660; LDA #$5A; STA $0220; LDA $0220; LDA #$6B; STA $C030; LDA $C000;
+  LDA $C060/$C070/$C040/$C090; STA $C090; LDA $C200; LDA #$77; JMP $0580.
+- $0580–$0582: `4C 80 05` normal park (JMP $0580).
+- $05A0–$05A2: `4C A0 05` error park (JMP $05A0) — target of both Phase A test failures.
+- $03FB–$03FD: `4C FA C3` NMI trampoline (JMP $C3FA).
 
-`module_tests/apple2/decode_trace.js` — deterministic trace decoder:
-- `node module_tests/apple2/decode_trace.js <trace.csv> --cpu-en [--from N] [--to N]`
-  prints one line per CPU_EN event (PZ-fall row = T65 latch edge) with decoded registers.
-- `node module_tests/apple2/decode_trace.js --diff a.csv b.csv` re-verifies equivalence
-  independently of the PowerShell harness (same rules: per-field, case-insensitive,
-  skip fields where VHDL value has [UXWZ-]).
-- T65_REGS layout pinned from source (t65.vhd line 275 / t65.v line 407):
-  [0:4]=PC [4:8]=S [8:10]=P [10:12]=Y [12:14]=X [14:16]=A. Parse fails loudly on bad input.
-- Known fixed bug history: first version used overlapping slice windows (slice(n*2,n*2+4))
-  which mislabeled S/P/Y/X/A — do not reuse that pattern; the current file is correct.
+## ROM vector mapping (this core: rom_addr = A[13:0])
+
+| CPU access | file offset | bytes | result |
+|---|---|---|---|
+| reset $FFFC/$FFFD | 0x3FFC/0x3FFD | 62 FA | PC := $FA62 (boot walk) |
+| NMI   $FFFA/$FFFB | 0x3FFA/0x3FFB | FB 03 | PC := $03FB (trampoline → $C3FA) |
+| IRQ/BRK $FFFE/$FFFF | 0x3FFE/0x3FFF | FA C3 | PC := $C3FA |
+
+The real IIe NMI handler at **$C3FA–$C401** (crosses the page boundary — CLD sits at
+$C400): `BIT $C015; STA $C007; CLD; SEI; JSR $0101`. Empirically verified in the final
+trace: NMI pulse at c≈8000 → stack pushes → vector reads → fetches at $03FC/$03FD →
+$C3FA handler executes (BIT $C015 at c≈8224, STA $C007, CLD at $C400, SEI, JSR $0101) →
+deterministic pattern walk. IRQ_N is tied high in both TBs; the only interrupt source is
+the TB NMI pulse (NMI_LO=8000..NMI_HI=8009).
+
+## Files changed this session (both uncommitted; user manages git)
+
+- `module_tests/apple2/apple2_verilog_tb.sv`
+  - Phase A rewritten (correct softswitch addresses + dummy-read/normalize sequence);
+    PHASE_A is exactly 256 bytes, code C100–C14F.
+  - `ram_do[15:8] = main_byte(addr)` (AUX bank preloaded with same image).
+  - Earlier-session changes retained: TRACE_START=0, boot handoff at $5858, NMI trampoline
+    override, io_select[1] PD fix, DBG_* port map entries.
+- `module_tests/apple2/apple2_vhdl_tb.vhd` — exact mirrors of all of the above.
+  **PHASE_A verified byte-identical between the two TBs (256 bytes each)** via a node
+  extraction/comparison one-liner.
+- `rtl/apple2.v`, `module_tests/apple2/apple2_ent.vhd` — DBG_* debug ports from earlier
+  diagnosis sessions (DBG_T65_REGS, DBG_DI, DBG_ROM_ADDR, DBG_ROM_OUT). Still used by both
+  TBs (CSV columns 21–24). Keep-vs-remove decision pending.
+
+## Verification evidence
+
+- Verilog-only trace check after the fix: `rows=22624 C1xx=1036 park0580=224 err05a0=0
+  C3FA=2 auxWrites=7 auxWriteAUX1=7` (all $0660 writes have AUX=1).
+- Full harness: `APPLE2 EQUIVALENCE PASS rows=22624 fields=429840
+  ignored_metavalues=16 park=0580 aux_write=1 io_strobe=1 nmi=1 romswitch_01=1 palmode_0=1`.
+- Full suite: `passed=13 failed=0 skipped=0 seconds=299.1` (virtual_keyboard_overlay ran
+  and passed this time; it had been SKIP in the earlier 11/1/1 run).
+
+## Remaining work
+
+1. **DBG_* keep-vs-remove decision** (user): the four debug ports are harmless but are
+   test-only pins on `apple2`/`apple2_ent`. Removing them means editing both DUTs, both TBs
+   (port map + CSV header), and confirming the harness column expectations; keeping them is
+   zero-cost for simulation.
+2. **Docs**: update `module_tests/README.md` roster line for apple2 (now PASS with gates)
+   and this file's status if it moves; the t65 harness docs are unaffected.
+3. **User commit** of staged test files + these TB changes (nothing committed yet).
 
 ## Commands
 
 ```powershell
-# full harness (from E:\MiSTer\Apple-II_FPGAdev\Apple-II-Verilog_MiSTer)
+# full apple2 harness (from E:\MiSTer\Apple-II_FPGAdev\Apple-II-Verilog_MiSTer)
 powershell -NoProfile -ExecutionPolicy Bypass -File module_tests/apple2/run_equivalence.ps1
 
-# fast GHDL-analysis-only check (prints errors without running sims)
-C:/msys64/ucrt64/bin/ghdl.exe -a --std=08 -fsynopsys "--workdir=module_tests/apple2/build/vhdl" `
-  module_tests/shared/spram_const.vhd module_tests/apple2/ramcard_stub.vhd `
-  module_tests/apple2/timing_generator_init.vhd module_tests/apple2/video_generator_ent.vhd `
-  ../Apple-II_MiSTer_newsdee/rtl/t65/T65_Pack.vhd ../Apple-II_MiSTer_newsdee/rtl/t65/T65_MCode.vhd `
-  ../Apple-II_MiSTer_newsdee/rtl/t65/T65_ALU.vhd ../Apple-II_MiSTer_newsdee/rtl/t65/T65.vhd `
-  module_tests/apple2/R65C02_ent.vhd module_tests/apple2/apple2_ent.vhd module_tests/apple2/apple2_vhdl_tb.vhd
+# whole suite
+powershell -NoProfile -ExecutionPolicy Bypass -File module_tests/run_tests.ps1
 ```
 
-Trace analysis: node one-liners over `build/vhdl_trace.csv` (split on `,`; columns above).
+Fast Verilog-only iteration (bash/MSYS2, ~35 s build):
 
-## TB environment reference
+```bash
+cd E:/MiSTer/Apple-II_FPGAdev/Apple-II-Verilog_MiSTer
+export VERILATOR_ROOT="C:/msys64/ucrt64/share/verilator" MAKE="/c/msys64/ucrt64/bin/mingw32-make.exe" SHELL="/c/msys64/usr/bin/sh.exe" PATH="/c/msys64/usr/bin:/c/msys64/ucrt64/bin:$PATH"
+/c/msys64/ucrt64/bin/verilator_bin.exe --binary --timing -Wno-fatal --top-module apple2_verilog_tb \
+  --Mdir module_tests/apple2/build/verilog \
+  module_tests/apple2/apple2_verilog_tb.sv rtl/apple2.v rtl/t65/t65_pack.v rtl/t65/t65_mcode.v \
+  rtl/t65/t65_alu.v rtl/t65/t65.v rtl/R65Cx2.sv rtl/timing_generator.v rtl/video_generator.v \
+  rtl/rom.v rtl/ramcard.v
+./module_tests/apple2/build/verilog/Vapple2_verilog_tb.exe
+```
 
-- Main RAM low byte `main_byte(a)`: pattern `(ai + ai/16 + 60) mod 256`, overrides:
-  $5857–$585B = `4C 00 C1 EA EA` (JMP $C100), $0540–$056E = PHASE_B, $0580–$0582 = `4C 80 05`
-  (normal park JMP $0580), $05A0–$05A2 = `4C A0 05` (error park JMP $05A0).
-- Main RAM high byte: `(ai*7 + 165) mod 256`.
-- Reset vector: ROM[0x0FFC]/ROM[0x0FFD] → PC=$6B4C (boot walk through real ROM reaches $5857).
-- `cpu='0'` in both TBs (T65 active, R65C02 parked).
+Quick trace gate check (after a Verilog run):
 
-## Gotchas learned
+```bash
+awk -F, 'NR==1{for(i=1;i<=NF;i++)h[$i]=i} $1!="CYCLE"{
+  if ($h["ADDR"]=="0660" && $h["RAM_WE"]=="1") {auxw++; if ($h["AUX"]=="1") auxw1++}
+  if ($h["ADDR"]=="0580") park++; if ($h["ADDR"]=="05a0") errp++
+  if ($h["ADDR"]=="c3fa") c3fa++; rows++
+} END {printf "rows=%d park0580=%d err05a0=%d C3FA=%d auxWrites=%d auxWriteAUX1=%d\n", rows, park, errp, c3fa, auxw, auxw1}' \
+  module_tests/apple2/build/verilog_trace.csv
+```
 
-- VHDL **entity** port lists are semicolon-separated (component port maps too); GHDL errors:
-  "interfaces must be separated by ';'". Hit twice this session.
-- Use node byte-level splices with an occurrence-count check (`split(old).length-1 === 1`) to
-  preserve CRLF/mixed EOLs in these files.
-- The `D` column is D_OUT (CPU data output), **not** read data; read data is T65_DI (col 22)
-  and raw ROM out is col 24.
-- Fixed-row sampling of a 14-cycle window misreads latched bytes — always use the PZ-fall row.
+## Gotchas (kept from earlier sessions — still true)
+
+- **Stale DI on row 1 of each 14-cycle window**: the first trace row of a window shows the
+  PREVIOUS byte; T65 latches on the PZ-fall (last) row. Reading "the vector bytes" from row
+  1 misreports them (e.g. NMI window rows showed 24/FB; true latched bytes are FB/03).
+- Sparse sampling (16-cycle grid from c=8128) can miss entire 14-cycle windows — a missing
+  address in the transition list is not proof it was never fetched.
+- `D` column = D_OUT (CPU data output), not read data; read data = T65_DI (col 22).
+- VHDL **entity** port lists are semicolon-separated (GHDL: "interfaces must be separated
+  by ';'").
+- Softswitch writes take effect from the ADDRESS bit A[0], never from the data bus.
+- With RAMRD=1, page-02/03 reads route to the AUX half — harmless here because both banks
+  hold the same image, but remember it when changing the RAM model.
+- Preserve mixed EOLs; use node byte-level splices or the edit tool, not PowerShell
+  Get-Content/Set-Content, for these files.
