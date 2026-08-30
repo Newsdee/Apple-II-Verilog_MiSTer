@@ -101,7 +101,8 @@ V_SRC = \
 		$(RTL)/mouse/jt6805/jt6805_regs.v  \
 		$(RTL)/mouse/jt6805/jtframe_6805mcu.v  \
 		$(RTL)/floppy_track.sv  \
-		$(RTL)/clock_card.v  \
+		$(RTL)/nsc_ticker.sv  \
+		$(RTL)/no_slot_clock.sv  \
 		$(RTL)/apple2_top.v  \
 		$(RTL)/apple2.v  \
 		$(RTL)/keyboard.v 

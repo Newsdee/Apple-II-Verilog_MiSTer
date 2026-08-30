@@ -78,6 +78,11 @@
 //      evaluation per tick window), not a stuck-state bug.
 //   6. Upstream's blocking `cmp_reg_cnt_q = 0;` in the reset branch became a
 //      nonblocking assignment (value-identical, lint-clean).
+//   7. The packed struct (nsc_time_t) and enum (carry_sm) were replaced with
+//      a plain logic [83:0] vector + 4-bit localparams: identical bit layout
+//      and behavior, but Quartus 17 cannot synthesize procedural packed-struct
+//      field assignments / enum case in always_comb (error 10166). Verilator
+//      accepts both forms; this form is accepted by both.
 //-----------------------------------------------------------------------------
 
 module no_slot_clock(
@@ -94,30 +99,21 @@ module no_slot_clock(
 );
 
 // ---------------------------------------------------------------------------
-// NSC_time — identical layout to AppleTini globals.sv (packed struct).
-// The low 64 bits are what the DS1216E-style readout publishes, as BCD pairs
-// (hi nibble, lo nibble): year, month, day, day-of-week, hour, minute,
-// second, centisecond. Bit 0 of byte 0 is emitted first on a read-out.
+// NSC_time — identical bit layout to AppleTini globals.sv's packed struct
+// (modification 7: plain vector, no struct). The low 64 bits are what the
+// DS1216E-style readout publishes, as BCD pairs (hi nibble, lo nibble):
+// year, month, day, day-of-week, hour, minute, second, centisecond.
+// Bit 0 of byte 0 is emitted first on a read-out.
+//   [83:64] centisecond_ticks  internal tick counter (never published)
+//   [63:60] year_hi            [59:56] year_lo
+//   [55:52] month_hi           [51:48] month_lo
+//   [47:44] day_hi             [43:40] day_lo
+//   [39:36] day_of_week_hi     [35:32] day_of_week_lo
+//   [31:28] hour_hi            [27:24] hour_lo
+//   [23:20] minute_hi          [19:16] minute_lo
+//   [15:12] second_hi          [11:8]  second_lo
+//   [7:4]   centisecond_hi     [3:0]   centisecond_lo
 // ---------------------------------------------------------------------------
-typedef struct packed {
-    logic [19:0] centisecond_ticks; // internal tick counter (never published)
-    logic [3:0]  year_hi;
-    logic [3:0]  year_lo;
-    logic [3:0]  month_hi;
-    logic [3:0]  month_lo;
-    logic [3:0]  day_hi;
-    logic [3:0]  day_lo;
-    logic [3:0]  day_of_week_hi;
-    logic [3:0]  day_of_week_lo;
-    logic [3:0]  hour_hi;
-    logic [3:0]  hour_lo;
-    logic [3:0]  minute_hi;
-    logic [3:0]  minute_lo;
-    logic [3:0]  second_hi;
-    logic [3:0]  second_lo;
-    logic [3:0]  centisecond_hi;
-    logic [3:0]  centisecond_lo;
-} nsc_time_t;
 
 localparam logic [63:0] clock_access_pattern = 64'h5CA33AC55CA33AC5;
 localparam logic [63:0] fake_time = 64'h2503300117510000;
@@ -125,16 +121,23 @@ localparam logic [63:0] fake_time = 64'h2503300117510000;
 // 10 ms centisecond period at 14.31818 MHz (see header, modification 5)
 parameter CSEC_WRAP = 20'd143181;
 
-typedef enum {IDLE, INC_CSEC, INC_SEC,
-              INC_MIN, INC_HOUR, INC_DAY,
-              INC_MONTH, INC_YEAR, UPDATE_PUB} carry_sm;
+// Carry FSM states (modification 7: plain 4-bit constants, not an enum)
+localparam [3:0] IDLE       = 4'd0;
+localparam [3:0] INC_CSEC   = 4'd1;
+localparam [3:0] INC_SEC    = 4'd2;
+localparam [3:0] INC_MIN    = 4'd3;
+localparam [3:0] INC_HOUR   = 4'd4;
+localparam [3:0] INC_DAY    = 4'd5;
+localparam [3:0] INC_MONTH  = 4'd6;
+localparam [3:0] INC_YEAR   = 4'd7;
+localparam [3:0] UPDATE_PUB = 4'd8;
 
 logic [7:0]  wr_data_d, wr_data_q = 0;
 logic        wr_data_en_d, wr_data_en_q = 0;
 
-nsc_time_t   cur_time_d, cur_time_q = '0;
+logic [83:0] cur_time_d, cur_time_q = 84'd0;
 logic [63:0] pub_time_d, pub_time_q = 0;
-carry_sm     carry_state_d, carry_state_q = IDLE;
+logic [3:0]  carry_state_d, carry_state_q = IDLE;
 
 logic        clock_reg_en_d, clock_reg_en_q = 0;
 logic        write_en_d, write_en_q = 0;
@@ -245,8 +248,13 @@ end
 assign wr_data = wr_data_q;
 assign wr_data_en = wr_data_en_q;
 
-logic [7:0] month_byte;
-logic [7:0] day_byte;
+// Month/day byte views of cur_time_q. Continuous assigns, NOT in-block
+// assignments: assigning them only inside the INC_MONTH branch made Quartus
+// infer latches there, which fails its "purely combinational" always_comb
+// check (error 10166). Values are identical — they are read only in that
+// branch and depend only on cur_time_q.
+wire [7:0] month_byte = {cur_time_q[55:52], cur_time_q[51:48]};
+wire [7:0] day_byte   = {cur_time_q[47:44], cur_time_q[43:40]};
 
 always_comb begin
     cur_time_d = cur_time_q;
@@ -257,206 +265,204 @@ always_comb begin
         pub_time_d = input_time[63:0];
         carry_state_d = IDLE;
     end else begin
-        if (cur_time_q.centisecond_ticks == CSEC_WRAP) begin
-            cur_time_d.centisecond_ticks = 0;
+        if (cur_time_q[83:64] == CSEC_WRAP) begin
+            cur_time_d[83:64] = 0;
             carry_state_d = INC_CSEC;
         end else begin
-            cur_time_d.centisecond_ticks = cur_time_q.centisecond_ticks + 1;
+            cur_time_d[83:64] = cur_time_q[83:64] + 20'd1;
         end
         case (carry_state_q)
         IDLE: begin
-            if (cur_time_q.day_of_week_lo == 0) begin
-                cur_time_d.day_of_week_lo = 1;
+            if (cur_time_q[35:32] == 0) begin
+                cur_time_d[35:32] = 1;
             end
-            if (cur_time_q.day_lo == 0
-                && cur_time_q.day_hi == 0) begin
-                cur_time_d.day_lo = 1;
+            if (cur_time_q[43:40] == 0
+                && cur_time_q[47:44] == 0) begin
+                cur_time_d[43:40] = 1;
             end
         end
         INC_CSEC: begin
-            if (cur_time_q.centisecond_lo == 4'd9) begin
-                cur_time_d.centisecond_lo = 4'd0;
-                if (cur_time_q.centisecond_hi == 4'd9) begin
-                    cur_time_d.centisecond_hi = 4'd0;
+            if (cur_time_q[3:0] == 4'd9) begin
+                cur_time_d[3:0] = 4'd0;
+                if (cur_time_q[7:4] == 4'd9) begin
+                    cur_time_d[7:4] = 4'd0;
                     carry_state_d = INC_SEC;
                 end else begin
-                    cur_time_d.centisecond_hi = cur_time_q.centisecond_hi + 1;
+                    cur_time_d[7:4] = cur_time_q[7:4] + 4'd1;
                     carry_state_d = UPDATE_PUB;
                 end
             end else begin
-                cur_time_d.centisecond_lo = cur_time_q.centisecond_lo + 1;
+                cur_time_d[3:0] = cur_time_q[3:0] + 4'd1;
                 carry_state_d = UPDATE_PUB;
             end
         end
         INC_SEC: begin
-            if (cur_time_q.second_lo == 4'd9) begin
-                cur_time_d.second_lo = 4'd0;
-                if (cur_time_q.second_hi == 4'd5) begin
-                    cur_time_d.second_hi = 4'd0;
+            if (cur_time_q[11:8] == 4'd9) begin
+                cur_time_d[11:8] = 4'd0;
+                if (cur_time_q[15:12] == 4'd5) begin
+                    cur_time_d[15:12] = 4'd0;
                     carry_state_d = INC_MIN;
                 end else begin
-                    cur_time_d.second_hi = cur_time_q.second_hi + 1;
+                    cur_time_d[15:12] = cur_time_q[15:12] + 4'd1;
                     carry_state_d = UPDATE_PUB;
                 end
             end else begin
-                cur_time_d.second_lo = cur_time_q.second_lo + 1;
+                cur_time_d[11:8] = cur_time_q[11:8] + 4'd1;
                 carry_state_d = UPDATE_PUB;
             end
         end
         INC_MIN: begin
-            if (cur_time_q.minute_lo == 4'd9) begin
-                cur_time_d.minute_lo = 4'd0;
-                if (cur_time_q.minute_hi == 4'd5) begin
-                    cur_time_d.minute_hi = 4'd0;
+            if (cur_time_q[19:16] == 4'd9) begin
+                cur_time_d[19:16] = 4'd0;
+                if (cur_time_q[23:20] == 4'd5) begin
+                    cur_time_d[23:20] = 4'd0;
                     carry_state_d = INC_HOUR;
                 end else begin
-                    cur_time_d.minute_hi = cur_time_q.minute_hi + 1;
+                    cur_time_d[23:20] = cur_time_q[23:20] + 4'd1;
                     carry_state_d = UPDATE_PUB;
                 end
             end else begin
-                cur_time_d.minute_lo = cur_time_q.minute_lo + 1;
+                cur_time_d[19:16] = cur_time_q[19:16] + 4'd1;
                 carry_state_d = UPDATE_PUB;
             end
         end
         INC_HOUR: begin
-            if (cur_time_q.hour_lo == 4'd9 ||
-                (cur_time_q.hour_lo == 4'd3 && cur_time_q.hour_hi == 4'd2)) begin
-                cur_time_d.hour_lo = 4'd0;
-                if (cur_time_q.hour_hi == 4'd2) begin
-                    cur_time_d.hour_hi = 4'd0;
+            if (cur_time_q[27:24] == 4'd9 ||
+                (cur_time_q[27:24] == 4'd3 && cur_time_q[31:28] == 4'd2)) begin
+                cur_time_d[27:24] = 4'd0;
+                if (cur_time_q[31:28] == 4'd2) begin
+                    cur_time_d[31:28] = 4'd0;
                     carry_state_d = INC_DAY;
                 end else begin
-                    cur_time_d.hour_hi = cur_time_q.hour_hi + 1;
+                    cur_time_d[31:28] = cur_time_q[31:28] + 4'd1;
                     carry_state_d = UPDATE_PUB;
                 end
             end else begin
-                cur_time_d.hour_lo = cur_time_q.hour_lo + 1;
+                cur_time_d[27:24] = cur_time_q[27:24] + 4'd1;
                 carry_state_d = UPDATE_PUB;
             end
         end
         INC_DAY: begin
-            if (cur_time_q.day_of_week_lo == 4'd7) begin
-                cur_time_d.day_of_week_lo = 4'd1;
+            if (cur_time_q[35:32] == 4'd7) begin
+                cur_time_d[35:32] = 4'd1;
             end else begin
-                cur_time_d.day_of_week_lo = cur_time_q.day_of_week_lo + 1;
+                cur_time_d[35:32] = cur_time_q[35:32] + 4'd1;
             end
-            if (cur_time_q.day_lo == 4'd9) begin
-                cur_time_d.day_lo = 4'd0;
-                cur_time_d.day_hi = cur_time_q.day_hi + 1;
+            if (cur_time_q[43:40] == 4'd9) begin
+                cur_time_d[43:40] = 4'd0;
+                cur_time_d[47:44] = cur_time_q[47:44] + 4'd1;
                 carry_state_d = INC_MONTH;  // checks end of month too
             end else begin
-                cur_time_d.day_lo = cur_time_q.day_lo + 1;
+                cur_time_d[43:40] = cur_time_q[43:40] + 4'd1;
                 carry_state_d = UPDATE_PUB;
             end
         end
         INC_MONTH: begin
-            month_byte = {cur_time_q.month_hi, cur_time_q.month_lo};
-            day_byte = {cur_time_q.day_hi, cur_time_q.day_lo};
             if (month_byte == 8'h01) begin
                 if (day_byte == 8'h32) begin
-                    cur_time_d.day_lo = 4'd1;
-                    cur_time_d.day_hi = 4'd0;
-                    cur_time_d.month_lo = 4'd2;
+                    cur_time_d[43:40] = 4'd1;
+                    cur_time_d[47:44] = 4'd0;
+                    cur_time_d[51:48] = 4'd2;
                 end
                 carry_state_d = UPDATE_PUB;
             end
             if (month_byte == 8'h02) begin
-                if (cur_time_q.year_lo[1:0] == 2'b00) begin
+                if (cur_time_q[58:57] == 2'b00) begin // year_lo[1:0]
                     if (day_byte == 8'h30) begin
-                        cur_time_d.day_lo = 4'd1;
-                        cur_time_d.day_hi = 4'd0;
-                        cur_time_d.month_lo = 4'd3;
+                        cur_time_d[43:40] = 4'd1;
+                        cur_time_d[47:44] = 4'd0;
+                        cur_time_d[51:48] = 4'd3;
                     end
                 end else begin
                     if (day_byte == 8'h29) begin
-                        cur_time_d.day_lo = 4'd1;
-                        cur_time_d.day_hi = 4'd0;
-                        cur_time_d.month_lo = 4'd3;
+                        cur_time_d[43:40] = 4'd1;
+                        cur_time_d[47:44] = 4'd0;
+                        cur_time_d[51:48] = 4'd3;
                     end
                 end
                 carry_state_d = UPDATE_PUB;
             end
             if (month_byte == 8'h03) begin
                 if (day_byte == 8'h32) begin
-                    cur_time_d.day_lo = 4'd1;
-                    cur_time_d.day_hi = 4'd0;
-                    cur_time_d.month_lo = 4'd4;
+                    cur_time_d[43:40] = 4'd1;
+                    cur_time_d[47:44] = 4'd0;
+                    cur_time_d[51:48] = 4'd4;
                 end
                 carry_state_d = UPDATE_PUB;
             end
             if (month_byte == 8'h04) begin
                 if (day_byte == 8'h31) begin
-                    cur_time_d.day_lo = 4'd1;
-                    cur_time_d.day_hi = 4'd0;
-                    cur_time_d.month_lo = 4'd5;
+                    cur_time_d[43:40] = 4'd1;
+                    cur_time_d[47:44] = 4'd0;
+                    cur_time_d[51:48] = 4'd5;
                 end
                 carry_state_d = UPDATE_PUB;
             end
             if (month_byte == 8'h05) begin
                 if (day_byte == 8'h32) begin
-                    cur_time_d.day_lo = 4'd1;
-                    cur_time_d.day_hi = 4'd0;
-                    cur_time_d.month_lo = 4'd6;
+                    cur_time_d[43:40] = 4'd1;
+                    cur_time_d[47:44] = 4'd0;
+                    cur_time_d[51:48] = 4'd6;
                 end
                 carry_state_d = UPDATE_PUB;
             end
             if (month_byte == 8'h06) begin
                 if (day_byte == 8'h31) begin
-                    cur_time_d.day_lo = 4'd1;
-                    cur_time_d.day_hi = 4'd0;
-                    cur_time_d.month_lo = 4'd7;
+                    cur_time_d[43:40] = 4'd1;
+                    cur_time_d[47:44] = 4'd0;
+                    cur_time_d[51:48] = 4'd7;
                 end
                 carry_state_d = UPDATE_PUB;
             end
             if (month_byte == 8'h07) begin
                 if (day_byte == 8'h32) begin
-                    cur_time_d.day_lo = 4'd1;
-                    cur_time_d.day_hi = 4'd0;
-                    cur_time_d.month_lo = 4'd8;
+                    cur_time_d[43:40] = 4'd1;
+                    cur_time_d[47:44] = 4'd0;
+                    cur_time_d[51:48] = 4'd8;
                 end
                 carry_state_d = UPDATE_PUB;
             end
             if (month_byte == 8'h08) begin
                 if (day_byte == 8'h32) begin
-                    cur_time_d.day_lo = 4'd1;
-                    cur_time_d.day_hi = 4'd0;
-                    cur_time_d.month_lo = 4'd9;
+                    cur_time_d[43:40] = 4'd1;
+                    cur_time_d[47:44] = 4'd0;
+                    cur_time_d[51:48] = 4'd9;
                 end
                 carry_state_d = UPDATE_PUB;
             end
             if (month_byte == 8'h09) begin
                 if (day_byte == 8'h31) begin
-                    cur_time_d.day_lo = 4'd1;
-                    cur_time_d.day_hi = 4'd0;
-                    cur_time_d.month_lo = 4'd0;
-                    cur_time_d.month_hi = 4'd1;
+                    cur_time_d[43:40] = 4'd1;
+                    cur_time_d[47:44] = 4'd0;
+                    cur_time_d[51:48] = 4'd0;
+                    cur_time_d[55:52] = 4'd1;
                 end
                 carry_state_d = UPDATE_PUB;
             end
             if (month_byte == 8'h10) begin
                 if (day_byte == 8'h32) begin
-                    cur_time_d.day_lo = 4'd1;
-                    cur_time_d.day_hi = 4'd0;
-                    cur_time_d.month_lo = 4'd1;
-                    cur_time_d.month_hi = 4'd1;
+                    cur_time_d[43:40] = 4'd1;
+                    cur_time_d[47:44] = 4'd0;
+                    cur_time_d[51:48] = 4'd1;
+                    cur_time_d[55:52] = 4'd1;
                 end
                 carry_state_d = UPDATE_PUB;
             end
             if (month_byte == 8'h11) begin
                 if (day_byte == 8'h31) begin
-                    cur_time_d.day_lo = 4'd1;
-                    cur_time_d.day_hi = 4'd0;
-                    cur_time_d.month_lo = 4'd1;
-                    cur_time_d.month_hi = 4'd2;
+                    cur_time_d[43:40] = 4'd1;
+                    cur_time_d[47:44] = 4'd0;
+                    cur_time_d[51:48] = 4'd1;
+                    cur_time_d[55:52] = 4'd2;
                 end
                 carry_state_d = UPDATE_PUB;
             end
             if (month_byte == 8'h12) begin
                 if (day_byte == 8'h32) begin
-                    cur_time_d.day_lo = 4'd1;
-                    cur_time_d.day_hi = 4'd0;
-                    cur_time_d.month_lo = 4'd1;
-                    cur_time_d.month_hi = 4'd0;
+                    cur_time_d[43:40] = 4'd1;
+                    cur_time_d[47:44] = 4'd0;
+                    cur_time_d[51:48] = 4'd1;
+                    cur_time_d[55:52] = 4'd0;
                     carry_state_d = INC_YEAR;
                 end else begin
                     carry_state_d = UPDATE_PUB;
@@ -464,17 +470,17 @@ always_comb begin
             end
         end
         INC_YEAR: begin
-            if (cur_time_q.year_lo == 4'd9) begin
-                cur_time_d.year_lo = 4'd0;
-                if (cur_time_q.year_hi == 4'd9) begin
-                    cur_time_d.year_hi = 4'd0;
+            if (cur_time_q[59:56] == 4'd9) begin
+                cur_time_d[59:56] = 4'd0;
+                if (cur_time_q[63:60] == 4'd9) begin
+                    cur_time_d[63:60] = 4'd0;
                     carry_state_d = UPDATE_PUB;
                 end else begin
-                    cur_time_d.year_hi = cur_time_q.year_hi + 1;
+                    cur_time_d[63:60] = cur_time_q[63:60] + 1;
                     carry_state_d = UPDATE_PUB;
                 end
             end else begin
-                cur_time_d.year_lo = cur_time_q.year_lo + 1;
+                cur_time_d[59:56] = cur_time_q[59:56] + 1;
                 carry_state_d = UPDATE_PUB;
             end
         end
@@ -494,7 +500,7 @@ end
 
 always_ff @(posedge clk) begin
     if (rst) begin
-        cur_time_q <= fake_time;
+        cur_time_q <= {20'd0, fake_time};
         carry_state_q <= IDLE;
         pub_time_q <= 64'h0;
     end else begin

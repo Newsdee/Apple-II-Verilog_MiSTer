@@ -10,7 +10,7 @@ when Quartus is not compiling.
 |---|---|
 | Audio 3.1/3.2/3.3 (mixer, speaker avg) | Done, staged in BOTH repos (`rtl/apple2_top.v` / `.vhd`) |
 | Track clamp (`rtl/floppy_track.sv`, track>34→34) | Done, unit PASS + full smoke PASS, staged in Verilog repo; copy to newsdee pending Quartus |
-| NSC port | **DONE in Verilog repo**: unit PASS (12 checks) + full smoke PASS; staged. Copy to newsdee pending Quartus. See session log items 11-14. |
+| NSC port | **DONE, synced to newsdee** (byte-identical copies). Unit PASS (12 checks) + full smoke PASS with the NSC modules actually in the Verilator file list (Makefile fixed, see item 15). Rewritten for Quartus 17 synthesis (modification 7: plain vector instead of packed struct/enum). newsdee `apple2_top.vhd` VHDL wiring fixed. Pending: user's Quartus compile. See session log items 11-15. |
 
 ## Session log (2026-08, NSC implementation)
 
@@ -74,6 +74,53 @@ when Quartus is not compiling.
     checks); full `verilator/build_verilator.bat` + `run_verilator.bat
     --smoke-test` → SMOKE PASS exit 0. TB persisted in-repo as
     `module_tests/nsc/nsc_unit_tb.sv`.
+15. newsdee Quartus compile exposed three integration issues (file had never
+    been through Quartus before):
+    a. Error 10794 at apple2_top.vhd(759): the merged port map wired
+       `wr_data => std_logic_vector(CLOCK_DO)` — a type-conversion on an
+       OUTPUT actual (illegal VHDL; NSC wr_data/wr_data_en are outputs that
+       drive the bus during DS1216E readout, exactly like the old clock_card
+       DATA_OUT/OE). Fixed: `CLOCK_DO` is now `std_logic_vector(7 downto 0)`,
+       connected directly (`wr_data => CLOCK_DO`), with the conversion moved
+       into the PD mux (`unsigned(CLOCK_DO) when CLOCK_OE = '1'`). PD mux
+       priority unchanged.
+    b. Error 10166 at no_slot_clock.sv(252): "always_comb construct does not
+       infer purely combinational logic" (first reported against the
+       struct/enum version; suspected trigger was Quartus 17's limited SV
+       support for procedural packed-struct field assignments and enum case).
+       Rewrote (modification 7 in the file header): `nsc_time_t` struct →
+       plain `logic [83:0]` with explicit part-selects (identical bit layout,
+       table in the header comment); `carry_sm` enum → nine 4-bit localparams.
+       No behavioral change. The rewrite was necessary (Q17 then parsed the
+       whole file), but 10166 persisted — item e is the actual trigger.
+    d. Error 10768 at no_slot_clock.sv(367): "range must be the final index
+       in the indexed name" — one line escaped the mechanical transform:
+       `cur_time_q.year_lo[1:0]` (member + sub-range, legal on a struct) became
+       the illegal double part-select `cur_time_q[59:56][1:0]`. Fixed to
+       `cur_time_q[58:57]` (low two bits of year_lo). Re-validated: NSC UNIT
+       PASS + full SMOKE PASS, then re-synced byte-identical to newsdee.
+    e. Error 10166 persisted at line 255 after the rewrite, with the real tell
+       this time: Warning 10240 "inferring latch(es) for variable month_byte /
+       day_byte" — both were assigned only inside the INC_MONTH branch, so
+       Quartus inferred latches in the always_comb block, which fails its
+       "purely combinational" check. Fixed by moving them to continuous
+       assigns (`wire [7:0] month_byte = {cur_time_q[55:52], cur_time_q[51:48]};`
+       etc.) — identical values, since they are read only in that branch and
+       depend only on cur_time_q. Also made the BCD increment literals
+       explicitly sized (`+ 4'd1`, `+ 20'd1`) to clear the 15× Warning 10230
+       (truncated value size 32 → target width). Re-validated: NSC UNIT PASS +
+       full SMOKE PASS (LATCH warnings gone), synced byte-identical to newsdee.
+    c. Latent bug found while re-validating: `verilator/Makefile` still listed
+       `$(RTL)/clock_card.v` and never listed `no_slot_clock.sv` /
+       `nsc_ticker.sv` — so the "full smoke PASS" of item 14 did NOT compile
+       the NSC modules (unknown-module instantiations in apple2_top.v). Fixed:
+       replaced the clock_card.v line with the two NSC files. Full build +
+       `--smoke-test` re-run after the rewrite → SMOKE PASS exit 0, this time
+       genuinely covering the NSC in the full machine.
+    Validation after all fixes: NSC UNIT PASS (12 checks; readout
+    2503300117510000 == fake_time, bit layout confirmed) + full SMOKE PASS.
+    Rewritten no_slot_clock.sv copied byte-identical to newsdee
+    (`diff` clean); nsc_ticker.sv unchanged and still identical in both repos.
 
 ### Verilator build quirks (MSYS2 ucrt64, v5.050 rev vUNKNOWN-built20260702)
 
