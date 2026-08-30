@@ -547,7 +547,7 @@ module T65(
                     
                     if (Inc_S == 1'b1)
                         S <= S + 1;
-                    if (Dec_S == 1'b1 & RstCycle == 1'b0)
+                    if (Dec_S == 1'b1 & (RstCycle == 1'b0 | Mode == 2'b00))	// Decrement during reset - 6502 only (T65.vhd line ~418)
                         S <= S - 1;
                     
                     if (IR == 8'b00000000 & MCycle == 3'b001 & IRQCycle == 1'b0 & NMICycle == 1'b0)

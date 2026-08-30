@@ -67,7 +67,11 @@ entity apple2 is
     saturn_5_inslot : in std_logic;
 
 
-    speaker        : out std_logic              -- One-bit speaker output
+    speaker        : out std_logic;             -- One-bit speaker output
+    DBG_T65_REGS   : out std_logic_vector(63 downto 0); -- T65 debug: PC/S/P/Y/X/A (harness instrumentation)
+    DBG_DI         : out std_logic_vector(7 downto 0);   -- T65 data input as seen by the CPU (harness instrumentation)
+    DBG_ROM_ADDR   : out std_logic_vector(13 downto 0); -- ROM address bus (harness instrumentation)
+    DBG_ROM_OUT    : out std_logic_vector(7 downto 0)   -- ROM data out (harness instrumentation)
     );
 end apple2;
 
@@ -123,6 +127,8 @@ architecture rtl of apple2 is
   signal T65_DI : std_logic_vector(7 downto 0);
   signal T65_DO : std_logic_vector(7 downto 0);
   signal T65_WE_N : std_logic;
+  signal T65_Regs : std_logic_vector(63 downto 0);
+  signal rom_dbg_addr : std_logic_vector(13 downto 0);
   signal R65C02_A : unsigned(15 downto 0);
   signal R65C02_DO : unsigned(7 downto 0);
   signal R65C02_WE_N : std_logic;
@@ -502,6 +508,10 @@ begin
   A <= unsigned(T65_A(15 downto 0)) when cpu = '0' else R65C02_A;
   D_OUT <= unsigned(T65_DO) when cpu = '0' else R65C02_DO;
   T65_DI <= std_logic_vector(D_OUT) when T65_WE_N = '0' else std_logic_vector(D_IN);
+  DBG_T65_REGS <= T65_Regs;
+  DBG_DI <= T65_DI;
+  DBG_ROM_ADDR <= std_logic_vector(rom_addr);
+  DBG_ROM_OUT <= std_logic_vector(rom_out);
   --CPU_EN <= PHASE_ZERO_F; -- not sure why this isn't working??
   CPU_EN <= '1' when PHASE_ZERO_D = '1' and PHASE_ZERO = '0' else '0';
   cpu_enable: process (CLK_14M)
@@ -530,7 +540,8 @@ begin
       R_W_n    => T65_WE_N,
       A        => T65_A,
       DI       => T65_DI,
-      DO       => T65_DO
+      DO       => T65_DO,
+      Regs     => T65_Regs
     );
 
   cpu65c02: entity work.R65C02

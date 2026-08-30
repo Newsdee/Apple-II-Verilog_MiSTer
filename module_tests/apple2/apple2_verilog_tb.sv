@@ -137,6 +137,10 @@ module apple2_verilog_tb;
    wire        cpu_we;
    wire        io_strobe;
    wire        speaker;
+   wire [63:0] dbg_t65_regs;
+   wire [7:0]  dbg_di;
+   wire [13:0] dbg_rom_addr;
+   wire [7:0]  dbg_rom_out;
    wire        video;
    wire        color_line;
    wire        text_mode;
@@ -200,7 +204,11 @@ module apple2_verilog_tb;
       .ioctl_download(ioctl_download),
       .ioctl_wr(ioctl_wr),
       .saturn_5_inslot(1'b0),
-      .speaker(speaker)
+      .speaker(speaker),
+      .DBG_T65_REGS(dbg_t65_regs),
+      .DBG_DI(dbg_di),
+      .DBG_ROM_ADDR(dbg_rom_addr),
+      .DBG_ROM_OUT(dbg_rom_out)
    );
 
    always #5 clk_14m = ~clk_14m;
@@ -221,7 +229,7 @@ module apple2_verilog_tb;
          $display("FATAL: cannot open %s", TRACE_FILE);
          $finish;
       end
-      $fdisplay(f, "CYCLE,ADDR,D,RAM_ADDR,RAM_WE,AUX,CPU_WE,PD,IO_SELECT,DEVICE_SELECT,IO_STROBE,SPEAKER,VIDEO,PHASE_ZERO,PHASE_ZERO_R,PHASE_ZERO_F,ROMSWITCH,PALMODE,CPU_WAIT,NMI_N");
+      $fdisplay(f, "CYCLE,ADDR,D,RAM_ADDR,RAM_WE,AUX,CPU_WE,PD,IO_SELECT,DEVICE_SELECT,IO_STROBE,SPEAKER,VIDEO,PHASE_ZERO,PHASE_ZERO_R,PHASE_ZERO_F,ROMSWITCH,PALMODE,CPU_WAIT,NMI_N,T65_REGS,T65_DI,ROM_ADDR,ROM_OUT");
 
       for (cycle = 0; cycle < TOTAL; cycle++) begin
          @(negedge clk_14m);
@@ -270,11 +278,11 @@ module apple2_verilog_tb;
          if ((cycle >= TRACE_START && cycle <= DENSE_END) ||
              (cycle >= NMI_TRACE_LO && cycle <= NMI_TRACE_HI) ||
              (cycle >= SPARSE_BASE && ((cycle - SPARSE_BASE) % 16 == 0))) begin
-            $fdisplay(f, "%0d,%04h,%02h,%05h,%b,%b,%b,%02h,%02h,%02h,%b,%b,%b,%b,%b,%b,%b,%b,%b,%b",
+            $fdisplay(f, "%0d,%04h,%02h,%05h,%b,%b,%b,%02h,%02h,%02h,%b,%b,%b,%b,%b,%b,%b,%b,%b,%b,%016h,%02h,%04h,%02h",
                       cycle, addr, d, ram_addr, ram_we, aux, cpu_we, pd,
                       io_select, device_select, io_strobe, speaker, video,
                       phase_zero, phase_zero_r, phase_zero_f, romswitch,
-                      1'b0, cpu_wait, nmi_n);
+                      1'b0, cpu_wait, nmi_n, dbg_t65_regs, dbg_di, dbg_rom_addr, dbg_rom_out);
          end
       end
 

@@ -21,6 +21,10 @@
 --
 -- Trace columns (must match t65_verilog_tb.sv exactly):
 --   CYCLE,PC,SP,P,Y,X,A,ADDR,DI,DO,RW,NMI_N,IRQ_N
+-- PC is the full 16-bit program counter (4 hex digits). The T65 Regs port is
+-- {PC[15:0], S[15:0], P, Y, X, A} = exactly 64 bits (T65.vhd line ~275; S is a
+-- 16-bit register whose high byte stays FF). So P/Y/X/A live at
+-- regs(31:24)/(23:16)/(15:8)/(7:0) and the SP column is the low byte of S.
 -- P bits follow T65_Pack: C=0,Z=1,I=2,D=3,B=4,V=6,N=7.
 
 library ieee;
@@ -74,8 +78,10 @@ architecture test of t65_vhdl_tb is
   signal regs   : std_logic_vector(63 downto 0);
 
   -- Real RAM, $0000-$EFFF (phase A). Phase B never reads it.
-  type ram_vec_t is array (0 to 6143) of std_logic_vector(7 downto 0);
-  signal ram : ram_vec_t := (others => (others => '0'));
+  -- Static init from the generated package (pattern byte + phase-A program).
+  -- GHDL 6.0.0 mcode corrupts nonblocking array updates when a second
+  -- process drives the same array signal, so the seed must not be a process.
+  signal ram : ram_vec_t := RAM_INIT;
 
   -- Stateless pattern RAM, copied verbatim from apple2_vhdl_tb.vhd main_byte.
   function main_byte(a : unsigned) return std_logic_vector is
@@ -102,6 +108,21 @@ architecture test of t65_vhdl_tb is
         when 0 => return x"4C";
         when 1 => return x"A0";
         when others => return x"05";
+      end case;
+    elsif ai >= 16#6B4C# and ai <= 16#6B51# then
+      -- Boot preamble (phase B only): define A/X/Y deterministically at the
+      -- reset vector before the pattern walk starts. The golden T65 resets
+      -- only P; A/X/Y are 'U' in VHDL sim until first written, while Verilator
+      -- zero-initializes them, so an immediate walk would desync on garbage
+      -- ALU/indexed opcodes (simulation artifact, see PROGRESS.md). The walk
+      -- then starts at $6B52.
+      case ai - 16#6B4C# is
+        when 0 => return x"A9";   -- LDA #$21
+        when 1 => return x"21";
+        when 2 => return x"A2";   -- LDX #$32
+        when 3 => return x"32";
+        when 4 => return x"A0";   -- LDY #$43
+        when others => return x"43";
       end case;
     else
       return std_logic_vector(to_unsigned((ai + ai/16 + 60) mod 256, 8));
@@ -162,112 +183,15 @@ begin
          else main_byte(unsigned(a24(15 downto 0)));
   end generate gen_phase_b;
 
-  -- Phase A RAM seed: pattern byte everywhere, then the test program.
-  ram_init : process
-  begin
-    if PHASE = 0 then
-      for i in 0 to 6143 loop
-        ram(i) <= std_logic_vector(to_unsigned((i + i/16 + 60) mod 256, 8));
-      end loop;
-      -- $0500: A9 05   LDA #$05
-      ram(16#0500# - 0) <= x"A9"; ram(16#0501#) <= x"05";
-      -- $0502: 18      CLC
-      ram(16#0502#) <= x"18";
-      -- $0503: E9 07   SBC #$07   (A=FD C=0 N=1)
-      ram(16#0503#) <= x"E9"; ram(16#0504#) <= x"07";
-      -- $0505: 69 03   ADC #$03   (A=00 C=1 Z=1)
-      ram(16#0505#) <= x"69"; ram(16#0506#) <= x"03";
-      -- $0507: 38      SEC
-      ram(16#0507#) <= x"38";
-      -- $0508: 69 FF   ADC #$FF   (A=00 C=1 Z=1 V=0)
-      ram(16#0508#) <= x"69"; ram(16#0509#) <= x"FF";
-      -- $050A: A9 7F   LDA #$7F
-      ram(16#050A#) <= x"A9"; ram(16#050B#) <= x"7F";
-      -- $050C: 69 00   ADC #$00   (A=80 N=1 V=1 C=0)
-      ram(16#050C#) <= x"69"; ram(16#050D#) <= x"00";
-      -- $050E: B8      CLV
-      ram(16#050E#) <= x"B8";
-      -- $050F: A9 00   LDA #$00   (Z=1)
-      ram(16#050F#) <= x"A9"; ram(16#0510#) <= x"00";
-      -- $0511: F0 03   BEQ +3 -> $0516 (taken)
-      ram(16#0511#) <= x"F0"; ram(16#0512#) <= x"03";
-      -- $0513/$0514: EA EA  (must never execute)
-      ram(16#0513#) <= x"EA"; ram(16#0514#) <= x"EA";
-      -- $0516: A9 01   LDA #$01   (Z=0)
-      ram(16#0516#) <= x"A9"; ram(16#0517#) <= x"01";
-      -- $0518: D0 03   BNE +3 -> $051D (taken)
-      ram(16#0518#) <= x"D0"; ram(16#0519#) <= x"03";
-      -- $051A/$051B: EA EA  (must never execute)
-      ram(16#051A#) <= x"EA"; ram(16#051B#) <= x"EA";
-      -- $051D: A9 01   LDA #$01   (Z=0)
-      ram(16#051D#) <= x"A9"; ram(16#051E#) <= x"01";
-      -- $051F: F0 FE   BEQ -2 (not taken; if taken it would self-loop)
-      ram(16#051F#) <= x"F0"; ram(16#0520#) <= x"FE";
-      -- $0521: A9 02   LDA #$02
-      ram(16#0521#) <= x"A9"; ram(16#0522#) <= x"02";
-      -- $0523: 85 34   STA $34
-      ram(16#0523#) <= x"85"; ram(16#0524#) <= x"34";
-      -- $0525: A5 34   LDA $34
-      ram(16#0525#) <= x"A5"; ram(16#0526#) <= x"34";
-      -- $0527: A2 0A   LDX #$0A
-      ram(16#0527#) <= x"A2"; ram(16#0528#) <= x"0A";
-      -- $0529: 8E 34 06 STX $0634
-      ram(16#0529#) <= x"8E"; ram(16#052A#) <= x"34"; ram(16#052B#) <= x"06";
-      -- $052C: AE 34 06 LDX $0634
-      ram(16#052C#) <= x"AE"; ram(16#052D#) <= x"34"; ram(16#052E#) <= x"06";
-      -- $052F: A0 05   LDY #$05
-      ram(16#052F#) <= x"A0"; ram(16#0530#) <= x"05";
-      -- $0531: 98      TYA
-      ram(16#0531#) <= x"98";
-      -- $0532: 20 49 05 JSR $0549 (pushes $0535, RTS returns to $0536)
-      ram(16#0532#) <= x"20"; ram(16#0533#) <= x"49"; ram(16#0534#) <= x"05";
-      -- $0535: EA      NOP (skipped by RTS+1)
-      ram(16#0535#) <= x"EA";
-      -- $0536: A9 77   LDA #$77   (resume point after RTS)
-      ram(16#0536#) <= x"A9"; ram(16#0537#) <= x"77";
-      -- $0538: 58      CLI
-      ram(16#0538#) <= x"58";
-      -- $0539: 4C 46 05 JMP $0546 (to park)
-      ram(16#0539#) <= x"4C"; ram(16#053A#) <= x"46"; ram(16#053B#) <= x"05";
-      -- $053C-$0545: EA padding
-      for i in 16#053C# to 16#0545# loop
-        ram(i) <= x"EA";
-      end loop;
-      -- $0546: 4C 46 05 JMP $0546 (park)
-      ram(16#0546#) <= x"4C"; ram(16#0547#) <= x"46"; ram(16#0548#) <= x"05";
-      -- $0549: A9 5A   LDA #$5A   (subroutine)
-      ram(16#0549#) <= x"A9"; ram(16#054A#) <= x"5A";
-      -- $054B: 48      PHA
-      ram(16#054B#) <= x"48";
-      -- $054C: 68      PLA
-      ram(16#054C#) <= x"68";
-      -- $054D: 60      RTS
-      ram(16#054D#) <= x"60";
-    end if;
-    wait for 1 ns;
-    report "SEED_DONE ram500=" & to_hstring(ram(16#0500#))
-      & " ram501=" & to_hstring(ram(16#0501#))
-      & " ram0=" & to_hstring(ram(0)) severity note;
-    wait;
-  end process ram_init;
 
-  dbg_t0 : process
-  begin
-    wait for 1 ns;
-    report "DBG_T0 ram500=" & to_hstring(ram(16#0500#))
-      & " ram501=" & to_hstring(ram(16#0501#))
-      & " ram0=" & to_hstring(ram(0))
-      & " ramEFFF=" & to_hstring(ram(6143)) severity note;
-    wait;
-  end process dbg_t0;
 
   stimulus : process
     file trace_output : text open write_mode is TRACE_FILE;
     variable trace_line : line;
-    variable pc, sp, pflag, y, x, aacc : std_logic_vector(7 downto 0);
+    variable pc : std_logic_vector(15 downto 0);
+    variable sp, pflag, y, x, aacc : std_logic_vector(7 downto 0);
     variable rw_b, nmi_b, irq_b : std_logic_vector(0 downto 0);
     variable total : integer;
-    variable dbg_rw : string(1 to 1);
   begin
     if PHASE = 0 then total := TOTAL_A; else total := TOTAL_B; end if;
 
@@ -289,25 +213,13 @@ begin
       wait until rising_edge(clk);
       wait for 1 ns;
 
-      if cycle >= 11 and cycle <= 14 then
-        if rw_n = '1' then dbg_rw := "1"; else dbg_rw := "0"; end if;
-        report "DBG cyc=" & integer'image(cycle)
-          & " a24=" & to_hstring(a24)
-          & " di=" & to_hstring(di)
-          & " ram500=" & to_hstring(ram(16#0500#))
-          & " ram501=" & to_hstring(ram(16#0501#))
-          & " ram0=" & to_hstring(ram(0))
-          & " ram100=" & to_hstring(ram(100))
-          & " ramEFFF=" & to_hstring(ram(6143))
-          & " rw=" & (dbg_rw) severity note;
-      end if;
 
-      pc     := regs(63 downto 56);
-      sp     := regs(55 downto 48);
-      pflag  := regs(47 downto 40);
-      y      := regs(39 downto 32);
-      x      := regs(31 downto 24);
-      aacc   := regs(23 downto 16);
+      pc     := regs(63 downto 48);
+      sp     := regs(39 downto 32);
+      pflag  := regs(31 downto 24);
+      y      := regs(23 downto 16);
+      x      := regs(15 downto 8);
+      aacc   := regs(7 downto 0);
       rw_b   := (others => rw_n);
       nmi_b  := (others => nmi_n);
       irq_b  := (others => irq_n);

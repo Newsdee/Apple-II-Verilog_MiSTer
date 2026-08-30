@@ -1,42 +1,132 @@
-# Generates build/t65_rom_array.vhd from rtl/roms/apple2e.hex (16384 bytes = $F000-$FFFF).
-# GHDL has no runtime file I/O, so the golden side consumes the ROM as a VHDL constant.
+# Generates the shared memory constants for the T65 equivalence harness:
+#   build/t65_rom_array.vhd : VHDL package with ROM_DATA (apple2e.hex, $F000-$FFFF)
+#                             and RAM_INIT ($0000-$EFFF pattern + phase-A program).
+#   build/t65_ram_init.hex  : same RAM contents as a hex file for the Verilog
+#                             testbench $readmemh (CWD = repo root).
+#
+# GHDL has no runtime file I/O, so the golden side consumes both memories as
+# VHDL constants. The Verilog side $readmemh's the same bytes, so the two
+# sides are byte-identical by construction. Re-run this generator whenever
+# apple2e.hex or the phase-A program table changes.
 param()
 
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $hexPath = Join-Path $root 'rtl\roms\apple2e.hex'
 $outDir = Join-Path $PSScriptRoot 'build'
-$outPath = Join-Path $outDir 't65_rom_array.vhd'
+$outVhd = Join-Path $outDir 't65_rom_array.vhd'
+$outHex = Join-Path $outDir 't65_ram_init.hex'
 
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
-$words = @()
+# ---- ROM: apple2e.hex, 16384 bytes = $F000-$FFFF ---------------------------
+$romWords = @()
 Get-Content $hexPath | ForEach-Object {
     foreach ($t in ($_ -split '\s+' | Where-Object { $_ })) {
-        $words += [Convert]::ToByte($t, 16)
+        $romWords += [Convert]::ToByte($t, 16)
     }
 }
-if ($words.Count -ne 16384) { throw "apple2e.hex has $($words.Count) words, expected 16384" }
+if ($romWords.Count -ne 16384) { throw "apple2e.hex has $($romWords.Count) words, expected 16384" }
+
+# ---- RAM: $0000-$EFFF, deterministic pattern byte ---------------------------
+$ramSize = 61440
+$ram = New-Object byte[] $ramSize
+for ($i = 0; $i -lt $ramSize; $i++) {
+    $ram[$i] = [byte](($i + [math]::Floor($i / 16) + 60) % 256)
+}
+
+# Phase-A test program at $0500-$054D (see t65_vhdl_tb.vhd header for the
+# instruction-level description). This table is the single source of truth;
+# both simulation sides consume it via the generated files.
+$prog = @(
+    @('0500', 'A9'), @('0501', '05'),   # LDA #$05
+    @('0502', '18'),                    # CLC
+    @('0503', 'E9'), @('0504', '07'),    # SBC #$07
+    @('0505', '69'), @('0506', '03'),    # ADC #$03
+    @('0507', '38'),                    # SEC
+    @('0508', '69'), @('0509', 'FF'),    # ADC #$FF
+    @('050A', 'A9'), @('050B', '7F'),    # LDA #$7F
+    @('050C', '69'), @('050D', '00'),    # ADC #$00
+    @('050E', 'B8'),                    # CLV
+    @('050F', 'A9'), @('0510', '00'),    # LDA #$00
+    @('0511', 'F0'), @('0512', '03'),    # BEQ +3 (taken)
+    @('0513', 'EA'), @('0514', 'EA'),    # must never execute
+    @('0516', 'A9'), @('0517', '01'),    # LDA #$01
+    @('0518', 'D0'), @('0519', '03'),    # BNE +3 (taken)
+    @('051A', 'EA'), @('051B', 'EA'),    # must never execute
+    @('051D', 'A9'), @('051E', '01'),    # LDA #$01
+    @('051F', 'F0'), @('0520', 'FE'),    # BEQ -2 (not taken)
+    @('0521', 'A9'), @('0522', '02'),    # LDA #$02
+    @('0523', '85'), @('0524', '34'),    # STA $34
+    @('0525', 'A5'), @('0526', '34'),    # LDA $34
+    @('0527', 'A2'), @('0528', '0A'),    # LDX #$0A
+    @('0529', '8E'), @('052A', '34'), @('052B', '06'),  # STX $0634
+    @('052C', 'AE'), @('052D', '34'), @('052E', '06'),  # LDX $0634
+    @('052F', 'A0'), @('0530', '05'),    # LDY #$05
+    @('0531', '98'),                    # TYA
+    @('0532', '20'), @('0533', '49'), @('0534', '05'),  # JSR $0549
+    @('0535', 'EA'),                    # skipped by RTS+1
+    @('0536', 'A9'), @('0537', '77'),    # LDA #$77 (resume after RTS)
+    @('0538', '58'),                    # CLI
+    @('0539', '4C'), @('053A', '46'), @('053B', '05'),  # JMP $0546
+    @('053C', 'EA'), @('053D', 'EA'), @('053E', 'EA'), @('053F', 'EA'),
+    @('0540', 'EA'), @('0541', 'EA'), @('0542', 'EA'), @('0543', 'EA'),
+    @('0544', 'EA'), @('0545', 'EA'),    # padding
+    @('0546', '4C'), @('0547', '46'), @('0548', '05'),  # JMP $0546 (park)
+    @('0549', 'A9'), @('054A', '5A'),    # LDA #$5A (subroutine)
+    @('054B', '48'),                    # PHA
+    @('054C', '68'),                    # PLA
+    @('054D', '60')                     # RTS
+)
+foreach ($entry in $prog) {
+    $addr = [Convert]::ToInt32($entry[0], 16)
+    if ($addr -ge $ramSize) { throw "program byte at ${entry[0]} outside RAM range" }
+    $ram[$addr] = [Convert]::ToByte($entry[1], 16)
+}
+
+# ---- Emit VHDL package -------------------------------------------------------
+function Format-VhdlLine {
+    param([byte[]]$Words, [int]$Start, [int]$Count, [bool]$TrailingComma)
+    $parts = @()
+    for ($j = 0; $j -lt $Count; $j++) {
+        $parts += ('x"{0:X2}"' -f $Words[$Start + $j])
+    }
+    if ($TrailingComma) { $parts[-1] += ',' }
+    return '    ' + ($parts -join ', ')
+}
 
 $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine('library ieee;')
 [void]$sb.AppendLine('use ieee.std_logic_1164.all;')
 [void]$sb.AppendLine('')
-[void]$sb.AppendLine('-- Generated by module_tests/t65/gen_rom_array.ps1 from rtl/roms/apple2e.hex.')
+[void]$sb.AppendLine('-- Generated by module_tests/t65/gen_rom_array.ps1 from rtl/roms/apple2e.hex')
+[void]$sb.AppendLine('-- and the phase-A program table in that script.')
 [void]$sb.AppendLine('-- Do not edit by hand; re-run the generator instead.')
 [void]$sb.AppendLine('package t65_rom_array is')
 [void]$sb.AppendLine('  type rom_vec_t is array (0 to 16383) of std_logic_vector(7 downto 0);')
 [void]$sb.AppendLine('  constant ROM_DATA : rom_vec_t := (')
 for ($i = 0; $i -lt 16384; $i += 16) {
-    $line = ''
-    for ($j = 0; $j -lt 16; $j++) {
-        $line += ('x"{0:X2}"' -f $words[$i + $j])
-        if ($j -lt 15) { $line += ', ' }
-    }
-    if ($i + 16 -lt 16384) { $line += ',' }
-    [void]$sb.AppendLine("    $line")
+    [void]$sb.AppendLine((Format-VhdlLine -Words $romWords -Start $i -Count 16 -TrailingComma ($i + 16 -lt 16384)))
+}
+[void]$sb.AppendLine('  );')
+[void]$sb.AppendLine('')
+[void]$sb.AppendLine('  type ram_vec_t is array (0 to 61439) of std_logic_vector(7 downto 0);')
+[void]$sb.AppendLine('  constant RAM_INIT : ram_vec_t := (')
+for ($i = 0; $i -lt $ramSize; $i += 16) {
+    [void]$sb.AppendLine((Format-VhdlLine -Words $ram -Start $i -Count 16 -TrailingComma ($i + 16 -lt $ramSize)))
 }
 [void]$sb.AppendLine('  );')
 [void]$sb.AppendLine('end package t65_rom_array;')
-[System.IO.File]::WriteAllText($outPath, $sb.ToString(), (New-Object System.Text.UTF8Encoding($false)))
-Write-Host "wrote $outPath ($($words.Count) bytes)"
+[System.IO.File]::WriteAllText($outVhd, $sb.ToString(), (New-Object System.Text.UTF8Encoding($false)))
+
+# ---- Emit Verilog hex (16 words per line) ------------------------------------
+$hexLines = New-Object System.Collections.Generic.List[string]
+for ($i = 0; $i -lt $ramSize; $i += 16) {
+    $parts = @()
+    for ($j = 0; $j -lt 16; $j++) { $parts += ('{0:X2}' -f $ram[$i + $j]) }
+    $hexLines.Add(($parts -join ' '))
+}
+[System.IO.File]::WriteAllLines($outHex, $hexLines, (New-Object System.Text.UTF8Encoding($false)))
+
+Write-Host "wrote $outVhd (ROM=16384 RAM=$ramSize bytes)"
+Write-Host "wrote $outHex ($ramSize words)"

@@ -212,6 +212,10 @@ architecture test of apple2_vhdl_tb is
   signal device_select : std_logic_vector(7 downto 0);
   signal io_strobe   : std_logic;
   signal speaker     : std_logic;
+  signal dbg_t65_regs : std_logic_vector(63 downto 0);
+  signal dbg_di       : std_logic_vector(7 downto 0);
+  signal dbg_rom_addr : std_logic_vector(13 downto 0);
+  signal dbg_rom_out  : std_logic_vector(7 downto 0);
   signal video       : std_logic;
   signal color_line  : std_logic;
   signal hbl         : std_logic;
@@ -273,7 +277,11 @@ begin
       ioctl_download => ioctl_download,
       ioctl_wr => ioctl_wr,
       saturn_5_inslot => saturn_5_inslot,
-      speaker => speaker
+      speaker => speaker,
+      DBG_T65_REGS => dbg_t65_regs,
+      DBG_DI => dbg_di,
+      DBG_ROM_ADDR => dbg_rom_addr,
+      DBG_ROM_OUT => dbg_rom_out
     );
 
   -- Stateless deterministic RAM: low and high bytes use different functions.
@@ -289,7 +297,7 @@ begin
     variable ai : integer;
   begin
     -- Column order must match apple2_verilog_tb.sv exactly.
-    write(trace_line, string'("CYCLE,ADDR,D,RAM_ADDR,RAM_WE,AUX,CPU_WE,PD,IO_SELECT,DEVICE_SELECT,IO_STROBE,SPEAKER,VIDEO,PHASE_ZERO,PHASE_ZERO_R,PHASE_ZERO_F,ROMSWITCH,PALMODE,CPU_WAIT,NMI_N"));
+    write(trace_line, string'("CYCLE,ADDR,D,RAM_ADDR,RAM_WE,AUX,CPU_WE,PD,IO_SELECT,DEVICE_SELECT,IO_STROBE,SPEAKER,VIDEO,PHASE_ZERO,PHASE_ZERO_R,PHASE_ZERO_F,ROMSWITCH,PALMODE,CPU_WAIT,NMI_N,T65_REGS,T65_DI,ROM_ADDR,ROM_OUT"));
     writeline(trace_output, trace_line);
 
     for cycle in 0 to TOTAL-1 loop
@@ -364,6 +372,10 @@ begin
         write(trace_line, string'(",")); write(trace_line, palmode);
         write(trace_line, string'(",")); write(trace_line, cpu_wait);
         write(trace_line, string'(",")); write(trace_line, nmi_n);
+        write(trace_line, string'(",")); write(trace_line, to_hstring(dbg_t65_regs));
+        write(trace_line, string'(",")); write(trace_line, to_hstring(dbg_di));
+        write(trace_line, string'(",")); write(trace_line, to_hstring(dbg_rom_addr));
+        write(trace_line, string'(",")); write(trace_line, to_hstring(dbg_rom_out));
         writeline(trace_output, trace_line);
       end if;
     end loop;

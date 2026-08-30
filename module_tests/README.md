@@ -259,6 +259,68 @@ new warnings separately from existing warnings. Verilator cannot prove
 mixed-language binding, FPGA memory packing, clock-domain safety, timing, or
 hardware signal quality.
 
+## Operational gotchas (from live debugging)
+
+Concrete failure modes found while running these harnesses. Each item is a
+rule; the reason follows the dash.
+
+### Trace format and comparison
+
+- Compare hex case-insensitively — GHDL `to_hstring` emits uppercase, Verilog
+  `$fdisplay %h` lowercase; raw string compare flags every row.
+- Access columns by header name, never by position — the two TBs share a
+  "column order must match exactly" contract; debug columns must be added to
+  both TBs (signal, port map, header, write statement) in one change.
+- Skip metavalues only when the VHDL/golden value contains `[UXWZ-]`, always
+  count the skips, and keep an anti-vacuous gate (min compared fields, exact
+  expected row count, or behavioral gates) — skipping must never be able to
+  produce an empty pass; never skip on the Verilog side to "fix" a mismatch.
+- Prove build freshness after any DUT/TB edit: confirm a new signal actually
+  appears in the trace with live values — GHDL caches per-file analysis in the
+  workdir, and Windows locks `Vemu.exe` output against relink until it is
+  stopped.
+
+### Trace semantics (apple2 harness family)
+
+- The `D` column is D_OUT (CPU data output), not read data — read data is the
+  T65_DI/DI column; misreading it fabricates phantom write values.
+- One trace row = one 14M cycle; a fetch window spans 14 rows. T65 latches at
+  the CPU_EN edge, i.e. the row where PHASE_ZERO falls, which is
+  address-dependent inside the window — fixed-row sampling (e.g. every 14th
+  row) misreads which byte was latched; use
+  `module_tests/apple2/decode_trace.js --cpu-en` instead.
+- The first row of an address window shows the previous address's data —
+  synchronous ROM / registered data has one-cycle latency.
+- Pin register-string layouts to source before decoding (T65 `Regs` =
+  PC,S,P,Y,X,A per t65.vhd:275 / t65.v:407) and validate the parser against a
+  known row before trusting any decoded field.
+
+### Analysis tooling discipline
+
+- No inline ad-hoc parsing for decisions — use checked-in tools; a tool must
+  fail loudly on malformed input, never skip silently. (A session's
+  overlapping-slice one-liner produced register values that contradicted the
+  same trace minutes later.)
+- For load-bearing "traces match" claims, re-diff with an independent tool
+  (`decode_trace.js --diff`) that mirrors the harness rules exactly.
+- A trace anomaly with both sides matching field-for-field is a common-cause
+  finding: suspect the TB program, gates, or environment before touching RTL;
+  instrument first, conclude second.
+
+### VHDL and environment pitfalls
+
+- Entity port lists are semicolon-separated, not comma — GHDL: "interfaces
+  must be separated by ';'"; hit twice in one session on debug-port additions.
+- Preserve mixed EOL/encoding byte-for-byte — use byte-level splices with an
+  occurrence-count check (`split(needle).length - 1 === 1`); never
+  `Get-Content | Set-Content` on UTF-8-without-BOM files.
+- ROM address mapping is TB-specific — the t65 TB maps $F000-$FFFF to the
+  first 4096 bytes of apple2e.hex, not the last 4KB; check the TB mapping
+  before reasoning about reset vectors or "wrong" ROM bytes.
+- Uninitialized-register differences are simulator artifacts, not bugs — T65
+  resets only P; ABC/X/Y start U in GHDL and 0 in Verilator (documented
+  exclusion; the t65 harness skips those whole rows and counts them).
+
 ## Repository implementation
 
 Use `disk_ii/` as the basic directory pattern, while applying the stronger
@@ -370,7 +432,8 @@ use `shared/spram_sim.vhd` while the documented GHDL defect remains.
 | keyboard | keyboard.vhd + spram_const shim | keyboard.v + keyboard.hex | PASS 2026-08-28; re-verified 2026-08-29 (rows=316, fields=2528) |
 | via6522 | mockingboard/via6522.vhd | mockingboard/via6522.v | PASS 2026-08-29; rows=794, fields=14292, gate_checks=7; candidate aligned to golden per user decision (pre-alignment FAIL profile and fix list in module_tests/via6522/README.md) |
 | mockingboard | mockingboard + via6522 + stub PSG | mockingboard + via6522 + stub PSG | PASS 2026-08-30; rows=488, fields=5856, gate_checks=10; candidate aligned per user decision (6-line glue fix: .ce(VIA_CE_F), side-select .strobe ≡ golden wen|ren, .portb_in 8'hFF; pre-alignment FAIL profile and harness bring-up fixes in module_tests/mockingboard/README.md). Real YM2149.sv differs only in volTable init syntax (64/64 values verified identical 2026-08-29); test glue uses a bit-identical stub PSG on both sides |
-| t65 | t65/T65*.vhd | t65*.v | In progress; isolates CPU behavior for apple2 |
+| t65 | t65/T65*.vhd | t65*.v | PASS 2026-08-30; rowsA=320 rowsB=500 fieldsA=3072 fieldsB=5784 ignored_metavalues=80 gate_checks=17; candidate aligned per user decision (t65.v missing `or Mode == "00"` in RstCycle Dec_S gate -> post-reset S was 00 instead of FD); Phase B power-on artifact (golden ABC/X/Y unreset: 'U' vs Verilator 0) resolved by TB-side boot preamble at $6B4C in both testbenches; pre-alignment and pre-preamble FAIL profiles retained in module_tests/t65/README.md + PROGRESS.md |
+| r65c02 | R65Cx2.vhd (entity R65C02) | R65Cx2.sv (module R65C02) | Planned (separate harness requested by user, 2026-08-30); 12-port interface, Verilog names the data-out `dout` vs VHDL `do`, reset active-low, no Mode generic. Regs layout verified identical on both sides: {PC[15:0], const 8'h01, S[7:0], P(N,V,R,B,D,I,Z,C), Y, X, A} = 64 bits (note the hard-coded 01 byte at [47:40] in BOTH ports). S is 8-bit here (unlike T65's 16-bit S). Reuse t65 harness scaffolding and trace schema; scrutinize the reset-time S sequence given the T65 Dec_S/RstCycle finding |
 | apple2 | apple2.vhd and VHDL dependencies | apple2.v and Verilog dependencies | In progress; integration-level harness |
 | apple2_font_rom | apple2_font_rom.vhd + spram_const shim | apple2_font_rom.v + video2.hex | PASS 2026-08-29; rows=4228, fields=38052, writes=37 (36 divergent probes aligned write-first, 1 equal), 64/64 readbacks; candidate aligned per user decision (one-line glyph_data fix; pre-alignment FAIL profile in module_tests/apple2_font_rom/README.md) |
 | vga_controller | vga_controller.vhd | vga_controller.v | PASS 2026-08-30; rows=163248, fields=3226938, ignored_metavalues=38022, hs_edges=177, vs_high=2736, combos=16, p3_triples=9; candidate aligned per user decision (2 fixes in palette-download process: buffer write on all 4 beats with pre-cycle value, color_addr wrap after beat 3 not beat 2); pre-alignment DIVERGENCE profile and power-up artifact classification retained in module_tests/vga_controller/README.md |

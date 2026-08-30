@@ -51,7 +51,11 @@ module apple2(
     ioctl_download,
     ioctl_wr,
     saturn_5_inslot,
-    speaker
+    speaker,
+    DBG_T65_REGS,
+    DBG_DI,
+    DBG_ROM_ADDR,
+    DBG_ROM_OUT
 );
     input         CLK_14M;		// 14.31818 MHz master clock
     output        CLK_2M;
@@ -100,6 +104,10 @@ module apple2(
     input         ioctl_wr;
     input         saturn_5_inslot;
     output        speaker;		// One-bit speaker output
+    output [63:0] DBG_T65_REGS;	// T65 debug: {PC,S,P,Y,X,A} (harness instrumentation)
+    output [7:0]  DBG_DI;		// T65 data input as seen by the CPU (harness instrumentation)
+    output [13:0] DBG_ROM_ADDR;	// ROM address bus (harness instrumentation)
+    output [7:0]  DBG_ROM_OUT;	// ROM data out (harness instrumentation)
 
     // Clocks
     wire          CLK_7M;
@@ -545,6 +553,9 @@ module apple2(
     assign A = (cpu == 1'b0) ? (T65_A[15:0]) : R65C02_A;
     assign D_OUT = (cpu == 1'b0) ? T65_DO : R65C02_DO;
     assign T65_DI = (T65_WE_N == 1'b0) ? D_OUT : D_IN;
+    assign DBG_DI = T65_DI;
+    assign DBG_ROM_ADDR = rom_addr;
+    assign DBG_ROM_OUT = rom_out;
     //CPU_EN <= PHASE_ZERO_F; -- not sure why this isn't working??
     assign CPU_EN = (PHASE_ZERO_D == 1'b1 & PHASE_ZERO == 1'b0) ? 1'b1 : 1'b0;
 
@@ -571,6 +582,7 @@ module apple2(
         .A(T65_A),
         .DI(T65_DI),
         .DO(T65_DO),
+        .Regs(DBG_T65_REGS),
         .PRINT(CPU_PRINT)
     );
 

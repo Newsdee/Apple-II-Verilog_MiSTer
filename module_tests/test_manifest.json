@@ -42,6 +42,11 @@
       "compareOnly": true
     },
     {
+      "name": "t65",
+      "runner": "t65/run_equivalence.ps1",
+      "compareOnly": true
+    },
+    {
       "name": "via6522",
       "runner": "via6522/run_equivalence.ps1",
       "compareOnly": true

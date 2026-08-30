@@ -5,6 +5,10 @@
 // full core uses (the Verilog port has no BCD_en input; PRINT is unconnected).
 // Same memory model, stimulus timelines, and trace schema as the VHDL bench:
 //   CYCLE,PC,SP,P,Y,X,A,ADDR,DI,DO,RW,NMI_N,IRQ_N
+// PC is the full 16-bit program counter (4 hex digits). The T65 Regs port is
+// {PC[15:0], S[15:0], P, Y, X, A} = exactly 64 bits (S is a 16-bit register
+// whose high byte stays FF). So P/Y/X/A live at regs[31:24]/[23:16]/[15:8]/
+// [7:0] and the SP column is the low byte of S.
 // P bits follow T65_Pack: C=0,Z=1,I=2,D=3,B=4,V=6,N=7.
 //
 // Phase selection via +PHASE=0|1 (default 0). Output file follows the phase:
@@ -15,6 +19,11 @@
 module t65_verilog_tb;
    reg clk = 0;
    reg res_n = 0;
+   // Set once stimulus has begun; keeps the write-back from firing on the
+   // pre-stimulus posedge when DUT outputs are still at their (zero) init
+   // values. The VHDL side never sees this: rw_n is U there, so its
+   // "rw_n = '0'" guard is false before stimulus.
+   reg sim_go = 0;
    reg irq_n = 1;
    reg nmi_n = 1;
    wire rw_n;
@@ -29,7 +38,7 @@ module t65_verilog_tb;
    reg [7:0] rom [0:16383];
 
    // Real RAM $0000-$EFFF (phase A only; phase B is stateless).
-   reg [7:0] ram [0:6143];
+   reg [7:0] ram [0:61439];
 
    // Phase B program override region, copied verbatim from apple2_vhdl_tb.vhd.
    localparam [7:0] PHASE_B_PROG [0:46] = '{
@@ -74,6 +83,21 @@ module t65_verilog_tb;
             0:       main_byte = 8'h4C;
             1:       main_byte = 8'hA0;
             default: main_byte = 8'h05;
+         endcase
+      end else if (a >= 24'h6B4C && a <= 24'h6B51) begin
+         // Boot preamble (phase B only): define A/X/Y deterministically at the
+         // reset vector before the pattern walk starts. The golden T65 resets
+         // only P; A/X/Y are 'U' in VHDL sim until first written, while Verilator
+         // zero-initializes them, so an immediate walk would desync on garbage
+         // ALU/indexed opcodes (simulation artifact, see PROGRESS.md). The walk
+         // then starts at $6B52. Must stay byte-identical to t65_vhdl_tb.vhd.
+         case (a - 24'h6B4C)
+            0:       main_byte = 8'hA9;   // LDA #$21
+            1:       main_byte = 8'h21;
+            2:       main_byte = 8'hA2;   // LDX #$32
+            3:       main_byte = 8'h32;
+            4:       main_byte = 8'hA0;   // LDY #$43
+            default: main_byte = 8'h43;
          endcase
       end else begin
          main_byte = ((a + a/16 + 60) % 256);
@@ -129,7 +153,7 @@ module t65_verilog_tb;
    // Phase A: commit writes at the end of the step RW_n is low in (the write
    // strobe is registered inside T65, so it is stable for the whole step).
    always @(posedge clk) begin
-      if (!rw_n && phase == 0 && a24[15:0] < 16'hF000)
+      if (sim_go && !rw_n && phase == 0 && a24[15:0] < 16'hF000)
          ram[a24[15:0]] <= do_sig;
    end
 
@@ -137,82 +161,10 @@ module t65_verilog_tb;
       integer i;
       $value$plusargs("PHASE=%d", phase);
       $readmemh("rtl/roms/apple2e.hex", rom);
-      for (i = 0; i < 6144; i++)
-         ram[i] = ((i + i/16 + 60) % 256);
-      if (phase == 0) begin
-         // $0500: A9 05   LDA #$05
-         ram['h0500] = 8'hA9; ram['h0501] = 8'h05;
-         // $0502: 18      CLC
-         ram['h0502] = 8'h18;
-         // $0503: E9 07   SBC #$07   (A=FD C=0 N=1)
-         ram['h0503] = 8'hE9; ram['h0504] = 8'h07;
-         // $0505: 69 03   ADC #$03   (A=00 C=1 Z=1)
-         ram['h0505] = 8'h69; ram['h0506] = 8'h03;
-         // $0507: 38      SEC
-         ram['h0507] = 8'h38;
-         // $0508: 69 FF   ADC #$FF   (A=00 C=1 Z=1 V=0)
-         ram['h0508] = 8'h69; ram['h0509] = 8'hFF;
-         // $050A: A9 7F   LDA #$7F
-         ram['h050A] = 8'hA9; ram['h050B] = 8'h7F;
-         // $050C: 69 00   ADC #$00   (A=80 N=1 V=1 C=0)
-         ram['h050C] = 8'h69; ram['h050D] = 8'h00;
-         // $050E: B8      CLV
-         ram['h050E] = 8'hB8;
-         // $050F: A9 00   LDA #$00   (Z=1)
-         ram['h050F] = 8'hA9; ram['h0510] = 8'h00;
-         // $0511: F0 03   BEQ +3 -> $0516 (taken)
-         ram['h0511] = 8'hF0; ram['h0512] = 8'h03;
-         // $0513/$0514: EA EA  (must never execute)
-         ram['h0513] = 8'hEA; ram['h0514] = 8'hEA;
-         // $0516: A9 01   LDA #$01   (Z=0)
-         ram['h0516] = 8'hA9; ram['h0517] = 8'h01;
-         // $0518: D0 03   BNE +3 -> $051D (taken)
-         ram['h0518] = 8'hD0; ram['h0519] = 8'h03;
-         // $051A/$051B: EA EA  (must never execute)
-         ram['h051A] = 8'hEA; ram['h051B] = 8'hEA;
-         // $051D: A9 01   LDA #$01   (Z=0)
-         ram['h051D] = 8'hA9; ram['h051E] = 8'h01;
-         // $051F: F0 FE   BEQ -2 (not taken; if taken it would self-loop)
-         ram['h051F] = 8'hF0; ram['h0520] = 8'hFE;
-         // $0521: A9 02   LDA #$02
-         ram['h0521] = 8'hA9; ram['h0522] = 8'h02;
-         // $0523: 85 34   STA $34
-         ram['h0523] = 8'h85; ram['h0524] = 8'h34;
-         // $0525: A5 34   LDA $34
-         ram['h0525] = 8'hA5; ram['h0526] = 8'h34;
-         // $0527: A2 0A   LDX #$0A
-         ram['h0527] = 8'hA2; ram['h0528] = 8'h0A;
-         // $0529: 8E 34 06 STX $0634
-         ram['h0529] = 8'h8E; ram['h052A] = 8'h34; ram['h052B] = 8'h06;
-         // $052C: AE 34 06 LDX $0634
-         ram['h052C] = 8'hAE; ram['h052D] = 8'h34; ram['h052E] = 8'h06;
-         // $052F: A0 05   LDY #$05
-         ram['h052F] = 8'hA0; ram['h0530] = 8'h05;
-         // $0531: 98      TYA
-         ram['h0531] = 8'h98;
-         // $0532: 20 49 05 JSR $0549 (pushes $0535, RTS returns to $0536)
-         ram['h0532] = 8'h20; ram['h0533] = 8'h49; ram['h0534] = 8'h05;
-         // $0535: EA      NOP (skipped by RTS+1)
-         ram['h0535] = 8'hEA;
-         // $0536: A9 77   LDA #$77   (resume point after RTS)
-         ram['h0536] = 8'hA9; ram['h0537] = 8'h77;
-         // $0538: 58      CLI
-         ram['h0538] = 8'h58;
-         // $0539: 4C 46 05 JMP $0546 (to park)
-         ram['h0539] = 8'h4C; ram['h053A] = 8'h46; ram['h053B] = 8'h05;
-         // $053C-$0545: EA padding
-         for (i = 'h053C; i <= 'h0545; i++) ram[i] = 8'hEA;
-         // $0546: 4C 46 05 JMP $0546 (park)
-         ram['h0546] = 8'h4C; ram['h0547] = 8'h46; ram['h0548] = 8'h05;
-         // $0549: A9 5A   LDA #$5A   (subroutine)
-         ram['h0549] = 8'hA9; ram['h054A] = 8'h5A;
-         // $054B: 48      PHA
-         ram['h054B] = 8'h48;
-         // $054C: 68      PLA
-         ram['h054C] = 8'h68;
-         // $054D: 60      RTS
-         ram['h054D] = 8'h60;
-      end
+      // RAM contents (pattern byte + phase-A program) come from the generated hex file;
+      // gen_rom_array.ps1 is the single source of truth and also emits the VHDL
+      // RAM_INIT constant, so both sides are byte-identical by construction.
+      $readmemh("module_tests/t65/build/t65_ram_init_lf.hex", ram);
    end
 
    task automatic apply_stimulus(input integer cycle);
@@ -243,13 +195,14 @@ module t65_verilog_tb;
 
       for (cycle = 0; cycle < (phase == 0 ? 320 : 500); cycle = cycle + 1) begin
          @(negedge clk);
+         sim_go = 1;
          apply_stimulus(cycle);
          @(posedge clk);
          #1;
 
          $fdisplay(trace_output, "%0d,%04X,%02X,%02X,%02X,%02X,%02X,%04X,%02X,%02X,%b,%b,%b",
             cycle,
-            regs[63:56], regs[55:48], regs[47:40], regs[39:32], regs[31:24], regs[23:16],
+            regs[63:48], regs[39:32], regs[31:24], regs[23:16], regs[15:8], regs[7:0],
             a24[15:0], di, do_sig, rw_n, nmi_n, irq_n);
       end
 
