@@ -33,7 +33,7 @@ before the prologue defines them).
 - Build (from repo root):
   `'C:\msys64\ucrt64\bin\verilator_bin.exe' --binary --timing -Wno-fatal --top-module r65c02_verilog_tb --Mdir module_tests/r65c02/build/verilog rtl/R65Cx2.sv module_tests/r65c02/r65c02_verilog_tb.sv`
   (`--timing` required for `always #5 clk`). Pre-existing warnings: CASEINCOMPLETE at R65Cx2.sv:1195/1273 (not new).
-- Run: `./module_tests/r65c02/build/verilog/Vr65c02_verilog_tb.exe +TOTAL=4000` (CWD = repo root; plusargs per §9).
+- Run: `./module_tests/r65c02/build/verilog/Vr65c02_verilog_tb.exe +TOTAL=4000 +IRQPULSE=730 +NMIPULSE=768` (CWD = repo root; plusargs per §8).
 - If an interrupted build leaves zero-byte `Vr65c02_verilog_tb__ALL.cpp`, delete before rebuilding.
 - File encoding note: `rtl/R65Cx2.sv` uses CRLF; Perl regexes must handle `\r`.
 
@@ -82,7 +82,7 @@ layout to Verilog — the VHDL TB reads it directly, no hierarchical access.
 | `PROGRESS.md` | this file |
 | `build/analyze.pl`, `build/table_dump.txt`, `build/opcode_census.txt` | DONE (table decode, 256/256) |
 | `build/probe_tb.sv`, `build/dump_tb.sv`, `build/dbg*.pl` | probe artifacts (keep) |
-| `build/gen_mem_array.pl` | generator — WORKING (this session: many fixes, §13) |
+| `build/gen_mem_array.pl` | generator — WORKING (this session: many fixes, §12) |
 | `build/program_table.pl` | directed program v1 — branch block redesigned THIS SESSION |
 | `build/r65_mem_init.hex` | 4096 lines × 16 bytes — VERIFIED (vectors at FFFA-FFFF correct) |
 | `build/r65_mem_array.vhd` | VHDL package MEM_INIT — generated, tail verified |
@@ -151,7 +151,7 @@ layout to Verilog — the VHDL TB reads it directly, no hierarchical access.
 - Write commit: `always @(posedge clk) if (sim_go && !nwe) mem[addr] <= dout;` — `sim_go` guard prevents pre-stimulus writes.
 - `always #5 clk = ~clk;` (needs --timing).
 - reset_sig low for cycles 0..3 (mirrors t65's 4-cycle window), then high.
-- Plusargs: `+IRQPULSE=<n>` / `+NMIPULSE=<n>` (one low cycle each, 0=disabled; sampled at posedge n), `+TOTAL=<n>` (default 4000).
+- Plusargs: `+IRQPULSE=<n>` / `+NMIPULSE=<n>` (**8-cycle-wide** low windows starting at cycle n, 0=disabled — see the calibration note below for why 1 cycle is not enough), `+TOTAL=<n>` (default 4000).
 - Emits 22-column CSV to `module_tests/r65c02/build/verilog_trace.csv`.
 
 **Calibration COMPLETE (pulses enabled):**
@@ -230,14 +230,14 @@ tested. Must write `(Is-Meta $a) -or (Is-Meta $b)`.
 3. This harness does NOT prove FPGA behavior — Quartus compile + hardware
    remain separate validation (see AGENTS.md).
 
-## 12. Standing rules
+## 11. Standing rules
 
 - Preserve user changes, generated artifacts, ROM data, mixed EOLs; no commits
   unless asked; no long Quartus compiles unless asked.
 - Verilator is a required validation step for any RTL change (AGENTS.md).
 - Generated files live under `module_tests/r65c02/build/`.
 
-## 13. Session bug log (fixed — do not re-debug)
+## 12. Session bug log (fixed — do not re-debug)
 
 1. `insn_size` PADTO returned scalarref; pass 1 dereferenced as array → return `[$t]`.
 2. Missing `_s` sentinel labels for 7 not-taken branches → added.

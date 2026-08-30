@@ -32,8 +32,18 @@
       "compareOnly": true
     },
     {
+      "name": "joystick_input",
+      "runner": "joystick_input/run_equivalence.ps1",
+      "compareOnly": false
+    },
+    {
       "name": "mockingboard",
       "runner": "mockingboard/run_equivalence.ps1",
+      "compareOnly": true
+    },
+    {
+      "name": "r65c02",
+      "runner": "r65c02/run_equivalence.ps1",
       "compareOnly": true
     },
     {

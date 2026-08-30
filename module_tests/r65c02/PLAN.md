@@ -1,7 +1,34 @@
 # R65C02 Equivalence Harness — Execution Plan
 
-Status: **PLANNED** (not yet executed). Created 2026-08-30 after user request.
-Roster entry: `module_tests/README.md` → "r65c02" (Planned).
+Status: **COMPLETE (v1) 2026-08-30** — `R65C02 EQUIVALENCE PASS`
+(83,906 fields compared, 0 mismatches, coverage 61/61). Contract doc:
+`README.md`; session log + DUT facts: `PROGRESS.md`. Roster entry updated.
+
+## As-built deviations from this plan (all deliberate)
+
+1. **Trace schema is 22 columns, not 15**: P is emitted per-bit
+   (`P_N..P_C`) instead of one `P` byte, so the permanently-undefined B flag
+   can be skipped field-by-field without discarding defined rows. The plan's
+   "metavalue budget" for R/B is subsumed by field-level meta-skip.
+2. **Memory model**: single generated 64K image (pattern + program +
+   vectors) instead of `apple2e.hex` ROM + RAM overrides — the CPU is tested
+   in isolation; the apple2 harness covers the ROM path.
+3. **v1 = Phase A only** (single phase, no `+PHASE`). Phase B (mid-stream
+   reset) is deferred — see README "v1 exclusions".
+4. **Coverage is 61/63 mnemonics**: BRK and RTI are excluded from v1 (RTI's
+   non-standard semantics need a dedicated test design; v2).
+5. **Executed-opcode detection** uses `SYNC=1 AND SYNC_IRQ=0` rows (DI =
+   opcode) rather than reconstructing fetches from ADDR==PC — and it must
+   exclude `SYNC_IRQ=1` rows because interrupt-injected fetches carry bogus DI.
+6. **GHDL requires `--std=93 -C`** for the golden (VHDL-2008 mode fails on
+   the opcode-table aggregate). No wrapper file was needed, as predicted.
+7. **Generator is Perl** (`build/gen_mem_array.pl`), not PowerShell; sources
+   live in `build/` and are tracked via force-add (the directory is
+   gitignored for generated artifacts).
+8. Interrupts use **8-cycle pulse windows** at fixed cycles 730/768 (the DUT
+   samples nmi_n/irq_n only outside branch-taken/opcode-fetch subcycles).
+
+The remainder of this file is the original plan, kept as history.
 
 ## Purpose and claim boundary
 

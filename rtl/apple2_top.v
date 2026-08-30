@@ -296,6 +296,18 @@ module apple2_top(
     wire [9:0]    psg_5_audio_r;
     wire [9:0]    audio;
 
+    // box-average the $C030 speaker bit at 14.318 MHz into
+    // ~48 kHz samples (298 clocks = 20.8 us) so fast toggles average out
+    // instead of aliasing from point sampling. Duty maps to 0..512 (half-
+    // scale, 4x the old 0..128 level); the framework DC blocker centers it.
+    wire        spk_bit;
+    reg  [8:0]  spk_cnt = 9'd0;
+    reg  [8:0]  spk_sum = 9'd0;
+    reg  [9:0]  spk_avg = 10'd0;
+    wire [8:0]  spk_sum_now = spk_sum + {8'b0, spk_bit};
+    wire [17:0] spk_prod = {spk_sum_now, 9'b0};      // *512, max 152576 < 2^18
+    wire [17:0] spk_div  = spk_prod / 18'd298;        // max 512
+
     reg           joyx;
     reg           joyy;
     wire          pdl_strobe;
@@ -424,7 +436,7 @@ module apple2_top(
         .ioctl_download(ioctl_download),
         .ioctl_wr(ioctl_wr),
         .saturn_5_inslot(saturn_5_inslot),
-        .speaker(audio[7])
+        .speaker(spk_bit)
     );
 
     vga_controller tv(
@@ -716,9 +728,22 @@ module apple2_top(
     );
 `endif
 
-    assign audio[6:0] = 7'b0;
-    assign audio[9:8] = 2'b0;
-    assign AUDIO_R = (psg_4_audio_r + psg_5_audio_r + audio);
-    assign AUDIO_L = (psg_4_audio_l + psg_5_audio_l + audio);
+    always @(posedge CLK_14M) begin
+        if (spk_cnt == 9'd297) begin
+            spk_cnt <= 9'd0;
+            spk_sum <= 9'd0;
+            spk_avg <= spk_div[9:0];
+        end else begin
+            spk_cnt <= spk_cnt + 9'd1;
+            if (spk_bit) spk_sum <= spk_sum + 9'd1;
+        end
+    end
+    assign audio = spk_avg;
+    // 3x 10-bit sum needs 11 bits (765+765+512=2042); saturate instead of
+    // truncating. Single-MB usage is bit-identical to the old wrap.
+    wire [10:0] audio_sum_l = psg_4_audio_l + psg_5_audio_l + audio;
+    wire [10:0] audio_sum_r = psg_4_audio_r + psg_5_audio_r + audio;
+    assign AUDIO_L = audio_sum_l[10] ? 10'h3FF : audio_sum_l[9:0];
+    assign AUDIO_R = audio_sum_r[10] ? 10'h3FF : audio_sum_r[9:0];
 
 endmodule
