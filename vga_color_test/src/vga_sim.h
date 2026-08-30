@@ -51,7 +51,14 @@ struct Settings {
     int color_line_start = 1;     // N for kCLTextGraphics (0..191)
     std::string image_path;       // empty = synthetic pattern
     int threshold = 128;          // luminance threshold for images
-    int phase = 0;                // feed phase 0..3 (color-phase offset)
+    int phase = 2;                // feed phase 0..3 (color-phase offset;
+                                  // 2 verified correct against real NTSC)
+    // Alignment offset in samples. The DUT's internal data pipeline leads its
+    // timing window by ~12 samples (measured 0.08% residual at shift 12), so
+    // content fed at the HBL falling edge appears ~12 samples early. In the
+    // real core the video stream's phase relative to HBL compensates this
+    // implicitly; the synthetic feeder compensates it explicitly.
+    int align = 12;
 };
 
 int color_line_for(const Settings& s, int active_line);
@@ -64,14 +71,17 @@ int video_bit(int line, int col);
 // pattern.
 struct VideoSource {
     const Image1Bit* image = nullptr;  // non-null when an image is loaded
-    // Feed phase: circular shift of the 560-sample row before feeding.
+    // Feed offset: circular shift of the 560-sample row before feeding.
+    // offset = phase (0..3, color phase) + align (DUT skew compensation).
     // The artifact-color rotation (shift_color = rotl(sr[4:1], hcount[1:0]))
     // depends on which sample phase the content sits at relative to the HBL
-    // falling edge, so a wrong phase rotates the palette (e.g. red<->blue).
-    int phase = 0;
+    // falling edge, so the offset modulo 4 sets the palette rotation and the
+    // full offset sets the horizontal alignment - they are coupled.
+    int offset = 0;
     int bit(int line, int col) const {
         if (image) {
-            const int c = (col - phase + Image1Bit::kWidth) % Image1Bit::kWidth;
+            const int W = Image1Bit::kWidth;
+            const int c = (col - offset + 2 * W) % W;
             return image->at(line, c);
         }
         return video_bit(line, col);

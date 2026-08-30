@@ -216,7 +216,31 @@ New assets: `batman.png`, `bruce_lee.png`, `karateka.png` (568x192) copied from
 The B&W/green/amber + COLOR_LINE=1 artifact-color interaction is treated as a
 **latent divergence to investigate**. Do NOT "fix" the controller in the tester;
 document where it diverges from expected golden behavior and flag it for the
-active `rtl/vga_controller.v` + equivalence harness.
+active `rtl/vga_controller.v` + equivalence harness. GUI mitigation (2026-08-30):
+selecting B&W/Green/Amber in the Display combo forces COLOR_LINE to No color.
+
+### FEED PHASE + ALIGNMENT (verified 2026-08-30) — red/blue swap + left shift
+The DUT's artifact rotation `shift_color = rotl(sr[4:1], hcount[1:0])` depends
+on which sample phase the content sits at relative to the HBL falling edge.
+Our synthetic feeder originally fed the image starting exactly at the falling
+edge, which (a) rotated the palette by half (red<->blue) and (b) left the
+image ~12 samples short on the left. The DUT itself is correct (equivalent to
+golden); the real core's video stream simply does not start at the HBL
+falling edge.
+Two measured DUT/feed properties (both reproduced in the golden):
+1. **Data/window skew ~12 samples**: the RGB data pipeline leads the timing
+   window by ~12 cycles, so content fed at the falling edge appears ~12
+   samples early (measured 0.08% residual at shift 12 in B&W).
+2. **559 of 560 samples output**: hcount reset latency drops the last sample;
+   the rightmost source sample never reaches the output (intrinsic; the real
+   core's 560th sample is off the visible area anyway).
+Compensation is in the FEED, exposed as two live GUI controls (and CLI
+`--phase`/`--align`): `Feed phase` 0..3 (default **2**, user-verified correct
+against real NTSC colors) and `Feed align` 0..16 (default **12**). Total feed
+offset = phase + align; alignment and color phase are coupled mod 4 (offset 12
+= perfect left edge but phase-0 colors; offset 14 = correct colors with the
+content 2 samples right of the window edge - the real core's actual phase).
+`tools/shift_check.py` measures the residual circular shift of a B&W dump.
 
 ### Phase 3 results (verified 2026-08-30)
 - Code layout: `src/vga_sim.{h,cpp}` (DUT driver shared by headless + GUI),
@@ -238,8 +262,17 @@ active `rtl/vga_controller.v` + equivalence harness.
   the full core). Rebuild + 2-frame preamble on image/threshold change and
   Reset only.
 - Verified: builds; headless regression passes (batman dump, 14 colors);
-  GUI launches and runs (10 s soak, clean shutdown). Visual confirmation of
-  the new display modes is the user's next step.
+  GUI launches and runs (10 s soak, clean shutdown).
+- GUI display (user-iterated 2026-08-30): 1200x900 window; controls 280 px
+  with labels above widgets; video window 840x880; Full-559/Half-scaled width
+  toggle (default half); optional 4:3 canvas 640x480 (scanline-doubled,
+  top-left, black remainder, zoom auto-halves when toggled); FPS + loop/sim
+  ms readout (no artificial loop cap); Save-frame-as-PNG; B&W/Green/Amber
+  display forces COLOR_LINE off; Feed phase + Feed align sliders (live).
+- Known residual: rightmost ~1-2 source samples clip at the output edge
+  (intrinsic 559/560, see above). Total Replay color sparsity is expected for
+  its 284-px 2x-duplicated source (see COLOR SPARSITY); user may recapture
+  the source.
 
 ## Next steps (when resuming)
 

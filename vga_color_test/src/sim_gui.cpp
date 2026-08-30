@@ -178,9 +178,14 @@ int VgaGui::run() {
         }
         ImGui::Text("Luminance threshold");
         ImGui::SliderInt("##threshold", &s_.threshold, 0, 255);
-        ImGui::Text("Feed phase (color offset)");
+        // Feed offset = phase (color, mod 4) + align (DUT skew). Both are
+        // live: they only re-map the feed, no DUT rebuild needed.
+        ImGui::Text("Feed phase (color, mod 4)");
         if (ImGui::SliderInt("##phase", &s_.phase, 0, 3))
-            vs_.phase = s_.phase;  // live: no DUT rebuild needed
+            vs_.offset = s_.phase + s_.align;
+        ImGui::Text("Feed align (samples)");
+        if (ImGui::SliderInt("##align", &s_.align, 0, 16))
+            vs_.offset = s_.phase + s_.align;
         if (s_.image_path.empty())
             ImGui::TextDisabled("(no image: synthetic pattern)");
 
