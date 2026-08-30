@@ -707,24 +707,47 @@ module apple2_top(
 `endif
 
 `ifdef SIM_FAST
-    // SIM_FAST: no clock card in slot 1
+    // SIM_FAST: no NSC in the slot ROM space
     assign CLOCK_DO = 8'b0;
     assign CLOCK_OE = 1'b0;
 `else
-    clock_card clock(
-        .CLK_14M(CLK_14M),
-        .CLK_2M(CLK_2M),
-        .PH_2(PHASE_ZERO),
-        .IO_SELECT_N(~IO_SELECT[1]),
-        .DEVICE_SELECT_N(~DEVICE_SELECT[1]),
-        .IO_STROBE_N(~IO_STROBE),
-        .ADDRESS(ADDR),
-        .RW_N(~cpu_we),
-        .RESET(reset),
-        .DATA_IN(D),
-        .DATA_OUT(CLOCK_DO),
-        .OE(CLOCK_OE),
-        .RTC(RTC)
+    // No Slot Clock (NSC): DS1216E-style software time interface hiding
+    // under each slot's ROM page at offsets $00-$07 (replaces the old
+    // clock_card; see NSC_PORT_NOTES.md). nsc_ticker supplies BCD time/date
+    // (HPS RTC reload + free-running calendar); no_slot_clock (BSD port of
+    // jtflanagan/AppleTini's module) implements the 64-write unlock /
+    // 64-bit readout protocol on the bus.
+    wire        nsc_time_en;
+    wire [63:0] nsc_time_bcd;
+
+    nsc_ticker nsc_tkr(
+        .clk(CLK_14M),
+        .rst(reset),
+        .rtc(RTC),
+        .time_bcd(nsc_time_bcd),
+        .time_en(nsc_time_en)
+    );
+
+    // Reachable from any slot 1-6 wide window ($C1xx-$C7xx; $C3xx only when
+    // C3ROM is set) or the $C8xx-$CFFF slot-ROM window (IO_STROBE decode).
+    // The stock driver probes slots 3,1,2,4-7 then internal, so with the
+    // default C3ROM=0 it finds the NSC at $C1xx. The module itself restricts
+    // to offsets $00-$07.
+    wire nsc_slot_sel = IO_SELECT[6] | IO_SELECT[5] | IO_SELECT[4] |
+                        IO_SELECT[3] | IO_SELECT[2] | IO_SELECT[1] |
+                        IO_STROBE;
+
+    no_slot_clock nsc(
+        .clk(CLK_14M),
+        .rst(reset),
+        .strobe(PHASE_ZERO_R),
+        .addr(ADDR),
+        .rw(~cpu_we),
+        .slot_sel(nsc_slot_sel),
+        .input_time({20'b0, nsc_time_bcd}),
+        .input_time_en(nsc_time_en),
+        .wr_data(CLOCK_DO),
+        .wr_data_en(CLOCK_OE)
     );
 `endif
 
