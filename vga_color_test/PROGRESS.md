@@ -6,7 +6,8 @@ VGA controller — load 1-bit Apple II images, feed video+timing into the DUT,
 show the processed RGB in an ImGui window. See `PLAN.md` for the full design
 and decisions.
 
-**Last updated: 2026-08-30. Phase 1 and Phase 2 COMPLETE and verified.**
+**Last updated: 2026-08-30. Phases 1-3 COMPLETE and verified. Two reported
+visual issues DIAGNOSED (feeder bug fixed; color sparsity explained).**
 
 ---
 
@@ -15,7 +16,7 @@ and decisions.
 - **Phase 1 (headless DUT + feeder): DONE.** Builds, runs, captures a clean
   559×192 frame, dumps PPM, all gates pass, output is deterministic.
 - **Phase 2 (image source): DONE and verified (see Phase 2 results below).**
-- **Phase 3 (ImGui GUI): NOT STARTED.**
+- **Phase 3 (ImGui GUI): DONE and verified (see Phase 3 results below).**
 - **Phase 4 (automated validation / --smoke-test): NOT STARTED.**
 
 ### Open question (BLOCKING a design decision, not the build)
@@ -185,26 +186,68 @@ harness is a good idea** to confirm, but that is separate from this tester.
 
 ---
 
+### FEEDER BUG (fixed 2026-08-30) — the "image off center" report
+`main.cpp` fed `vs.bit(active_line, clock)` with `clock` in 0..911, i.e. source
+columns 352..911 during the active period — columns 560+ were OUT OF BOUNDS and
+wrapped into the next image row. Net effect: image rotated ~196 samples with row
+bleed (measured 3.69% mismatch at the best circular shift). Phase 1 never caught
+it because the synthetic pattern is periodic. Fix: feed `clock - kHblHighClocks`
+(0..559). After the fix, Total Replay B&W aligns at 0.08% mismatch (90 px) with a
+constant 12-sample DUT pipeline offset. Diagnostic tool: `tools/shift_check.py`
+(Python + Pillow from `E:\MiSTer\Apple-II_FPGAdev\.venv`; measures circular shift
+between a source PNG and a B&W PPM dump).
+
+### COLOR SPARSITY (explained 2026-08-30) — the "colors not generating" report
+Not a DUT bug. Two compounding causes with the 284-px sources:
+1. 2x duplication phase-locks the artifact rotation: `shift_color =
+   rotl(sr[4:1], hcount[1:0])` — every duplicated source pixel's artifact sample
+   lands on the same hcount phase, so only ONE of the four rotations is ever
+   applied → at most ~2 artifact colors (observed: 3692FF `1100` and D87300
+   `0011` on the text screens).
+2. Sparse text content only produces the (0,1,0)/(1,0,1) bit triples.
+With native 568x192 sources (crop4, no duplication) the palette comes alive:
+`assets/batman.png` renders 12 of the 16 NTSC //e colors. The NTSC //e palette
+is the inline table in `palette_color()` (index `0000` is BLACK — that is why
+black backgrounds stay black), NOT the `BUFFER_COL*` custom-palette table.
+New assets: `batman.png`, `bruce_lee.png`, `karateka.png` (568x192) copied from
+`../../apple2ntsc/apple2_palgen/preview_images/`.
+
+### Open question — user decision 2026-08-30: option (c)
+The B&W/green/amber + COLOR_LINE=1 artifact-color interaction is treated as a
+**latent divergence to investigate**. Do NOT "fix" the controller in the tester;
+document where it diverges from expected golden behavior and flag it for the
+active `rtl/vga_controller.v` + equivalence harness.
+
+### Phase 3 results (verified 2026-08-30)
+- Code layout: `src/vga_sim.{h,cpp}` (DUT driver shared by headless + GUI),
+  `src/sim_gui.{h,cpp}` (SDL2/OpenGL2/ImGui front end), `src/main.cpp` (CLI +
+  mode dispatch: no output options -> GUI; --dump-frame/--dump-png/--smoke-test
+  -> headless; --ppm2png -> converter).
+- ImGui is reused from `../verilator/sim/imgui/` via ABSOLUTE -I path in the
+  Makefile (the generated .mk compiles from inside obj_dir/, so relative -I
+  breaks). SDL2 flags follow the full harness MinGW branch:
+  `-I<sdl2 prefix>/include/SDL2 -DSDL_MAIN_HANDLED` +
+  `-lgdi32 -lopengl32 -limm32 -lSDL2` (console app, own main).
+- GUI: controls window (bundled-image combo, open-image path + Load, threshold
+  slider, Display/Palette combos, Sharper-RGB + vertical-blend checkboxes,
+  COLOR_LINE combo + line slider, Reset, **Save frame as PNG** ->
+  `output/gui_frame_<timestamp>.png`, status line) + video window (zoom,
+  Full-559 / Half-scaled width toggle, 4:3 canvas 640x480 with scanline
+  doubling + black bars, FPS + loop/sim ms readout). Continuous loop: one DUT
+  frame per iteration, no artificial cap (true throughput for comparison vs
+  the full core). Rebuild + 2-frame preamble on image/threshold change and
+  Reset only.
+- Verified: builds; headless regression passes (batman dump, 14 colors);
+  GUI launches and runs (10 s soak, clean shutdown). Visual confirmation of
+  the new display modes is the user's next step.
+
 ## Next steps (when resuming)
 
-1. **Resolve the open question** (B&W/green/amber artifact-color behavior) with
-   the user → decide (a)/(b)/(c) above. (Still open as of Phase 2 completion.)
-2. **Phase 3 — ImGui GUI:**
-   - Copy needed SDL/OpenGL2/ImGui from `../verilator/sim/imgui/` (relative
-     build paths, do not duplicate the whole harness) and `sim_video.{cpp,h}`
-     texture/zoom behavior (strip audio/input/bus/storage).
-   - Controls window (image dropdown, open-image, threshold slider, display
-     combo, palette combo, Composite/Sharper-RGB, vertical-blend checkbox,
-     COLOR_LINE combo + N slider, reload/reset, **Save-frame-as-PNG button**,
-     status text) + video window (zoom/rotate/flip, DUT texture, optional mono
-     preview).
-   - Continuous sim loop feeding the selected image every frame; live toggles.
-   - Add ImGui sources + SDL2 to the Makefile.
-4. **Phase 4 — validation:** `--smoke-test` (headless, no SDL), load all
+1. **Phase 4 — validation:** `--smoke-test` (headless, no SDL), load all
    bundled images, all display modes + 3 built-in palettes, seam/comb on/off,
    deterministic frame hashes across two clean reconstructions, unsupported-size
    failure, optional PPM on failure.
-5. **README.md** for vga_color_test (build/run/image requirements/controls +
+2. **README.md** for vga_color_test (build/run/image requirements/controls +
    the copied-controller sync workflow).
 
 ## Reference

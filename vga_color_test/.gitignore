@@ -6,3 +6,4 @@ examples/
 *.png
 # Bundled example sources are tracked, not generated.
 !assets/*.png
+tools/*.exe
