@@ -1,0 +1,8 @@
+# Build + generated image outputs (regenerable)
+obj_dir/
+output/
+examples/
+*.ppm
+*.png
+# Bundled example sources are tracked, not generated.
+!assets/*.png
