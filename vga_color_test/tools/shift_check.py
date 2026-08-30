@@ -27,6 +27,8 @@ def map_source(img, threshold):
     g = img.convert("L")
     if sw == 560:
         pass
+    elif sw == 559:
+        pass  # resize below pads the last column (matches direct+pad)
     elif sw == 568:
         g = g.crop((4, 0, 564, H))
     elif sw == 284:
@@ -34,7 +36,7 @@ def map_source(img, threshold):
     elif sw == 280:
         pass
     else:
-        raise ValueError(f"unsupported source width {sw} (need 280/284/560/568)")
+        raise ValueError(f"unsupported source width {sw} (need 280/284/559/560/568)")
     if g.width != W:
         g = g.resize((W, H), Image.NEAREST)  # 2x horizontal duplication
     px = g.load()

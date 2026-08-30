@@ -15,6 +15,7 @@
 
 #include "image_source.h"
 #include "sim_gui.h"
+#include "smoke_test.h"
 #include "vga_sim.h"
 
 #include <cstdint>
@@ -267,12 +268,16 @@ int main(int argc, char** argv) {
     if (!c.ppm2png_in.empty())
         return convert_to_png(c.ppm2png_in, c.ppm2png_out);
 
-    if (c.dump_requested || c.smoke_test)
+    if (c.smoke_test)
+        return run_smoke_test();
+
+    if (c.dump_requested)
         return run_headless(c);
 
     // Default: interactive GUI.
     Image1Bit image;
     VideoSource vs;
+    vs.offset = c.settings.phase + c.settings.align;  // always: GUI image
     if (!c.settings.image_path.empty()) {
         std::string err;
         if (!load_image_1bit(c.settings.image_path, c.settings.threshold,
@@ -282,7 +287,6 @@ int main(int argc, char** argv) {
             c.settings.image_path.clear();
         }
         vs.image = &image;
-        vs.offset = c.settings.phase + c.settings.align;
     }
     VgaGui gui(c.settings, image, vs);
     return gui.run();

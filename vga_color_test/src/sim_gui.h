@@ -57,4 +57,5 @@ private:
     bool half_width_ = true;       // half = full 559 frame scaled to 50%
     bool canvas43_ = false;        // optional 640x480 canvas: scanline-
                                    // doubled, top-left, black remainder
+    bool combo_was_open_ = false;  // image dropdown open-state tracking
 };

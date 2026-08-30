@@ -51,6 +51,13 @@ bool load_image_1bit(const std::string& path, int threshold,
         for (int y = 0; y < Image1Bit::kHeight; ++y)
             for (int x = 0; x < Image1Bit::kWidth; ++x)
                 out->bits[(size_t)y * Image1Bit::kWidth + x] = src_bit(y, x);
+    } else if (h == Image1Bit::kHeight && w == 559) {
+        out->profile = "559x192 direct+pad";
+        for (int y = 0; y < Image1Bit::kHeight; ++y) {
+            for (int x = 0; x < 559; ++x)
+                out->bits[(size_t)y * Image1Bit::kWidth + x] = src_bit(y, x);
+            out->bits[(size_t)y * Image1Bit::kWidth + 559] = src_bit(y, 558);
+        }
     } else if (h == Image1Bit::kHeight && w == 568) {
         out->profile = "568x192 crop4";
         for (int y = 0; y < Image1Bit::kHeight; ++y)
@@ -60,7 +67,7 @@ bool load_image_1bit(const std::string& path, int threshold,
     } else {
         char buf[128];
         snprintf(buf, sizeof(buf),
-                 "unsupported image size %dx%d (need 280/284/560/568 x 192)",
+                 "unsupported image size %dx%d (need 280/284/559/560/568 x 192)",
                  w, h);
         *error = buf;
         stbi_image_free(px);

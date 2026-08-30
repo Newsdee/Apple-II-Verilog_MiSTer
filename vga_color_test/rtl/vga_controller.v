@@ -454,6 +454,7 @@ always @(posedge CLK_14M) begin: vertical_line_buffer
     seam_active_d <= seam_timing_active;
     if (seam_vbl) begin
         previous_line_valid <= 1'b0;
+        line_valid_q <= 1'b0;
         comb_hcount <= 0;
     end else if (seam_timing_active) begin
         previous_rgb_q <= previous_line_rgb[comb_hcount];

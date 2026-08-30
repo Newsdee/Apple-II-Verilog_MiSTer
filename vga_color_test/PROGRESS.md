@@ -6,8 +6,9 @@ VGA controller — load 1-bit Apple II images, feed video+timing into the DUT,
 show the processed RGB in an ImGui window. See `PLAN.md` for the full design
 and decisions.
 
-**Last updated: 2026-08-30. Phases 1-3 COMPLETE and verified. Two reported
-visual issues DIAGNOSED (feeder bug fixed; color sparsity explained).**
+**Last updated: 2026-08-30. Phases 1-4 COMPLETE and verified. Two reported
+visual issues DIAGNOSED (feeder bug fixed; color sparsity explained).
+Feed phase/alignment verified (phase 2 + align 12 defaults).**
 
 ---
 
@@ -17,7 +18,8 @@ visual issues DIAGNOSED (feeder bug fixed; color sparsity explained).**
   559×192 frame, dumps PPM, all gates pass, output is deterministic.
 - **Phase 2 (image source): DONE and verified (see Phase 2 results below).**
 - **Phase 3 (ImGui GUI): DONE and verified (see Phase 3 results below).**
-- **Phase 4 (automated validation / --smoke-test): NOT STARTED.**
+- **Phase 4 (automated validation / --smoke-test): DONE and verified (see
+  Phase 4 results below).**
 
 ### Open question (BLOCKING a design decision, not the build)
 The user was shown a 9-row contact sheet (`contact_sheet.png`) and asked to
@@ -274,14 +276,30 @@ content 2 samples right of the window edge - the real core's actual phase).
   its 284-px 2x-duplicated source (see COLOR SPARSITY); user may recapture
   the source.
 
+### Phase 4 results (verified 2026-08-30)
+`run.bat --smoke-test` (headless, no SDL; ~9.5 s). Seven gates, all passing:
+1. **image-load**: 11/11 bundled assets load (284x192 dup + 568x192 crop4).
+2. **basic-capture**: every image -> 107,328 px / 192 lines / 0 bad widths.
+3. **settings-matrix**: 96 cases on a representative native-width image
+   (4 display x 3 built-in palettes x seam x comb x color-line none/full).
+4. **bw-mono**: B&W + COLOR_LINE=none -> 0 non-gray pixels.
+5. **determinism**: two clean DUT reconstructions -> identical FNV-1a frame
+   hash (9bf0257251924685 on 2026-08-30).
+6. **alignment**: B&W capture vs thresholded source, best circular shift with
+   <1% mismatch (guards the feeder's column indexing; the original 196-sample
+   rotation bug would fail this gate hard).
+7. **bad-size**: 100x100 PPM rejected with a descriptive error.
+Failing frames dump to `output/smoke_fail_<gate>.ppm`. Code: `src/smoke_test.{h,cpp}`.
+
 ## Next steps (when resuming)
 
-1. **Phase 4 — validation:** `--smoke-test` (headless, no SDL), load all
-   bundled images, all display modes + 3 built-in palettes, seam/comb on/off,
-   deterministic frame hashes across two clean reconstructions, unsupported-size
-   failure, optional PPM on failure.
-2. **README.md** for vga_color_test (build/run/image requirements/controls +
-   the copied-controller sync workflow).
+1. (none outstanding - all planned phases done; README.md written 2026-08-30)
+2. Candidate follow-ups (not planned, user-driven):
+   - Recapture Total Replay as a native 560/568-px source (full palette).
+   - Investigate the (c)-flagged B&W/Green/Amber + COLOR_LINE=1 divergence
+     in the active `rtl/vga_controller.v` + equivalence harness.
+   - Re-run `module_tests/vga_controller/run_equivalence.ps1` if the active
+     controller has changed since the last snapshot comparison.
 
 ## Reference
 - Equivalence harness (cycle-vs-VHDL): `../module_tests/vga_controller/`

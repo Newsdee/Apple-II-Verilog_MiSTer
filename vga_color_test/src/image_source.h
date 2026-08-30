@@ -9,6 +9,8 @@
 //   280x192 : duplicate each source pixel horizontally (280*2 = 560)
 //   284x192 : crop 2 px from each side -> 280, then duplicate
 //   560x192 : feed directly
+//   559x192 : feed 559 directly, pad the 560th sample with the last column
+//             (the DUT drops the 560th sample anyway - 559 is its output width)
 //   568x192 : crop 4 px from each side -> 560
 // Anything else is rejected with a descriptive error (no rescaling).
 

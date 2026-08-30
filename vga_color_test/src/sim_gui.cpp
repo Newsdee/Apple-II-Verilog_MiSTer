@@ -58,6 +58,9 @@ bool VgaGui::load_image(const std::string& path) {
     image_ = loaded;
     vs_.image = &image_;
     s_.image_path = path;
+    // Keep the feed offset in sync with the current phase/align settings -
+    // loading must not silently fall back to offset 0 (phase-0 colors).
+    vs_.offset = s_.phase + s_.align;
     rebuild_and_prime();
     status_ = "loaded " + path + " (" +
               std::to_string(image_.src_width) + "x" +
@@ -127,7 +130,6 @@ int VgaGui::run() {
     frame_.assign((size_t)kOutWidth * kOutHeight * 3, 0);
     tex_ = make_texture_buffer();
 
-    list_asset_images();
     if (!s_.image_path.empty())
         load_image(s_.image_path);
     else
@@ -138,6 +140,17 @@ int VgaGui::run() {
     bool done = false;
 
     while (!done) {
+        // Live-rescan assets/ so images added while running appear in the
+        // combo without a restart; keep the current selection by path.
+        {
+            const std::string prev_path =
+                (asset_index_ >= 0 && asset_index_ < (int)asset_images_.size())
+                    ? asset_images_[asset_index_] : s_.image_path;
+            list_asset_images();
+            asset_index_ = -1;
+            for (int i = 0; i < (int)asset_images_.size(); ++i)
+                if (asset_images_[i] == prev_path) { asset_index_ = i; break; }
+        }
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             ImGui_ImplSDL2_ProcessEvent(&event);
