@@ -11,8 +11,9 @@
 //             previous edge.
 //   - clocken0/clocken1 => enable_a/enable_b gate the port logic only
 //     (clock_enable_output = BYPASS, so outputs are not gated)
-//   - enable_a/enable_b default to 1, matching the VHDL port defaults
-//     (floppy_track.sv leaves them unconnected)
+//   - enable_a/enable_b carry no input initializers: Quartus rejects
+//     "input ... = value" (Error 10231), so every instantiation must
+//     connect 1'b1 explicitly (the VHDL entity keeps its port defaults)
 //
 // Simulation model for Verilator; on Cyclone V the original instantiates
 // altsyncram directly.
@@ -26,8 +27,8 @@ module dpram #(
     input  wire                     clock_b,
     input  wire [data_width_g-1:0]  data_a,
     input  wire [data_width_g-1:0]  data_b,
-    input  wire                     enable_a = 1'b1,
-    input  wire                     enable_b = 1'b1,
+    input  wire                     enable_a,
+    input  wire                     enable_b,
     input  wire                     wren_a,
     input  wire                     wren_b,
     output wire [data_width_g-1:0]  q_a,

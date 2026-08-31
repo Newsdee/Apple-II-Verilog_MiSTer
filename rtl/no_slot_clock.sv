@@ -476,11 +476,11 @@ always_comb begin
                     cur_time_d[63:60] = 4'd0;
                     carry_state_d = UPDATE_PUB;
                 end else begin
-                    cur_time_d[63:60] = cur_time_q[63:60] + 1;
+                    cur_time_d[63:60] = cur_time_q[63:60] + 4'd1;
                     carry_state_d = UPDATE_PUB;
                 end
             end else begin
-                cur_time_d[59:56] = cur_time_q[59:56] + 1;
+                cur_time_d[59:56] = cur_time_q[59:56] + 4'd1;
                 carry_state_d = UPDATE_PUB;
             end
         end

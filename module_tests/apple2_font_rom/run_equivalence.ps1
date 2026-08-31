@@ -56,7 +56,7 @@ if (!$CompareOnly) {
 
     # Golden copy: GHDL 6.0.0 rejects the shorthand entity instantiation
     # `font_rom : work.spram`; add the explicit `entity` keyword only.
-    $goldenSrc = Join-Path $referenceRoot 'rtl\apple2_font_rom.vhd'
+    $goldenSrc = Join-Path $referenceRoot 'rtl\old\apple2_font_rom.vhd'
     $goldenCopy = Join-Path $vhdlBuild 'apple2_font_rom_golden.vhd'
     $srcBytes = [System.IO.File]::ReadAllBytes($goldenSrc)
     $hasBom = ($srcBytes.Length -ge 3 -and $srcBytes[0] -eq 0xEF -and $srcBytes[1] -eq 0xBB -and $srcBytes[2] -eq 0xBF)

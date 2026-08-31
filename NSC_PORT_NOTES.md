@@ -107,9 +107,15 @@ when Quartus is not compiling.
        assigns (`wire [7:0] month_byte = {cur_time_q[55:52], cur_time_q[51:48]};`
        etc.) — identical values, since they are read only in that branch and
        depend only on cur_time_q. Also made the BCD increment literals
-       explicitly sized (`+ 4'd1`, `+ 20'd1`) to clear the 15× Warning 10230
+       explicitly sized (`+ 4'd1`, `+ 20'd1`) to clear the Warning 10230s
        (truncated value size 32 → target width). Re-validated: NSC UNIT PASS +
        full SMOKE PASS (LATCH warnings gone), synced byte-identical to newsdee.
+    f. Two more Warning 10230s surfaced at the next compile (lines 479/483,
+       INC_YEAR branch: year_hi/year_lo `+ 1`) — missed in item e because the
+       grep listing them was truncated before reaching them. Sized to `+ 4'd1`
+       (BCD digit ≤ 9, +1 ≤ 10, fits 4 bits). Re-validated: NSC UNIT PASS +
+       full SMOKE PASS; file now has zero unsized literal arithmetic; synced
+       byte-identical to newsdee.
     c. Latent bug found while re-validating: `verilator/Makefile` still listed
        `$(RTL)/clock_card.v` and never listed `no_slot_clock.sv` /
        `nsc_ticker.sv` — so the "full smoke PASS" of item 14 did NOT compile

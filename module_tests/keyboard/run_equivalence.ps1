@@ -35,7 +35,7 @@ if (!$CompareOnly) {
     # untouched: a parse-normalized copy is generated under build/ that adds
     # the explicit 'entity' keyword only (a semantic no-op), with strict
     # verification that nothing else changed.
-    $goldenSrc = Join-Path $referenceRoot 'rtl\keyboard.vhd'
+    $goldenSrc = Join-Path $referenceRoot 'rtl\old\keyboard.vhd'
     $goldenCopy = Join-Path $vhdlBuild 'keyboard_golden.vhd'
     $srcBytes = [System.IO.File]::ReadAllBytes($goldenSrc)
     $hasBom = ($srcBytes.Length -ge 3 -and $srcBytes[0] -eq 0xEF -and $srcBytes[1] -eq 0xBB -and $srcBytes[2] -eq 0xBF)

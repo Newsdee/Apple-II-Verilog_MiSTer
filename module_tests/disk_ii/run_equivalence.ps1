@@ -25,9 +25,9 @@ if ((Test-Path $verilatorAggregate) -and (Get-Item $verilatorAggregate).Length -
 
 if (!$CompareOnly) {
     $vhdlSources = @(
-        (Join-Path $referenceRoot 'rtl\disk_ii_rom.vhd'),
-        (Join-Path $referenceRoot 'rtl\drive_ii.vhd'),
-        (Join-Path $referenceRoot 'rtl\disk_ii.vhd'),
+        (Join-Path $referenceRoot 'rtl\old\disk_ii_rom.vhd'),
+        (Join-Path $referenceRoot 'rtl\old\drive_ii.vhd'),
+        (Join-Path $referenceRoot 'rtl\old\disk_ii.vhd'),
         (Join-Path $PSScriptRoot 'disk_ii_vhdl_tb.vhd')
     )
 
