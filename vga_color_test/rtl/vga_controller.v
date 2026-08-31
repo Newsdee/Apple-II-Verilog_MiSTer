@@ -17,6 +17,7 @@ module vga_controller(
     input      [1:0]  SCREEN_MODE,
     input      [1:0]  COLOR_PALETTE,
     input             GRAY_SEAM_FIX,
+    input             SEAM_RUN_FILL,
     input             NTSC_VERTICAL_COMB,
     input             HBL,
     input             VBL,
@@ -57,6 +58,8 @@ reg [10:0] line_wr_addr = 0;
 reg [23:0] line_wr_data = 0;
 reg line_wr_en = 0;
 reg [23:0] raw_rgb = 0;
+reg raw_bit = 0;
+reg raw_settled = 0;
 reg [23:0] seam_rgb = 0;
 reg [23:0] previous_rgb_q = 0;
 reg [23:0] current_rgb_q = 0;
@@ -66,24 +69,30 @@ reg raw_active = 0;
 reg raw_vbl = 0;
 reg raw_color_mode = 0;
 reg raw_color_line = 0;
-reg seam_active = 0;
 reg seam_timing_active = 0;
 reg seam_vbl = 0;
+reg seam_vbl_d = 0;
 reg seam_color_mode = 0;
+reg seam_color_mode_d = 0;
 reg current_timing_active_q = 0;
 reg filtered_timing_active = 0;
 reg line_valid_q = 0;
 reg color_mode_q = 0;
-reg [13:0] timing_active_delay = 0;
+reg [15:0] timing_active_delay = 0;
 
-reg [23:0] seam_rgb_window [0:4];
-integer seam_luma_window [0:4];
-integer seam_saturation_window [0:4];
-reg [10:0] seam_hcount_window [0:4];
-reg [4:0] seam_valid_window = 0;
-reg [4:0] seam_vbl_window = 0;
-reg [4:0] seam_color_mode_window = 0;
-reg [4:0] seam_color_line_window = 0;
+// 7-sample window. SEAM_RUN_FILL=0 outputs the center at index 5 (the old
+// 5-window center, raw-2); SEAM_RUN_FILL=1 outputs the center at index 3
+// (raw-4, +2 samples) so the 2-3 px run rule can see 3 samples on each side.
+reg [23:0] seam_rgb_window [0:6];
+integer seam_luma_window [0:6];
+integer seam_saturation_window [0:6];
+reg [10:0] seam_hcount_window [0:6];
+reg [6:0] seam_valid_window = 0;
+reg [6:0] seam_vbl_window = 0;
+reg [6:0] seam_color_mode_window = 0;
+reg [6:0] seam_color_line_window = 0;
+reg [6:0] seam_bit_window = 0;
+reg [6:0] seam_settled_window = 0;
 
 reg [1:0] color_addr = 0;
 reg [3:0] palette_index = 0;
@@ -161,30 +170,6 @@ function integer rgb_saturation;
     end
 endfunction
 
-function [23:0] custom_palette_color;
-    input [3:0] color;
-    begin
-        case (color)
-            4'b0000: custom_palette_color = CURRENT_COL0;
-            4'b0010: custom_palette_color = CURRENT_COL1;
-            4'b0100: custom_palette_color = CURRENT_COL2;
-            4'b0110: custom_palette_color = CURRENT_COL3;
-            4'b1000: custom_palette_color = CURRENT_COL4;
-            4'b1010: custom_palette_color = CURRENT_COL5;
-            4'b1100: custom_palette_color = CURRENT_COL6;
-            4'b1110: custom_palette_color = CURRENT_COL7;
-            4'b0001: custom_palette_color = CURRENT_COL8;
-            4'b0011: custom_palette_color = CURRENT_COL9;
-            4'b0101: custom_palette_color = CURRENT_COL10;
-            4'b0111: custom_palette_color = CURRENT_COL11;
-            4'b1001: custom_palette_color = CURRENT_COL12;
-            4'b1011: custom_palette_color = CURRENT_COL13;
-            4'b1101: custom_palette_color = CURRENT_COL14;
-            default: custom_palette_color = CURRENT_COL15;
-        endcase
-    end
-endfunction
-
 function [23:0] palette_color;
     input [1:0] palette;
     input [3:0] color;
@@ -250,7 +235,7 @@ function [23:0] palette_color;
                     default: palette_color = 24'hFFFFFF;
                 endcase
             end
-            default: palette_color = custom_palette_color(color);
+            default: palette_color = 24'h000000;
         endcase
     end
 endfunction
@@ -375,7 +360,28 @@ always @(posedge CLK_14M) begin: pixel_generator
               (shift_reg[1:0] == 2'b00 && shift_reg[5:4] == 2'b11)))) begin
             shift_color = (shift_reg[4:1] << hcount[1:0]) |
                           (shift_reg[4:1] >> (4 - hcount[1:0]));
-            selected_color = palette_color(COLOR_PALETTE, shift_color);
+            if (COLOR_PALETTE == 2'b11) begin
+                case (shift_color)
+                    4'b0000: selected_color = CURRENT_COL0;
+                    4'b0010: selected_color = CURRENT_COL1;
+                    4'b0100: selected_color = CURRENT_COL2;
+                    4'b0110: selected_color = CURRENT_COL3;
+                    4'b1000: selected_color = CURRENT_COL4;
+                    4'b1010: selected_color = CURRENT_COL5;
+                    4'b1100: selected_color = CURRENT_COL6;
+                    4'b1110: selected_color = CURRENT_COL7;
+                    4'b0001: selected_color = CURRENT_COL8;
+                    4'b0011: selected_color = CURRENT_COL9;
+                    4'b0101: selected_color = CURRENT_COL10;
+                    4'b0111: selected_color = CURRENT_COL11;
+                    4'b1001: selected_color = CURRENT_COL12;
+                    4'b1011: selected_color = CURRENT_COL13;
+                    4'b1101: selected_color = CURRENT_COL14;
+                    default: selected_color = CURRENT_COL15;
+                endcase
+            end else begin
+                selected_color = palette_color(COLOR_PALETTE, shift_color);
+            end
             r = selected_color[23:16];
             g = selected_color[15:8];
             b = selected_color[7:0];
@@ -406,6 +412,9 @@ always @(posedge CLK_14M) begin: pixel_generator
         end
 
         raw_rgb <= {r, g, b};
+        raw_bit <= shift_reg[3];
+        raw_settled <= (!COLOR_LINE) ||
+            (shift_reg[0] == shift_reg[4] && shift_reg[5] == shift_reg[1]);
         raw_hcount <= hcount;
         raw_vbl <= VBL;
         raw_color_line <= COLOR_LINE;
@@ -416,8 +425,40 @@ end
 
 // Preserve the VHDL seam-cleanup pipeline layout and active-window delay.
 integer seam_index;
+
+// Part of the GRAY_SEAM_FIX ("Sharper RGB") feature: the 1-px seam fill.
+// A neutral pixel (low saturation, white-ish or black-ish luma) flanked on
+// both immediate sides by colored (saturated) pixels is a tint-transition
+// seam artifact, so replace it with the nearer colored neighbor (luma
+// distance, tie -> left). Solid neutral bars are untouched: at their edges
+// the other neighbor is neutral too.
+//
+// The decision needs the right neighbor, which is generated one cycle after
+// the center, so the enabled path outputs from the window (one or more extra
+// cycles vs the disabled path). The strobe keeps a constant 16-sample lead
+// over the output content on every path (original: raw + TAD_13; gray fill:
+// window[5] + TAD_15; run fill: window[3] + TAD_15 — the feed sample is 2
+// older, so the same index is 2 more absolute delay), which keeps bar
+// boundaries and seam positions at their original x positions with any
+// combination of options on (verified on colorbars + batman). The inter-line
+// comb skew is unchanged (line-RAM data/strobe and the read address all move
+// together). GRAY_SEAM_FIX=0 stays bit-identical.
+//
+// SEAM_RUN_FILL (optional, requires GRAY_SEAM_FIX): fills 2-3 px neutral
+// runs bounded by colored samples on both sides with the nearer boundary
+// color. Needs 3 samples of look-ahead/look-behind, so the center moves from
+// window index 5 to 3 (+2 cycles) and the TAD feed follows.
 always @(posedge CLK_14M) begin: seam_cleanup
-    for (seam_index = 0; seam_index < 4; seam_index = seam_index + 1) begin
+    integer c_luma;
+    integer l_luma;
+    integer r_luma;
+    integer run_l;
+    integer run_r;
+    integer lb_luma;
+    integer rb_luma;
+    reg fill_ok;
+    reg [23:0] fill_rgb;
+    for (seam_index = 0; seam_index < 6; seam_index = seam_index + 1) begin
         seam_rgb_window[seam_index] <= seam_rgb_window[seam_index + 1];
         seam_luma_window[seam_index] <= seam_luma_window[seam_index + 1];
         seam_saturation_window[seam_index] <= seam_saturation_window[seam_index + 1];
@@ -426,22 +467,238 @@ always @(posedge CLK_14M) begin: seam_cleanup
         seam_vbl_window[seam_index] <= seam_vbl_window[seam_index + 1];
         seam_color_mode_window[seam_index] <= seam_color_mode_window[seam_index + 1];
         seam_color_line_window[seam_index] <= seam_color_line_window[seam_index + 1];
+        seam_bit_window[seam_index] <= seam_bit_window[seam_index + 1];
+        seam_settled_window[seam_index] <= seam_settled_window[seam_index + 1];
     end
-    seam_rgb_window[4] <= raw_rgb;
-    seam_luma_window[4] <= rgb_luma(raw_rgb);
-    seam_saturation_window[4] <= rgb_saturation(raw_rgb);
-    seam_hcount_window[4] <= raw_hcount;
-    seam_valid_window[4] <= raw_active;
-    seam_vbl_window[4] <= raw_vbl;
-    seam_color_mode_window[4] <= raw_color_mode;
-    seam_color_line_window[4] <= raw_color_line;
+    seam_rgb_window[6] <= raw_rgb;
+    seam_luma_window[6] <= rgb_luma(raw_rgb);
+    seam_saturation_window[6] <= rgb_saturation(raw_rgb);
+    seam_hcount_window[6] <= raw_hcount;
+    seam_valid_window[6] <= raw_active;
+    seam_vbl_window[6] <= raw_vbl;
+    seam_color_mode_window[6] <= raw_color_mode;
+    seam_color_line_window[6] <= raw_color_line;
+    seam_bit_window[6] <= raw_bit;
+    seam_settled_window[6] <= raw_settled;
 
-    seam_rgb <= raw_rgb;
-    seam_active <= raw_active;
-    timing_active_delay <= {timing_active_delay[12:0], seam_valid_window[3]};
-    seam_timing_active <= timing_active_delay[13];
-    seam_vbl <= raw_vbl;
-    seam_color_mode <= raw_color_mode;
+    // TAD is fed from the sample the enabled path outputs (index 5 = raw-2,
+    // or 3 = raw-4 with the run fill). GRAY_SEAM_FIX=0 always uses index 5
+    // so the original strobe timing (TAD_13 = raw-16) is bit-identical.
+    timing_active_delay <= {timing_active_delay[14:0],
+        seam_valid_window[(GRAY_SEAM_FIX && SEAM_RUN_FILL) ? 3 : 5]};
+    seam_vbl_d <= raw_vbl;
+    seam_color_mode_d <= raw_color_mode;
+    if (GRAY_SEAM_FIX) begin
+        if (SEAM_RUN_FILL) begin
+            // Center = window[3]; left [2] (1) [1] (2) [0] (3), right
+            // [4] (1) [5] (2) [6] (3).
+            //  (1) both immediate neighbors colored -> nearer colored.
+            //  (2) polarity artifact -> nearest bit-matched neutral, else
+            //      nearest settled colored (reach 2 left / 1 right).
+            //  (3) 2-3 px neutral run bounded by colored on both sides ->
+            //      nearer boundary color.
+            c_luma = seam_luma_window[3];
+            l_luma = seam_luma_window[2];
+            r_luma = seam_luma_window[4];
+            fill_ok = (seam_saturation_window[3] < 32)
+                && (c_luma > 226 || c_luma < 28)
+                && seam_valid_window[3] && seam_valid_window[2]
+                && seam_valid_window[4]
+                && !seam_vbl_window[3]
+                && seam_color_line_window[3];
+            if (fill_ok && seam_saturation_window[2] >= 32 &&
+                seam_saturation_window[4] >= 32 && seam_color_line_window[2] &&
+                seam_color_line_window[4]) begin
+                fill_rgb = ((c_luma >= l_luma ? c_luma - l_luma : l_luma - c_luma) <=
+                            (c_luma >= r_luma ? c_luma - r_luma : r_luma - c_luma))
+                    ? seam_rgb_window[2] : seam_rgb_window[4];
+            end else begin
+                fill_ok = 0;
+                // A neutral sample whose own source bit matches its rendered
+                // polarity (black on bit 0, white on bit 1) is a true content
+                // sample, whatever branch rendered it; a sample with the
+                // opposite bit is itself an artifact and is excluded as a
+                // target.
+                if (c_luma > 226 && !seam_bit_window[3]) begin
+                    // White artifact: nearest true black in reach.
+                    if (!seam_bit_window[2] && seam_luma_window[2] < 28) begin
+                        fill_ok = 1; fill_rgb = seam_rgb_window[2];
+                    end else if (!seam_bit_window[4] &&
+                                 seam_luma_window[4] < 28) begin
+                        fill_ok = 1; fill_rgb = seam_rgb_window[4];
+                    end else if (!seam_bit_window[1] &&
+                                 seam_luma_window[1] < 28) begin
+                        fill_ok = 1; fill_rgb = seam_rgb_window[1];
+                    end
+                end else if (c_luma < 28 && seam_bit_window[3]) begin
+                    // Black artifact: nearest true white in reach.
+                    if (seam_bit_window[2] && seam_luma_window[2] > 226) begin
+                        fill_ok = 1; fill_rgb = seam_rgb_window[2];
+                    end else if (seam_bit_window[4] &&
+                                 seam_luma_window[4] > 226) begin
+                        fill_ok = 1; fill_rgb = seam_rgb_window[4];
+                    end else if (seam_bit_window[1] &&
+                                 seam_luma_window[1] > 226) begin
+                        fill_ok = 1; fill_rgb = seam_rgb_window[1];
+                    end
+                end
+                // Fallback for a detected artifact with no matching-polarity
+                // target in reach: nearest settled colored sample.
+                if (fill_ok == 0 && c_luma > 226 && !seam_bit_window[3]) begin
+                    if (seam_settled_window[2] &&
+                        seam_saturation_window[2] >= 32) begin
+                        fill_ok = 1; fill_rgb = seam_rgb_window[2];
+                    end else if (seam_settled_window[4] &&
+                                 seam_saturation_window[4] >= 32) begin
+                        fill_ok = 1; fill_rgb = seam_rgb_window[4];
+                    end
+                end else if (fill_ok == 0 && c_luma < 28 &&
+                             seam_bit_window[3]) begin
+                    if (seam_settled_window[2] &&
+                        seam_saturation_window[2] >= 32) begin
+                        fill_ok = 1; fill_rgb = seam_rgb_window[2];
+                    end else if (seam_settled_window[4] &&
+                                 seam_saturation_window[4] >= 32) begin
+                        fill_ok = 1; fill_rgb = seam_rgb_window[4];
+                    end
+                end
+                // Run rule: the center plus consecutive neutral samples on
+                // each side form a 2-3 px run whose far ends are both
+                // colored -> fill with the nearer boundary color.
+                if (fill_ok == 0) begin
+                    run_l = (seam_saturation_window[2] < 32 &&
+                             (seam_luma_window[2] > 226 ||
+                              seam_luma_window[2] < 28))
+                        ? ((seam_saturation_window[1] < 32 &&
+                            (seam_luma_window[1] > 226 ||
+                             seam_luma_window[1] < 28))
+                            ? ((seam_saturation_window[0] < 32 &&
+                                (seam_luma_window[0] > 226 ||
+                                 seam_luma_window[0] < 28)) ? 3 : 2)
+                            : 1)
+                        : 0;
+                    run_r = (seam_saturation_window[4] < 32 &&
+                             (seam_luma_window[4] > 226 ||
+                              seam_luma_window[4] < 28))
+                        ? ((seam_saturation_window[5] < 32 &&
+                            (seam_luma_window[5] > 226 ||
+                             seam_luma_window[5] < 28))
+                            ? ((seam_saturation_window[6] < 32 &&
+                                (seam_luma_window[6] > 226 ||
+                                 seam_luma_window[6] < 28)) ? 3 : 2)
+                            : 1)
+                        : 0;
+                    lb_luma = run_l == 0 ? seam_luma_window[2] :
+                               run_l == 1 ? seam_luma_window[1] :
+                                            seam_luma_window[0];
+                    rb_luma = run_r == 0 ? seam_luma_window[4] :
+                               run_r == 1 ? seam_luma_window[5] :
+                                            seam_luma_window[6];
+                    if ((run_l < 3) && (run_r < 3)
+                        && (run_l + run_r == 1 || run_l + run_r == 2)
+                        && (run_l == 0 ? seam_saturation_window[2] :
+                            run_l == 1 ? seam_saturation_window[1] :
+                                         seam_saturation_window[0]) >= 32
+                        && (run_r == 0 ? seam_saturation_window[4] :
+                            run_r == 1 ? seam_saturation_window[5] :
+                                         seam_saturation_window[6]) >= 32
+                        && (run_l == 0 ? seam_valid_window[2] :
+                            run_l == 1 ? seam_valid_window[1] :
+                                         seam_valid_window[0])
+                        && (run_r == 0 ? seam_valid_window[4] :
+                            run_r == 1 ? seam_valid_window[5] :
+                                         seam_valid_window[6])) begin
+                        fill_ok = 1;
+                        fill_rgb = ((c_luma >= lb_luma ?
+                                        c_luma - lb_luma : lb_luma - c_luma) <=
+                                    (c_luma >= rb_luma ?
+                                        c_luma - rb_luma : rb_luma - c_luma))
+                            ? (run_l == 0 ? seam_rgb_window[2] :
+                                run_l == 1 ? seam_rgb_window[1] :
+                                             seam_rgb_window[0])
+                            : (run_r == 0 ? seam_rgb_window[4] :
+                                run_r == 1 ? seam_rgb_window[5] :
+                                             seam_rgb_window[6]);
+                    end
+                end
+            end
+            seam_rgb <= fill_ok ? fill_rgb : seam_rgb_window[3];
+            // Strobe keeps the same 16-sample lead as the other paths: the
+            // run-fill feed (window[3] = raw-4) is 2 samples older than the
+            // gray-fill feed (window[5] = raw-2), so the same absolute
+            // delay is TAD_15 here (TAD_17 would over-delay by 2).
+            seam_timing_active <= timing_active_delay[15];
+        end else begin
+            // Center = window[5] (the pre-run-fill center, raw-2); left
+            // [4] (1) [3] (2), right [6] (1). Rules (1) and (2) only.
+            c_luma = seam_luma_window[5];
+            l_luma = seam_luma_window[4];
+            r_luma = seam_luma_window[6];
+            fill_ok = (seam_saturation_window[5] < 32)
+                && (c_luma > 226 || c_luma < 28)
+                && seam_valid_window[5] && seam_valid_window[4]
+                && seam_valid_window[6]
+                && !seam_vbl_window[5]
+                && seam_color_line_window[5];
+            if (fill_ok && seam_saturation_window[4] >= 32 &&
+                seam_saturation_window[6] >= 32 && seam_color_line_window[4] &&
+                seam_color_line_window[6]) begin
+                fill_rgb = ((c_luma >= l_luma ? c_luma - l_luma : l_luma - c_luma) <=
+                            (c_luma >= r_luma ? c_luma - r_luma : r_luma - c_luma))
+                    ? seam_rgb_window[4] : seam_rgb_window[6];
+            end else begin
+                fill_ok = 0;
+                if (c_luma > 226 && !seam_bit_window[5]) begin
+                    if (!seam_bit_window[4] && seam_luma_window[4] < 28) begin
+                        fill_ok = 1; fill_rgb = seam_rgb_window[4];
+                    end else if (!seam_bit_window[6] &&
+                                 seam_luma_window[6] < 28) begin
+                        fill_ok = 1; fill_rgb = seam_rgb_window[6];
+                    end else if (!seam_bit_window[3] &&
+                                 seam_luma_window[3] < 28) begin
+                        fill_ok = 1; fill_rgb = seam_rgb_window[3];
+                    end
+                end else if (c_luma < 28 && seam_bit_window[5]) begin
+                    if (seam_bit_window[4] && seam_luma_window[4] > 226) begin
+                        fill_ok = 1; fill_rgb = seam_rgb_window[4];
+                    end else if (seam_bit_window[6] &&
+                                 seam_luma_window[6] > 226) begin
+                        fill_ok = 1; fill_rgb = seam_rgb_window[6];
+                    end else if (seam_bit_window[3] &&
+                                 seam_luma_window[3] > 226) begin
+                        fill_ok = 1; fill_rgb = seam_rgb_window[3];
+                    end
+                end
+                if (fill_ok == 0 && c_luma > 226 && !seam_bit_window[5]) begin
+                    if (seam_settled_window[4] &&
+                        seam_saturation_window[4] >= 32) begin
+                        fill_ok = 1; fill_rgb = seam_rgb_window[4];
+                    end else if (seam_settled_window[6] &&
+                                 seam_saturation_window[6] >= 32) begin
+                        fill_ok = 1; fill_rgb = seam_rgb_window[6];
+                    end
+                end else if (fill_ok == 0 && c_luma < 28 &&
+                             seam_bit_window[5]) begin
+                    if (seam_settled_window[4] &&
+                        seam_saturation_window[4] >= 32) begin
+                        fill_ok = 1; fill_rgb = seam_rgb_window[4];
+                    end else if (seam_settled_window[6] &&
+                                 seam_saturation_window[6] >= 32) begin
+                        fill_ok = 1; fill_rgb = seam_rgb_window[6];
+                    end
+                end
+            end
+            seam_rgb <= fill_ok ? fill_rgb : seam_rgb_window[5];
+            seam_timing_active <= timing_active_delay[15];
+        end
+        seam_vbl <= seam_vbl_d;
+        seam_color_mode <= seam_color_mode_d;
+    end else begin
+        seam_rgb <= raw_rgb;
+        seam_timing_active <= timing_active_delay[13];
+        seam_vbl <= raw_vbl;
+        seam_color_mode <= raw_color_mode;
+    end
 end
 
 // One-line RGB buffer. Delayed write guarantees read-before-write behavior.
@@ -516,7 +773,5 @@ assign VGA_G = filtered_rgb[15:8];
 assign VGA_B = filtered_rgb[7:0];
 assign VGA_VBL = vbl_delayed;
 assign VGA_HBL = ~filtered_timing_active;
-
-wire unused_ioctl_addr = &{1'b0, ioctl_addr};
 
 endmodule

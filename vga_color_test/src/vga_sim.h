@@ -45,7 +45,8 @@ enum ColorLineMode { kCLNoColor = 0, kCLTextGraphics = 1, kCLFullColor = 2 };
 struct Settings {
     int screen_mode = 0;          // 00 color, 01 B&W, 10 green, 11 amber
     int color_palette = 0;        // 00 NTSC //e, 01 IIgs, 10 AppleWin, 11 custom
-    bool gray_seam_fix = false;   // Sharper RGB
+    bool gray_seam_fix = false;   // Sharper RGB (incl. 1-px seam fill)
+    bool seam_run_fill = false;   // optional 2-3 px run fill (needs sharp)
     bool ntsc_vertical_comb = false;  // vertical blend
     int color_line_mode = kCLFullColor;
     int color_line_start = 1;     // N for kCLTextGraphics (0..191)
@@ -110,6 +111,12 @@ struct FrameResult {
 class VgaSim {
 public:
     VgaSim() { rebuild(); }
+
+    // Debug: when the output pixel (trace_x, trace_y) is captured, print the
+    // DUT's raw-stage state (shift_reg, hcount, raw_rgb) recorded per active
+    // sample for that VGA line.
+    int trace_x = -1;
+    int trace_y = -1;
 
     // Reconstruct the Verilated model (no reset port exists) so stale
     // vertical-comb history cannot survive an image change / Reset.

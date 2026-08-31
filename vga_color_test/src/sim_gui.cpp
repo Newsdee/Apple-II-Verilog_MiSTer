@@ -219,7 +219,16 @@ int VgaGui::run() {
         ImGui::SetNextItemWidth(-1);
         ImGui::Combo("##palette", &s_.color_palette,
                      "NTSC //e\0IIgs\0AppleWin\0Custom\0");
-        ImGui::Checkbox("Sharper RGB (composite fix)", &s_.gray_seam_fix);
+        ImGui::Checkbox("Sharper RGB (composite fix + seam fill)",
+                        &s_.gray_seam_fix);
+        if (s_.gray_seam_fix) {
+            ImGui::Indent();
+            ImGui::Checkbox("2-3 px seam fill (experimental)",
+                            &s_.seam_run_fill);
+            ImGui::Unindent();
+        } else {
+            s_.seam_run_fill = false;
+        }
         ImGui::Checkbox("NTSC vertical blend", &s_.ntsc_vertical_comb);
 
         const char* cl_items[] = {"No color", "Text + graphics", "Full color"};

@@ -98,6 +98,7 @@ struct Cli {
     bool dbg = false;
     bool smoke_test = false;
     std::string ppm2png_in, ppm2png_out;
+    int trace_x = -1, trace_y = -1;
 };
 
 bool parse_args(int argc, char** argv, Cli* c) {
@@ -124,6 +125,12 @@ bool parse_args(int argc, char** argv, Cli* c) {
             const char* vo = next(a.c_str()); if (!vo) return false;
             c->ppm2png_in = vi;
             c->ppm2png_out = vo;
+        } else if (a == "--trace-x") {
+            const char* v = next(a.c_str()); if (!v) return false;
+            c->trace_x = atoi(v);
+        } else if (a == "--trace-y") {
+            const char* v = next(a.c_str()); if (!v) return false;
+            c->trace_y = atoi(v);
         } else if (a == "--frames") {
             const char* v = next(a.c_str()); if (!v) return false;
             c->frames = atoi(v);
@@ -144,6 +151,9 @@ bool parse_args(int argc, char** argv, Cli* c) {
             else { fprintf(stderr, "unknown --palette %s\n", v); return false; }
         } else if (a == "--sharp-rgb") {
             s->gray_seam_fix = true;
+        } else if (a == "--seam-run-fill") {
+            s->seam_run_fill = true;
+            s->gray_seam_fix = true;  // the run fill lives inside the feature
         } else if (a == "--vertical-blend") {
             s->ntsc_vertical_comb = true;
         } else if (a == "--image") {
@@ -218,6 +228,8 @@ int run_headless(const Cli& c) {
     }
 
     VgaSim sim;
+    sim.trace_x = c.trace_x;
+    sim.trace_y = c.trace_y;
     std::vector<uint8_t> frame((size_t)kOutWidth * kOutHeight * 3, 0);
 
     FrameResult res;

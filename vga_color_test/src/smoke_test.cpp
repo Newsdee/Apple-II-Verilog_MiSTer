@@ -173,32 +173,36 @@ int run_smoke_test() {
     for (int display = 0; display < 4; ++display)
         for (int palette = 0; palette < 3; ++palette)  // built-in only
             for (int seam = 0; seam < 2; ++seam)
-                for (int comb = 0; comb < 2; ++comb)
-                    for (int cl = 0; cl < 2; ++cl) {  // none, full
-                        Settings m = s;
-                        m.screen_mode = display;
-                        m.color_palette = palette;
-                        m.gray_seam_fix = (seam != 0);
-                        m.ntsc_vertical_comb = (comb != 0);
-                        m.color_line_mode = cl ? kCLFullColor : kCLNoColor;
-                        rvs.offset = m.phase + m.align;
-                        std::fill(frame.begin(), frame.end(), 0);
-                        FrameResult r = capture_clean(sim, m, rvs, &frame);
-                        cases++;
-                        if (!r.ok()) {
-                            char tag[64];
-                            snprintf(tag, sizeof(tag), "d%d p%d s%d c%d cl%d",
-                                     display, palette, seam, comb, cl);
-                            check("settings-matrix", false,
-                                  rep->path + " " + tag + ": " + r.error);
-                            matrix_ok = false;
-                            dump_failure(std::string("matrix_") + tag, frame);
+                for (int runf = 0; runf < 2; ++runf)  // 2-3 px run fill
+                    for (int comb = 0; comb < 2; ++comb)
+                        for (int cl = 0; cl < 2; ++cl) {  // none, full
+                            Settings m = s;
+                            m.screen_mode = display;
+                            m.color_palette = palette;
+                            m.gray_seam_fix = (seam != 0);
+                            m.seam_run_fill = (seam != 0) && (runf != 0);
+                            m.ntsc_vertical_comb = (comb != 0);
+                            m.color_line_mode = cl ? kCLFullColor : kCLNoColor;
+                            rvs.offset = m.phase + m.align;
+                            std::fill(frame.begin(), frame.end(), 0);
+                            FrameResult r = capture_clean(sim, m, rvs, &frame);
+                            cases++;
+                            if (!r.ok()) {
+                                char tag[64];
+                                snprintf(tag, sizeof(tag),
+                                         "d%d p%d s%d r%d c%d cl%d",
+                                         display, palette, seam, runf, comb, cl);
+                                check("settings-matrix", false,
+                                      rep->path + " " + tag + ": " + r.error);
+                                matrix_ok = false;
+                                dump_failure(std::string("matrix_") + tag,
+                                             frame);
+                            }
                         }
-                    }
     if (matrix_ok)
         pass("settings-matrix",
              std::to_string(cases) + " cases on " + rep->path +
-             " (4 display x 3 palette x seam x comb x color-line)");
+             " (4 display x 3 palette x seam x run-fill x comb x color-line)");
 
     // --- Gate 4: B&W mono (R=G=B) ---
     {
