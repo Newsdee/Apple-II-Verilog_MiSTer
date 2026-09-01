@@ -47,6 +47,8 @@ struct Settings {
     int color_palette = 0;        // 00 NTSC //e, 01 IIgs, 10 AppleWin, 11 custom
     bool gray_seam_fix = false;   // Sharper RGB (incl. 1-px seam fill)
     bool seam_run_fill = false;   // optional 2-3 px run fill (needs sharp)
+    bool seam_run_wide = false;   // extend run fill to 2-5 px + edge rule
+    bool run_fill_ok = true;      // mode gate (auto in core: GR/DHGR only)
     bool ntsc_vertical_comb = false;  // vertical blend
     int color_line_mode = kCLFullColor;
     int color_line_start = 1;     // N for kCLTextGraphics (0..191)

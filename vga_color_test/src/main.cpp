@@ -154,6 +154,12 @@ bool parse_args(int argc, char** argv, Cli* c) {
         } else if (a == "--seam-run-fill") {
             s->seam_run_fill = true;
             s->gray_seam_fix = true;  // the run fill lives inside the feature
+        } else if (a == "--seam-run-wide") {
+            s->seam_run_fill = true;
+            s->seam_run_wide = true;
+            s->gray_seam_fix = true;
+        } else if (a == "--no-run-fill-ok") {
+            s->run_fill_ok = false;  // simulate the HGR (gated-off) mode
         } else if (a == "--vertical-blend") {
             s->ntsc_vertical_comb = true;
         } else if (a == "--image") {

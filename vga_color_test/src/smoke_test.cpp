@@ -174,13 +174,15 @@ int run_smoke_test() {
         for (int palette = 0; palette < 3; ++palette)  // built-in only
             for (int seam = 0; seam < 2; ++seam)
                 for (int runf = 0; runf < 2; ++runf)  // 2-3 px run fill
-                    for (int comb = 0; comb < 2; ++comb)
-                        for (int cl = 0; cl < 2; ++cl) {  // none, full
+                    for (int wide = 0; wide < 2; ++wide)  // 2-5 px extension
+                        for (int comb = 0; comb < 2; ++comb)
+                            for (int cl = 0; cl < 2; ++cl) {  // none, full
                             Settings m = s;
                             m.screen_mode = display;
                             m.color_palette = palette;
                             m.gray_seam_fix = (seam != 0);
                             m.seam_run_fill = (seam != 0) && (runf != 0);
+                            m.seam_run_wide = m.seam_run_fill && (wide != 0);
                             m.ntsc_vertical_comb = (comb != 0);
                             m.color_line_mode = cl ? kCLFullColor : kCLNoColor;
                             rvs.offset = m.phase + m.align;
@@ -190,8 +192,9 @@ int run_smoke_test() {
                             if (!r.ok()) {
                                 char tag[64];
                                 snprintf(tag, sizeof(tag),
-                                         "d%d p%d s%d r%d c%d cl%d",
-                                         display, palette, seam, runf, comb, cl);
+                                         "d%d p%d s%d r%d w%d c%d cl%d",
+                                         display, palette, seam, runf, wide,
+                                         comb, cl);
                                 check("settings-matrix", false,
                                       rep->path + " " + tag + ": " + r.error);
                                 matrix_ok = false;
@@ -202,7 +205,47 @@ int run_smoke_test() {
     if (matrix_ok)
         pass("settings-matrix",
              std::to_string(cases) + " cases on " + rep->path +
-             " (4 display x 3 palette x seam x run-fill x comb x color-line)");
+             " (4 display x 3 palette x seam x run-fill x wide x comb x "
+             "color-line)");
+
+    // --- Gate 3b: RUN_FILL_OK gate equivalence ---
+    // With the mode gate low (the HGR case) the DUT must take the exact
+    // run-fill-off path: the gated frame is byte-identical to the
+    // SEAM_RUN_FILL=0 frame, and the ungated frame differs (the fill is
+    // actually active when the gate is high).
+    {
+        Settings gated = s;   // run fill requested but gated off
+        gated.gray_seam_fix = true;
+        gated.seam_run_fill = true;
+        gated.seam_run_wide = true;
+        gated.run_fill_ok = false;
+        Settings off = gated; // v2-only reference
+        off.seam_run_fill = false;
+        off.seam_run_wide = false;
+        off.run_fill_ok = true;
+        Settings ungated = gated;
+        ungated.run_fill_ok = true;
+        std::vector<uint8_t> fa(frame.size()), fb(frame.size()),
+            fc(frame.size());
+        rvs.offset = gated.phase + gated.align;
+        FrameResult ra = capture_clean(sim, gated, rvs, &fa);
+        FrameResult rb = capture_clean(sim, off, rvs, &fb);
+        FrameResult rc = capture_clean(sim, ungated, rvs, &fc);
+        int diff_ab = 0, diff_ac = 0;
+        for (size_t i = 0; i < fa.size(); ++i) {
+            if (fa[i] != fb[i]) diff_ab++;
+            if (fa[i] != fc[i]) diff_ac++;
+        }
+        if (!check("run-gate-equiv", ra.ok() && rb.ok() && rc.ok() &&
+                   diff_ab == 0 && diff_ac > 0,
+                   rep->path + ": gated-vs-off " + std::to_string(diff_ab) +
+                   " px (want 0), gated-vs-ungated " +
+                   std::to_string(diff_ac) + " px (want >0)")) {
+            dump_failure("run_gate_gated", fa);
+            dump_failure("run_gate_off", fb);
+            dump_failure("run_gate_ungated", fc);
+        }
+    }
 
     // --- Gate 4: B&W mono (R=G=B) ---
     {

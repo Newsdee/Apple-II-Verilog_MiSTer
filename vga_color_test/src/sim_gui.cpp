@@ -225,9 +225,20 @@ int VgaGui::run() {
             ImGui::Indent();
             ImGui::Checkbox("2-3 px seam fill (experimental)",
                             &s_.seam_run_fill);
+            if (s_.seam_run_fill) {
+                ImGui::Indent();
+                ImGui::Checkbox("extend to 2-5 px runs (benched: overfills HGR)",
+                                &s_.seam_run_wide);
+                ImGui::Checkbox("mode gate RUN_FILL_OK (auto in core: GR/DHGR)",
+                                &s_.run_fill_ok);
+                ImGui::Unindent();
+            } else {
+                s_.seam_run_wide = false;
+            }
             ImGui::Unindent();
         } else {
             s_.seam_run_fill = false;
+            s_.seam_run_wide = false;
         }
         ImGui::Checkbox("NTSC vertical blend", &s_.ntsc_vertical_comb);
 

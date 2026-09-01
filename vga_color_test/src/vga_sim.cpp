@@ -59,6 +59,23 @@ FrameResult VgaSim::runFrame(const Settings& s, const VideoSource& vs,
     int input_line_idx = 0;
     bool prev_input_hbl = true;
 
+    // Seam-stage decision probe (debug): the captured pixel's fill decision
+    // was made 2 edges earlier (seam_rgb -> current_rgb_q -> filtered_rgb),
+    // reading the window as it was pre-edge then (= post-edge 3 back). A
+    // ring of 4 post-edge states lets us print both at the capture edge.
+    struct ProbeState {
+        uint32_t w2_rgb, w3_rgb, w4_rgb;
+        int w2_luma, w3_luma, w4_luma;
+        int w2_sat, w3_sat, w4_sat;
+        int w3_bit, w3_valid, w2_valid, w4_valid;
+        int c_luma, fill_ok;
+        uint32_t fill_rgb, seam_rgb, raw_rgb;
+        int sr, hc;
+        int bits, valid;  // full packed [6:0] bit/valid windows
+    };
+    ProbeState probe_hist[4] = {};
+    int probe_idx = 0;  // position of the most recently recorded state
+
     for (int line = 0; line < kFrameLines; ++line) {
         const bool vbl = line < kLeadingVbl ||
                          line >= kLeadingVbl + kActiveLines;
@@ -102,10 +119,43 @@ FrameResult VgaSim::runFrame(const Settings& s, const VideoSource& vs,
             top_->COLOR_PALETTE = s.color_palette;
             top_->GRAY_SEAM_FIX = s.gray_seam_fix;
             top_->SEAM_RUN_FILL = s.seam_run_fill && s.gray_seam_fix;
+            top_->SEAM_RUN_WIDE = s.seam_run_wide && s.seam_run_fill &&
+                                  s.gray_seam_fix;
+            top_->RUN_FILL_OK = s.run_fill_ok;
             top_->NTSC_VERTICAL_COMB = s.ntsc_vertical_comb;
 
             top_->CLK_14M = 1;
             top_->eval();
+
+            if (trace_armed) {
+                auto* rp = top_->rootp;
+                ProbeState& p = probe_hist[probe_idx];
+                // RUN=1 center is window[5] (9-sample window); [4]=left 1,
+                // [6]=right 1.
+                p.w2_rgb = (uint32_t)rp->vga_color_test_top__DOT__dut__DOT__seam_rgb_window[4];
+                p.w3_rgb = (uint32_t)rp->vga_color_test_top__DOT__dut__DOT__seam_rgb_window[5];
+                p.w4_rgb = (uint32_t)rp->vga_color_test_top__DOT__dut__DOT__seam_rgb_window[6];
+                p.w2_luma = (int)rp->vga_color_test_top__DOT__dut__DOT__seam_luma_window[4];
+                p.w3_luma = (int)rp->vga_color_test_top__DOT__dut__DOT__seam_luma_window[5];
+                p.w4_luma = (int)rp->vga_color_test_top__DOT__dut__DOT__seam_luma_window[6];
+                p.w2_sat = (int)rp->vga_color_test_top__DOT__dut__DOT__seam_saturation_window[4];
+                p.w3_sat = (int)rp->vga_color_test_top__DOT__dut__DOT__seam_saturation_window[5];
+                p.w4_sat = (int)rp->vga_color_test_top__DOT__dut__DOT__seam_saturation_window[6];
+                p.w3_bit = (int)((rp->vga_color_test_top__DOT__dut__DOT__seam_bit_window >> 5) & 1);
+                p.w2_valid = (int)((rp->vga_color_test_top__DOT__dut__DOT__seam_valid_window >> 4) & 1);
+                p.w3_valid = (int)((rp->vga_color_test_top__DOT__dut__DOT__seam_valid_window >> 5) & 1);
+                p.w4_valid = (int)((rp->vga_color_test_top__DOT__dut__DOT__seam_valid_window >> 6) & 1);
+                p.bits = (int)rp->vga_color_test_top__DOT__dut__DOT__seam_bit_window;
+                p.valid = (int)rp->vga_color_test_top__DOT__dut__DOT__seam_valid_window;
+                p.c_luma = (int)rp->vga_color_test_top__DOT__dut__DOT__seam_cleanup__DOT__c_luma;
+                p.fill_ok = (int)rp->vga_color_test_top__DOT__dut__DOT__seam_cleanup__DOT__fill_ok;
+                p.fill_rgb = (uint32_t)rp->vga_color_test_top__DOT__dut__DOT__seam_cleanup__DOT__fill_rgb;
+                p.seam_rgb = (uint32_t)rp->vga_color_test_top__DOT__dut__DOT__seam_rgb;
+                p.raw_rgb = (uint32_t)rp->vga_color_test_top__DOT__dut__DOT__raw_rgb;
+                p.sr = (int)rp->vga_color_test_top__DOT__dut__DOT__shift_reg;
+                p.hc = (int)rp->vga_color_test_top__DOT__dut__DOT__hcount;
+                probe_idx = (probe_idx + 1) & 3;
+            }
 
             if (trace_armed && raw_active_pre) {
                 trace.push_back({sr_pre, hc_pre,
@@ -165,6 +215,34 @@ FrameResult VgaSim::runFrame(const Settings& s, const VideoSource& vs,
                         printf("TRACE out=(%d,%d) rgb=%02x%02x%02x\n",
                                trace_x, trace_y, (got >> 16) & 255,
                                (got >> 8) & 255, got & 255);
+                        // Decision state: fill decision made 2 edges ago;
+                        // the window it read is the post-edge state from 3
+                        // edges ago.
+                        const ProbeState& dec = probe_hist[(probe_idx + 1) & 3];
+                        const ProbeState& win = probe_hist[probe_idx];
+                        printf("  DECISION (edge -2): fill_ok=%d fill_rgb=%06x "
+                               "seam_rgb_out=%06x c_luma=%d\n",
+                               dec.fill_ok, dec.fill_rgb, dec.seam_rgb,
+                               dec.c_luma);
+                        printf("  WINDOW (edge -3): w2=%06x(luma %d sat %d) "
+                               "w3=%06x(luma %d sat %d bit %d valid %d) "
+                               "w4=%06x(luma %d sat %d)\n",
+                               win.w2_rgb, win.w2_luma, win.w2_sat,
+                               win.w3_rgb, win.w3_luma, win.w3_sat,
+                               win.w3_bit, win.w3_valid,
+                               win.w4_rgb, win.w4_luma, win.w4_sat);
+                        printf("  WINDOWS (edge -3): bits[6:0]=%07o "
+                               "valid[6:0]=%07o\n",
+                               win.bits, win.valid);
+                        printf("  RAW (edge -2): raw_rgb=%06x sr=%06x hc=%d | "
+                               "now: raw_rgb=%06x sr=%06x hc=%d\n",
+                               dec.raw_rgb, dec.sr, dec.hc,
+                               (uint32_t)top_->rootp->
+                                   vga_color_test_top__DOT__dut__DOT__raw_rgb,
+                               (int)top_->rootp->
+                                   vga_color_test_top__DOT__dut__DOT__shift_reg,
+                               (int)top_->rootp->
+                                   vga_color_test_top__DOT__dut__DOT__hcount);
                         // Center the window on the expected raw hcount
                         // (output x + ~16 lead); mark RGB matches.
                         size_t match = trace.size();
