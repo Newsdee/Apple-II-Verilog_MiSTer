@@ -1,0 +1,41 @@
+# semantic_whitelist.txt — reviewed bus differences accepted by semantic_compare.py
+#
+# Every entry here is a NAMED, REVIEWED difference between the golden R65Cx2
+# trace and the new-core (GameKing 65C02) trace on the r65-pair stimulus
+# (4000 cycles, IRQ@730, NMI@768). The checker fails on any divergence not
+# covered by an entry below.
+#
+# Entry formats:
+#   LEN <delta> <opcode>...     allowed instruction-length delta (golden-new)
+#                               in cycles for the listed opcodes
+#   RMW_PREWRITE_GOLDEN <opcode>...
+#                               golden may emit exactly one extra write to the
+#                               effective address, carrying the value it read
+#                               there during the same instruction, immediately
+#                               before the final write (old-value pre-write)
+
+# --- Instruction length deltas (verified 2026-09-03 on regenerated traces) ---
+
+# abs,X shift/rotate: golden takes 7 cycles, new core 6. Golden re-reads b2 on
+# the forced-fix cycle (MOS convention); the WDC suite expects the b2 re-read
+# which the new core implements. One instance of each in the r65 stimulus.
+LEN +1 1e 3e 5e 7e
+
+# JMP indirect / JMP (abs,X): new core takes 6 cycles, golden 5. The new core
+# inserts one extra cycle in the indirect jump sequence. One instance of each
+# in the r65 stimulus.
+LEN -1 6c 7c
+
+# --- Write-event deltas -------------------------------------------------------
+
+# RMW instructions — shifts (ASL/LSR/ROL/ROR), INC/DEC, EOR (zp/zp,X/abs/
+# abs,X), and bit-transfer TSB/AND-bit (zp/zp,X/abs/abs,X):
+#   golden bus sequence:  read EA, WRITE old value, write new value
+#   new-core sequence:    read EA, read EA again, write new value
+# The golden old-value pre-write is a real bus event (a memory-mapped device
+# would see a write strobe with the pre-update data). It is accepted here
+# because policy (a) keeps the new core on the W65C02S convention; it is
+# flagged for Apple II I/O impact review per the decision policy. The checker
+# verifies the pre-write address and data against the instruction's own read
+# before accepting it, and accepts exactly one per instruction.
+RMW_PREWRITE_GOLDEN 06 16 0e 1e 46 56 4e 5e 26 36 2e 3e 66 76 6e 7e c6 d6 ce de e6 f6 ee fe 45 55 4d 5d 04 14 0c 1c 05 15 0d 1d

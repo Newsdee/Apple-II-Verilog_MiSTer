@@ -1,6 +1,66 @@
-# SST (single-step test) progress handoff — 2026-09-02
+# SST (single-step test) progress handoff — 2026-09-03
 
 Resume point for the WDC 65x02 single-step harness work. Read this top to bottom, then continue at "Next steps".
+
+**Current state (2026-09-03, continued): Priority 1 DONE — semantic checker built and validated.**
+New `module_tests/cpu_65c02/semantic_compare.py` + `semantic_whitelist.txt`
+(named entries). On the regenerated r65 pair it reports **PASS (exit 0)**:
+1504/1504 fetch pairs identical; 1503 instruction lengths checked (whitelist
+used: 4× `LEN +1 1e 3e 5e 7e`, 2× `LEN -1 6c 7c`); 1503 boundary states
+clean under the one-fetch skew rule; write events 98 golden vs 70 new with
+exactly 28 whitelisted RMW old-value pre-writes (shifts/INC/DEC/EOR/
+TSB/AND-bit families — the first run exposed 4 TSB instructions missing from
+the initial whitelist); final state equal modulo constant P_B; **final
+write-map equality TRUE** (33 distinct addresses, last-write-wins);
+gates irq_handler=1020 / nmi_handler=1030 / errpark=0908 hit in both.
+Verified with 5 mutated-trace negative tests (write-data corruption,
+fetch-opcode change, state-bit flip, RMW-entry-free whitelist → all FAIL
+with precise localization; unmutated control → PASS). `--report-reads`
+(report-only) shows 31/1504 instructions with read-list differences: 24 RMW
+EA re-reads (new core), 7 convention reads (STZ dummy-EA-vs-b2-re-read,
+JMP-indirect extra reads matching the +1c length delta, pre-interrupt NOP
+dummies, park-loop tail truncation), and the 4 .ax shifts have NO read diff
+(golden's b2 forced-fix re-read coincides with the new core's EA re-read
+shape) — write-only delta. Key measured conventions now baked into the
+checker: golden state columns lag one fetch (gf[i] vs nf[i-1]); SP accepts
+unshifted at 14 stack-op/interrupt-entry boundaries; PC column dPC∈{0,1}
+plus reported in-transition exceptions after RTS@0912 and BRA@08fd.
+JSON summary: `build/semantic_summary.json`.
+
+**Current state (2026-09-03):** Session resumed after a crash; three outcomes:
+
+1. **SST debug anomaly RESOLVED — no RTL bug.** The "BIT abs,X reads wrong
+   data at EA" case was a corrupted hand-written `build/dbg_batch.txt` (the EA
+   address 5B57 sat in the patch list, displacing the last instruction byte;
+   value F5 landed at 5B57 instead of 5622). With the corrected batch, a clean
+   rebuild (`build/sst_rebuild/Vcpu65_sst_tb.exe`, SHA-256 `4039594a…a596`)
+   reads the EE sentinel at EA and produces the exact expected result (P=F9 —
+   the injected P=AB already has D=1; A unchanged). Old and new SST binaries
+   give byte-identical output on this test, so the stale-binary concern was
+   moot. The full observed trace (BIT abs,X → EOR zp → INC abs) was re-derived
+   by hand and is 100% correct for the (corrupted) memory.
+2. **Step 1 complete — r65 pair regenerated** (`run_divergence.ps1` full run;
+   log `build/divergence_rerun.log`). Equivalence story re-verified after
+   Option C: **1504/1504 fetches, 0 opcode mismatches, 0 fetch-address
+   mismatches**; final state identical (PC=090A SP=F7 A=33 X=00 Y=55,
+   N/V/D/I/Z/C all equal) except P_B, a structural constant 1 in the new core
+   (`reg_p = {fl_n, fl_v, 1'b1, 1'b1, fl_d, fl_i, fl_z, fl_c}` — B never
+   cleared; skipped by convention in the comparator). Delta table unchanged:
+   4× abs,X shift/rotate golden +1c (ASL/ROL/LSR/ROR .ax), 2× JMP indirect
+   new-core +1c (6c/7c); net final +2. IRQ@730 and NMI@768 gates hit in both
+   cores; both park at 0908. T65 phases unchanged (1932/4160, 4378/6500 —
+   pre-existing, not Option-C-related).
+3. **Category G corrected: D flag, not I flag** (bit-index error in the
+   2026-09-02 re-attribution; "P[3]" in LSB numbering is bit 3 = D). Decisive
+   evidence: for `69`/`e9` the WDC suite pins I=0 on all 10000 tests, yet the
+   D=1 half still takes the extra cycle; rockwell/synetek show the same
+   D-dependence, MOS suites depend on neither. See the correction block in
+   `wdc_vs_6502_analysis.md`. Policy (a) and all pass counts unaffected; the
+   failing half of each ADC/SBC opcode is the D=1 half. Side observation:
+   post-test garbage-phase INC abs shows the new core doing read,
+   second-read, write while golden shows W(old),W(new) consecutive rows
+   (write-strobe duration convention) — pre-existing delta class, candidate
+   for Priority-3 RMW/I-O coverage.
 
 **Current state (2026-09-02):** Policy **(a) adopted** (W65C02S/WDC reference
 authoritative for bus conventions — see `CPU_COMPARISON_RECOMMENDATIONS.md`).
@@ -37,14 +97,17 @@ Then produce the 3-way comparison table (suite vs golden vs new core) and final 
 | Probe TB (throwaway) | `module_tests/cpu_65c02/r65cx2_probe_tb.sv` |
 | Driver | `module_tests/cpu_65c02/sst_driver.py` — now has `--final-offset N` flag (default 0; use **1** for golden R65Cx2) |
 | New-core build dir / binary | `module_tests/cpu_65c02/build/sst_verilog/Vcpu65_sst_tb.exe` |
+| New-core SST TB clean rebuild (2026-09-03) | `build/sst_rebuild/Vcpu65_sst_tb.exe` (SHA-256 `4039594a…a596`; byte-identical output to the sst_verilog build on the dbg test) |
+| r65-pair rerun log (2026-09-03) | `build/divergence_rerun.log` (full run_divergence.ps1: all 6 stages + divergence report) |
 | Golden build dir / binary | `module_tests/cpu_65c02/build/sst_r65/Vr65cx2_sst_tb.exe` |
 | Old standalone golden TB | `module_tests/cpu_65c02/r65cx2_ora_tb.sv` (proved ORA zp = 3 cyc read-only) |
 | Sweep artifacts (persistent) | `build/sweep_wdc.txt`, `build/sweep_wdc_results.txt` (pre-fix new core), `build/sweep_wdc_nobcdfix_results.txt` (post-DEC_FIX-removal baseline), **`build/sweep_wdc_abxfix_results.txt` (current new-core state, post Option C)**, `build/sweep_wdc_golden_results.txt`, `build/sweep_wdc_batch.txt`, `build/fail_examples.json` |
 | Pre-Option-C RTL snapshot | `build/cpu_65c02_preabxfix.sv` (= `/tmp/cpu_65c02.sv.pre-abxfix`; 17-line diff vs current, see Category C resolution) |
 | Regression gate | `build/regress_check.py` — per-test pass/fail diff of the two sweep files above; exit 1 on any pass→fail flip |
 | Comparison plan | `module_tests/cpu_65c02/CPU_COMPARISON_RECOMMENDATIONS.md` (priorities 1–4 + decision policy; policy (a) adopted 2026-09-02) |
-| CPU analysis doc | `module_tests/cpu_65c02/cpu_cycle_analysis.md` |
-| WDC-vs-MOS attribution doc | `module_tests/cpu_65c02/wdc_vs_6502_analysis.md` (Categories A–I; G = ADC/SBC **I-flag** extra cycle, re-attributed 2026-09-02; C resolved by Option C; I = illegal-opcode decode mismatch) |
+| **Semantic checker (Priority 1, 2026-09-03)** | `module_tests/cpu_65c02/semantic_compare.py` + `semantic_whitelist.txt`; JSON summary `build/semantic_summary.json`. Usage: `python semantic_compare.py <golden.csv> <new.csv> [--whitelist ...] [--report-reads] [--gate NAME=ADDR ...] [--json-out FILE]`; exit 0 pass / 2 divergence / 1 usage |
+| CPU analysis doc | `module_tests/cpu_65c02/cpu_cycle_analysis.md` (needs Priority-2 corrections; accepted-differences table must share IDs with the whitelist) |
+| WDC-vs-MOS attribution doc | `module_tests/cpu_65c02/wdc_vs_6502_analysis.md` (Categories A–I; G = ADC/SBC **D-flag** extra cycle — corrected 2026-09-03, the 09-02 "I-flag" attribution was a bit-index error; C resolved by Option C; I = illegal-opcode decode mismatch) |
 | BCD root-cause artifacts | `build/bcd_batch.py`, `build/bcd_batch.txt`, `build/bcd_dbg*.txt`, `build/bcd_results*.txt`, `build/bcd_matrix.py` |
 
 Driver usage:
@@ -183,14 +246,16 @@ New-core TB: `+DBG=<idx>` dumps state/ir/dl/ea/idx_carry/nop8_cnt/sync/pc.
 
 ## Suite-quirk findings (WDC data itself)
 
-- **ADC/SBC I-flag extra cycle + D-pinning (Category G, re-attributed 2026-09-02):**
-  the WDC-lineage suites add one extra read to every ADC/SBC when I=1 (imm:
-  fixed $007F/$0000; zp/abs/indexed: EA re-read); perfect P[3] correlation
-  (1017/1017 vs 0/976 over 2000 tests), present in wdc/rockwell/synertek,
-  absent from 6502/nes6502. The generator pins D per opcode family (ADC always
-  D=0, SBC always D=1), which is why this was initially mislabeled "D=1 BCD".
-  Policy (a): documented, not emulated — the I=1 half of every ADC/SBC opcode
-  still fails on the new core (and golden).
+- **ADC/SBC D-flag (BCD) extra read cycle (Category G, corrected 2026-09-03):**
+  ~~I-flag re-attribution of 2026-09-02 was a bit-index error~~ — "P[3]" in LSB
+  numbering is bit 3 = **D** (C=0 Z=1 I=2 D=3 B=4). The WDC-lineage suites add
+  one extra read to every ADC/SBC when **D=1** (imm: fixed $007F/$0000;
+  zp/abs/indexed: EA re-read); the original per-bit statistic (1017/1017 vs
+  0/976) measured D all along. Decisive: for `69`/`e9` the suite pins I=0 on
+  all 10000 tests per file, yet exactly the D=1 half takes the extra cycle
+  (5000/5000); rockwell/synertek show the same D-dependence, MOS suites
+  neither. Policy (a): documented, not emulated — the **D=1** half of every
+  ADC/SBC opcode still fails on the new core (and golden).
 - **Illegal-opcode decode mismatch (Category I):** `bf`/`df` 0/50 both cores —
   WDC models them as 2-byte zero-page ops; the core decodes LDA abs,X / DEC
   abs,X. Pre-existing, unchanged by Option C.
@@ -218,7 +283,7 @@ New-core TB: `+DBG=<idx>` dumps state/ir/dl/ea/idx_carry/nop8_cnt/sync/pc.
 - Verilator gotchas: substr is INCLUSIVE-END; make step must be run manually; Windows paths need
   raw strings; UCRT64 bin on PATH for running .exes.
 
-## Next steps (in order, as of 2026-09-02)
+## Next steps (in order; item 1 done 2026-09-03)
 
 Done so far: golden BCD trace decoded (TB artifact), golden full sweep
 (`build/sweep_wdc_golden_results.txt`, 8093/12700), three-way + four-way tables
@@ -230,13 +295,21 @@ under policy (a) with the zero-regression gate**, Category G re-attribution
 The remaining work is now organized by `CPU_COMPARISON_RECOMMENDATIONS.md`
 (priorities 1–4 + decision policy). Plan agreed 2026-09-02:
 
-1. **Regenerate the r65 pair traces** (`run_divergence.ps1`, full — NOT
+1. ~~**Regenerate the r65 pair traces** (`run_divergence.ps1`, full — NOT~~
+   **DONE 2026-09-03** (see top): 1504/1504 aligned fetches, zero
+   opcode/address mismatches, final state identical modulo constant P_B,
+   delta table unchanged. Clean baseline established. Original text:
+   **Regenerate the r65 pair traces** (`run_divergence.ps1`, full — NOT
    -CompareOnly: the new-core RTL changed with Option C). The existing
    `build/r65_trace.csv` (new core) is stale; the four-opcode delta table in
    `cpu_cycle_analysis.md` §4.1 may change (M_ABX cross/forced-fix instances:
    .ax shifts, INC/DEC abs,X, JMP abs,X now dummy at pc+2). Re-verify the
    equivalence story: same instruction stream, same final state.
-2. **Priority 1 — semantic checker**: one maintained tool
+2. ~~**Priority 1 — semantic checker**: one maintained tool~~ **DONE
+   2026-09-03 (see top)**: `semantic_compare.py` + `semantic_whitelist.txt`
+   in place; PASS on the regenerated pair; 5-case mutated-trace negative
+   validation all correct; `--report-reads` report-only. Original text:
+   **Priority 1 — semantic checker**: one maintained tool
    `module_tests/cpu_65c02/semantic_compare.py` + named whitelist file replacing
    the build-dir ad-hoc helpers (9 requirements in the recommendations doc;
    initial whitelist = the §4.1 four-opcode table with stable IDs; "final

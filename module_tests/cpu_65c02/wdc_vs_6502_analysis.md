@@ -5,6 +5,10 @@ Updated: 2026-09-02 — policy (a) adopted (W65C02S/WDC reference authoritative
 for bus conventions); Category C resolved by the Option C M_ABX change;
 Category G re-attributed from "D=1 BCD" to the **I-flag** convention; new
 Category I (illegal-opcode decode mismatch).
+CORRECTED 2026-09-03 — Category G is the **D flag**, not the I flag: the
+re-attribution was a bit-index error ("P[3]" in LSB numbering is bit 3 = D;
+see the evidence block inside Category G). The original "D=1 BCD"
+attribution was right. No change to policy (a) or to any pass counts.
 Question answered: *Where the new core / golden R65Cx2 disagree with the WDC
 SingleStepTests reference, is it the WDC suite that diverges from original MOS
 6502 behavior? Would a faithful-6502 core (e.g. T65) track the 6502 suite more
@@ -126,7 +130,7 @@ Full WDC re-sweep (`build/sweep_wdc_abxfix_results.txt`, 12700 tests, seed 1):
 | `9d 9e` | 0/50 | **50/50** | stores |
 | `de fe` | 0/50 | **50/50** | INC/DEC RMW |
 | `3c` (JMP abs,X) | 27/50 | **50/50** | indirect jump (routes through M_ABX) |
-| `7d fd` | 10/18 of 50 | 23/31 of 50 | ADC/SBC — remainder is Category G (I flag) |
+| `7d fd` | 10/18 of 50 | 23/31 of 50 | ADC/SBC — remainder is Category G (D flag, corrected 2026-09-03) |
 
 No opcode outside the M_ABX family changed at all.
 
@@ -173,20 +177,49 @@ R pc+2, R 72DF, R 72DF, W 45 = 8A>>1) — its decode path routes $5E through the
 WDC-convention behavior rather than plain ADC (zp),Y. The MOS suite models
 $5E differently again (`RRRRRWW`). Golden R65Cx2 implements plain ADC (zp),Y.
 
-## Category G — ADC/SBC I-flag extra-cycle convention (re-attributed 2026-09-02)
+## Category G — ADC/SBC D-flag (BCD) extra-read-cycle convention (corrected 2026-09-03)
 
-The WDC suite models **every ADC/SBC with an extra read cycle when I=1**
-(P bit 3 set) that the MOS-lineage suites do not have. The earlier "D=1 BCD"
-label was wrong: the WDC SST generator **pins D per opcode family** — every
-ADC-family test (`69 65 6d 7d 79 71` …) is generated with D=0 and every
-SBC-family test (`e9 e5 ed fd f9 f1` …) with D=1 (verified: 10000/10000 in
-each file), so "D=1 tests" and "I=1 tests" could not be told apart at a
-coarse level. A per-bit correlation over 2000 sampled `7d` tests is exact:
-extra read ⟺ P[3]=1 (1017/1017 vs 0/976; no other bit or feature correlates).
+> **CORRECTION (2026-09-03): the trigger is D=1, not I=1.** The 2026-09-02
+> re-attribution to the I flag was a bit-index error: "P[3]" in LSB numbering
+> is bit 3 = **D** (C=0 Z=1 I=2 **D=3** B=4 …), so the original per-bit
+> statistic (extra read ⟺ P[3]=1) measured the D flag all along. Direct
+> cross-tabs of ncyc vs (I, D) on the full suites:
+>
+> - **Decisive:** for `69`/`e9` (immediate) in wdc65c02, the suite pins
+>   **I=0 for all 10000 tests** in each file, yet exactly the D=1 half takes
+>   3 cycles and the D=0 half takes 2 (5000/5000). I cannot be the trigger.
+> - `6d`/`ed` (abs), `65`/`e5` (zp): both I values present; ncyc = base + D
+>   exactly (e.g. `6d`: D=0 → 4c in 5000 tests, D=1 → 5c in 5000).
+> - `75`/`f5` (zp,X), `7d`/`fd` (abs,Y): ncyc = base(mode, cross) + D; both
+>   I values appear in every cell and never change the count (e.g. `f5`:
+>   D=0 → 4c/5c-cross, D=1 → 5c/6c-cross; I split ~50/50 within each cell).
+>
+> D is also **not pinned per family** as claimed below: `f5` has 4903 D=0 /
+> 5097 D=1 tests, `75` has 4968/5032 — the "10000/10000 pinned" claim is
+> refuted. Lineage re-check (2026-09-03): rockwell65c02 and synertek65c02
+> show the identical D-dependence (`69`: D=0→2c, D=1→3c; `7d`: D=0→4/5c,
+> D=1→5/6c), while 6502 and nes6502 depend on **neither** I nor D. Consequences:
+> (1) the failing half of each ADC/SBC opcode is the **D=1** half (same
+> counts, different test identity); (2) the original 2026-09-01 "D=1 BCD"
+> attribution was correct; (3) policy (a) and all pass counts are unaffected.
+> Re-verified on 50-sample `f5` runs: new core ≡ golden R65Cx2 bus-for-bus
+> on the instruction itself (4 cycles, no extra read in either); both produce
+> the suite's final architectural state; only the suite's D=1 extra-read
+> address (EA-low) is absent from both cores' traces.
 
-Exact location of the extra read, by mode (WDC suite, I=1):
+The WDC-lineage suites model **every ADC/SBC with an extra read cycle when
+D=1** (decimal correction) that the MOS-lineage suites do not have.
+~~The earlier "D=1 BCD" label was wrong: the WDC SST generator **pins D per
+opcode family** — every ADC-family test is generated with D=0 and every
+SBC-family test with D=1 (verified: 10000/10000 in each file), so "D=1
+tests" and "I=1 tests" could not be told apart at a coarse level. A per-bit
+correlation over 2000 sampled `7d` tests is exact: extra read ⟺ P[3]=1
+(1017/1017 vs 0/976; no other bit or feature correlates).~~ *(superseded by
+the correction block above — the pinning claim is false and P[3] is D)*
 
-| mode | WDC suite cycles (I=1) | extra read |
+Exact location of the extra read, by mode (WDC suite, D=1):
+
+| mode | WDC suite cycles (D=1) | extra read |
 |---|---|---|
 | immediate `69` | 3 | fixed address **$007F** |
 | immediate `e9` | 3 | fixed address **$0000** |
@@ -195,9 +228,10 @@ Exact location of the extra read, by mode (WDC suite, I=1):
 | abs,X `7d`/`fd`, abs,Y `79`/`f9` | base + cross + 1 | EA re-read (on top of the b2 re-read penalty) |
 
 Lineage evidence: the pattern is present in **all three WDC-lineage suites**
-(wdc65c02, rockwell65c02, synertek65c02 — same ~50/50 I=1 split in each) and
-absent from both MOS-lineage suites (6502, nes6502: ADC imm = 2 cycles and
-ADC abs,X = 4/5 cycles regardless of I). No real-silicon documentation
+(wdc65c02, rockwell65c02, synertek65c02 — same ~50/50 D=1 split and identical
+D-dependence in each, re-verified 2026-09-03) and absent from both
+MOS-lineage suites (6502, nes6502: ADC imm = 2 cycles and ADC abs,X = 4/5
+cycles regardless of I **or D**). No real-silicon documentation
 supports an I-dependent ADC/SBC cycle count; the fixed `$007F`/`$0000`
 immediate-mode addresses are a tell-tale reference-model artifact.
 
@@ -228,8 +262,8 @@ and the MOS suites agree. **Policy decision (2026-09-02, policy (a)): this
 convention is documented but NOT emulated** — no hardware evidence, absent
 from the MOS lineage, and the immediate-mode fixed addresses show it is a
 model artifact rather than datasheet behavior. The cores therefore still fail
-the I=1 half of every ADC/SBC opcode in the WDC suite (e.g. `7d` 23/50,
-`fd` 31/50 post-Option-C) while passing all I=0 tests.
+the D=1 half of every ADC/SBC opcode in the WDC suite (e.g. `7d` 23/50,
+`fd` 31/50 post-Option-C) while passing all D=0 tests.
 
 (The `$DE` 0/50 in the old open-items list was *not* this: `$DE` is DEC
 abs,X — resolved by the Option C change, Category C.)
@@ -288,9 +322,9 @@ wanted.
 
 ## Category F — open items (not yet root-caused)
 
-- ~~SBC indexed family nocross partials~~ **RESOLVED (Category G,
-  re-attributed):** the I=1 half of `7d`/`f9` fails because of the WDC
-  I-flag extra-cycle convention; I=0 passes.
+- ~~SBC indexed family nocross partials~~ **RESOLVED (Category G;
+  corrected 2026-09-03 to D flag):** the D=1 half of `7d`/`f9` fails because
+  of the WDC D-flag (BCD) extra-read-cycle convention; D=0 passes.
 - ~~`$DE`/`$FE` DEC/INC abs,X 0/50~~ **RESOLVED (Category C, Option C,
   2026-09-02):** both now 50/50 on the new core; golden R65Cx2 still fails
   them against the WDC suite (double-write RMW + no-carry-EA dummy vs the
@@ -308,7 +342,7 @@ wanted.
 - **Yes, WDC has real divergences from the MOS 6502 reference** on 79 of the
   109 opcodes where anything diverges at all — most notably the RMW bus
   protocol (Category A), the abs,X page-cross/forced-fix dummy address
-  (Category C), and the ADC/SBC I-flag extra cycle (Category G).
+  (Category C), and the ADC/SBC D-flag (BCD) extra read cycle (Category G).
 - **Policy (a) note (2026-09-02):** the project follows the WDC reference for
   bus conventions, so the new core now matches WDC on Category C as well;
   golden R65Cx2 remains the MOS-convention implementation. The T65
