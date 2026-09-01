@@ -1,0 +1,266 @@
+new core : 10302/12700 pass
+golden   : 8093/12700 pass
+
+  op |   new | golden | class
+-----------------------------
+  00 |  50/50 |   50/50 | OK
+  01 |  50/50 |   50/50 | OK
+  02 |  50/50 |   50/50 | OK
+  03 |  50/50 |   50/50 | OK
+  04 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  05 |  50/50 |   50/50 | OK
+  06 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  07 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  08 |  50/50 |   50/50 | OK
+  09 |  50/50 |   50/50 | OK
+  0a |  50/50 |   50/50 | OK
+  0b |  50/50 |   50/50 | OK
+  0c |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  0d |  50/50 |   50/50 | OK
+  0e |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  0f |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  10 |  50/50 |   50/50 | OK
+  11 |  22/50 |   22/50 | BOTH-FAIL-same-count  <==
+  12 |  50/50 |   50/50 | OK
+  13 |  50/50 |   50/50 | OK
+  14 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  15 |  50/50 |   50/50 | OK
+  16 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  17 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  18 |  50/50 |   50/50 | OK
+  19 |  30/50 |   30/50 | BOTH-FAIL-same-count  <==
+  1a |  50/50 |   50/50 | OK
+  1b |  50/50 |   50/50 | OK
+  1c |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  1d |  22/50 |   22/50 | BOTH-FAIL-same-count  <==
+  1e |  27/50 |    1/50 | BOTH-FAIL-diff-count  <==
+  1f |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  20 |  50/50 |   50/50 | OK
+  21 |  50/50 |   50/50 | OK
+  22 |  50/50 |   50/50 | OK
+  23 |  50/50 |   50/50 | OK
+  24 |  50/50 |   50/50 | OK
+  25 |  50/50 |   50/50 | OK
+  26 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  27 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  28 |  50/50 |   50/50 | OK
+  29 |  50/50 |   50/50 | OK
+  2a |  50/50 |   50/50 | OK
+  2b |  50/50 |   50/50 | OK
+  2c |  50/50 |   50/50 | OK
+  2d |  50/50 |   50/50 | OK
+  2e |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  2f |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  30 |  50/50 |   50/50 | OK
+  31 |  23/50 |   23/50 | BOTH-FAIL-same-count  <==
+  32 |  50/50 |   50/50 | OK
+  33 |  50/50 |   50/50 | OK
+  34 |  50/50 |   50/50 | OK
+  35 |  50/50 |   50/50 | OK
+  36 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  37 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  38 |  50/50 |   50/50 | OK
+  39 |  29/50 |   29/50 | BOTH-FAIL-same-count  <==
+  3a |  50/50 |   50/50 | OK
+  3b |  50/50 |   50/50 | OK
+  3c |  27/50 |   27/50 | BOTH-FAIL-same-count  <==
+  3d |  21/50 |   21/50 | BOTH-FAIL-same-count  <==
+  3e |  25/50 |    0/50 | BOTH-FAIL-diff-count  <==
+  3f |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  40 |  50/50 |   50/50 | OK
+  41 |  50/50 |   50/50 | OK
+  42 |  50/50 |   50/50 | OK
+  43 |  50/50 |   50/50 | OK
+  44 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  45 |  50/50 |   50/50 | OK
+  46 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  47 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  48 |  50/50 |   50/50 | OK
+  49 |  50/50 |   50/50 | OK
+  4a |  50/50 |   50/50 | OK
+  4b |  50/50 |   50/50 | OK
+  4c |  50/50 |   50/50 | OK
+  4d |  50/50 |   50/50 | OK
+  4e |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  4f |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  50 |  50/50 |   50/50 | OK
+  51 |  20/50 |   20/50 | BOTH-FAIL-same-count  <==
+  52 |  50/50 |   50/50 | OK
+  53 |  50/50 |   50/50 | OK
+  54 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  55 |  50/50 |   50/50 | OK
+  56 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  57 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  58 |  50/50 |   50/50 | OK
+  59 |  33/50 |   33/50 | BOTH-FAIL-same-count  <==
+  5a |  50/50 |   50/50 | OK
+  5b |  50/50 |   50/50 | OK
+  5c |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  5d |  27/50 |   27/50 | BOTH-FAIL-same-count  <==
+  5e |  32/50 |    0/50 | BOTH-FAIL-diff-count  <==
+  5f |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  60 |  50/50 |   50/50 | OK
+  61 |  25/50 |   25/50 | BOTH-FAIL-same-count  <==
+  62 |  50/50 |   50/50 | OK
+  63 |  50/50 |   50/50 | OK
+  64 |  50/50 |   50/50 | OK
+  65 |  26/50 |   26/50 | BOTH-FAIL-same-count  <==
+  66 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  67 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  68 |  50/50 |   50/50 | OK
+  69 |  25/50 |   25/50 | BOTH-FAIL-same-count  <==
+  6a |  50/50 |   50/50 | OK
+  6b |  50/50 |   50/50 | OK
+  6c |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  6d |  24/50 |   24/50 | BOTH-FAIL-same-count  <==
+  6e |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  6f |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  70 |  50/50 |   50/50 | OK
+  71 |  15/50 |   15/50 | BOTH-FAIL-same-count  <==
+  72 |  23/50 |   23/50 | BOTH-FAIL-same-count  <==
+  73 |  50/50 |   50/50 | OK
+  74 |  50/50 |   50/50 | OK
+  75 |  27/50 |   27/50 | BOTH-FAIL-same-count  <==
+  76 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  77 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  78 |  50/50 |   50/50 | OK
+  79 |  15/50 |   15/50 | BOTH-FAIL-same-count  <==
+  7a |  50/50 |   50/50 | OK
+  7b |  50/50 |   50/50 | OK
+  7c |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  7d |  10/50 |   10/50 | BOTH-FAIL-same-count  <==
+  7e |  26/50 |    0/50 | BOTH-FAIL-diff-count  <==
+  7f |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  80 |  50/50 |   50/50 | OK
+  81 |  50/50 |   50/50 | OK
+  82 |  50/50 |   50/50 | OK
+  83 |  50/50 |   50/50 | OK
+  84 |  50/50 |   50/50 | OK
+  85 |  50/50 |   50/50 | OK
+  86 |  50/50 |   50/50 | OK
+  87 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  88 |  50/50 |   50/50 | OK
+  89 |  50/50 |   50/50 | OK
+  8a |  50/50 |   50/50 | OK
+  8b |  50/50 |   50/50 | OK
+  8c |  50/50 |   50/50 | OK
+  8d |  50/50 |   50/50 | OK
+  8e |  50/50 |   50/50 | OK
+  8f |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  90 |  50/50 |   50/50 | OK
+  91 |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  92 |  50/50 |   50/50 | OK
+  93 |  50/50 |   50/50 | OK
+  94 |  50/50 |   50/50 | OK
+  95 |  50/50 |   50/50 | OK
+  96 |  50/50 |   50/50 | OK
+  97 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  98 |  50/50 |   50/50 | OK
+  99 |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  9a |  50/50 |   50/50 | OK
+  9b |  50/50 |   50/50 | OK
+  9c |  50/50 |   50/50 | OK
+  9d |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  9e |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  9f |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  a0 |  50/50 |   50/50 | OK
+  a1 |  50/50 |   50/50 | OK
+  a2 |  50/50 |   50/50 | OK
+  a3 |  50/50 |   50/50 | OK
+  a4 |  50/50 |   50/50 | OK
+  a5 |  50/50 |   50/50 | OK
+  a6 |  50/50 |   50/50 | OK
+  a7 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  a8 |  50/50 |   50/50 | OK
+  a9 |  50/50 |   50/50 | OK
+  aa |  50/50 |   50/50 | OK
+  ab |  50/50 |   50/50 | OK
+  ac |  50/50 |   50/50 | OK
+  ad |  50/50 |   50/50 | OK
+  ae |  50/50 |   50/50 | OK
+  af |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  b0 |  50/50 |   50/50 | OK
+  b1 |  25/50 |   25/50 | BOTH-FAIL-same-count  <==
+  b2 |  50/50 |   50/50 | OK
+  b3 |  50/50 |   50/50 | OK
+  b4 |  50/50 |   50/50 | OK
+  b5 |  50/50 |   50/50 | OK
+  b6 |  50/50 |   50/50 | OK
+  b7 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  b8 |  50/50 |   50/50 | OK
+  b9 |  26/50 |   26/50 | BOTH-FAIL-same-count  <==
+  ba |  50/50 |   50/50 | OK
+  bb |  50/50 |   50/50 | OK
+  bc |  24/50 |   24/50 | BOTH-FAIL-same-count  <==
+  bd |  26/50 |   26/50 | BOTH-FAIL-same-count  <==
+  be |  21/50 |   21/50 | BOTH-FAIL-same-count  <==
+  bf |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  c0 |  50/50 |   50/50 | OK
+  c1 |  50/50 |   50/50 | OK
+  c2 |  50/50 |   50/50 | OK
+  c3 |  50/50 |   50/50 | OK
+  c4 |  50/50 |   50/50 | OK
+  c5 |  50/50 |   50/50 | OK
+  c6 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  c7 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  c8 |  50/50 |   50/50 | OK
+  c9 |  50/50 |   50/50 | OK
+  ca |  50/50 |   50/50 | OK
+  cc |  50/50 |   50/50 | OK
+  cd |  50/50 |   50/50 | OK
+  ce |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  cf |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  d0 |  50/50 |   50/50 | OK
+  d1 |  25/50 |   25/50 | BOTH-FAIL-same-count  <==
+  d2 |  50/50 |   50/50 | OK
+  d3 |  50/50 |   50/50 | OK
+  d4 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  d5 |  50/50 |   50/50 | OK
+  d6 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  d7 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  d8 |  50/50 |   50/50 | OK
+  d9 |  26/50 |   26/50 | BOTH-FAIL-same-count  <==
+  da |  50/50 |   50/50 | OK
+  dc |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  dd |  23/50 |   23/50 | BOTH-FAIL-same-count  <==
+  de |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  df |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  e0 |  50/50 |   50/50 | OK
+  e1 |  24/50 |   24/50 | BOTH-FAIL-same-count  <==
+  e2 |  50/50 |   50/50 | OK
+  e3 |  50/50 |   50/50 | OK
+  e4 |  50/50 |   50/50 | OK
+  e5 |  27/50 |   27/50 | BOTH-FAIL-same-count  <==
+  e6 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  e7 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  e8 |  50/50 |   50/50 | OK
+  e9 |  25/50 |   25/50 | BOTH-FAIL-same-count  <==
+  ea |  50/50 |   50/50 | OK
+  eb |  50/50 |   50/50 | OK
+  ec |  50/50 |   50/50 | OK
+  ed |  26/50 |   26/50 | BOTH-FAIL-same-count  <==
+  ee |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  ef |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  f0 |  50/50 |   50/50 | OK
+  f1 |  16/50 |   16/50 | BOTH-FAIL-same-count  <==
+  f2 |  21/50 |   21/50 | BOTH-FAIL-same-count  <==
+  f3 |  50/50 |   50/50 | OK
+  f4 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  f5 |  30/50 |   30/50 | BOTH-FAIL-same-count  <==
+  f6 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  f7 |  50/50 |    0/50 | GOLDEN-ONLY-FAIL  <==
+  f8 |  50/50 |   50/50 | OK
+  f9 |  15/50 |   15/50 | BOTH-FAIL-same-count  <==
+  fa |  50/50 |   50/50 | OK
+  fb |  50/50 |   50/50 | OK
+  fc |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  fd |  18/50 |   18/50 | BOTH-FAIL-same-count  <==
+  fe |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+  ff |   0/50 |    0/50 | BOTH-FAIL-same-count  <==
+
+BOTH-FAIL-diff-count: 4 opcodes
+BOTH-FAIL-same-count: 63 opcodes
+GOLDEN-ONLY-FAIL: 42 opcodes
+OK: 145 opcodes
+
+diverging opcodes: 04 06 07 0c 0e 0f 11 14 16 17 19 1c 1d 1e 1f 26 27 2e 2f 31 36 37 39 3c 3d 3e 3f 44 46 47 4e 4f 51 54 56 57 59 5c 5d 5e 5f 61 65 66 67 69 6c 6d 6e 6f 71 72 75 76 77 79 7c 7d 7e 7f 87 8f 91 97 99 9d 9e 9f a7 af b1 b7 b9 bc bd be bf c6 c7 ce cf d1 d4 d6 d7 d9 dc dd de df e1 e5 e6 e7 e9 ed ee ef f1 f2 f4 f5 f6 f7 f9 fc fd fe ff

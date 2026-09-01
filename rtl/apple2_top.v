@@ -446,6 +446,11 @@ module apple2_top(
         .SCREEN_MODE(SCREEN_MODE),
         .COLOR_PALETTE(COLOR_PALETTE),
         .GRAY_SEAM_FIX(GRAY_SEAM_FIX),
+        // Run fill (2-3 px seam runs) is developed/A/B-tested in vga_color_test;
+        // kept off in the full sim (bit-identical to v2-only).
+        .SEAM_RUN_FILL(1'b0),
+        .SEAM_RUN_WIDE(1'b0),
+        .RUN_FILL_OK(1'b0),
         .NTSC_VERTICAL_COMB(NTSC_VERTICAL_COMB),
         .HBL(HBL),
         .VBL(VBL),
@@ -465,6 +470,29 @@ module apple2_top(
         .ioctl_wait(ioctl_wait)
     );
 
+`ifdef JOY_TO_KEY
+    // Joy-to-key: map the digital joystick to Apple II keystrokes. Sits next
+    // to the keyboard (CLK_14M domain) and injects one-shot key presses
+    // independently of the OSK virtual path, so PS/2 and the raw joystick are
+    // both untouched. Enabled at build time via -DJOY_TO_KEY (tied on here);
+    // a runtime OSD toggle can replace the 1'b1 later.
+    wire        joy_key_press;
+    wire [6:0]  joy_key_code;
+    joy_to_key joy_to_key(
+        .clk(CLK_14M),
+        .reset(reset_cold),
+        .enable(1'b1),
+        .joy(joy),
+        .ioctl_download(ioctl_download),
+        .ioctl_wr(ioctl_wr),
+        .ioctl_addr(ioctl_addr),
+        .ioctl_data(ioctl_data),
+        .ioctl_index(ioctl_index),
+        .joy_key_press(joy_key_press),
+        .joy_key_code(joy_key_code)
+    );
+`endif
+
     keyboard keyboard(
         .PS2_Key(PS2_Key),
         .virtual_active(virtual_keyboard_active),
@@ -474,6 +502,10 @@ module apple2_top(
         .virtual_control(virtual_control),
         .virtual_open_apple(virtual_open_apple),
         .virtual_closed_apple(virtual_closed_apple),
+`ifdef JOY_TO_KEY
+        .joy_key_code(joy_key_code),
+        .joy_key_press(joy_key_press),
+`endif
         .CLK_14M(CLK_14M),
         .reset(reset_cold),	// use reset_cold, not reset so we keep the
                               // keyboard state machine running for key up
@@ -529,13 +561,15 @@ module apple2_top(
         .TRACK2_BUSY(TRACK2_BUSY)
     );
 
+// HDD presence: the full build and SIM_FAST_HDD keep it; plain SIM_FAST stubs slot 7.
 `ifdef SIM_FAST
-    // SIM_FAST: no HDD - 6502 sees an empty slot 7
-    assign HDD_DO     = 8'b0;
-    assign HDD_SECTOR = 16'b0;
-    assign HDD_READ   = 1'b0;
-    assign HDD_WRITE  = 1'b0;
+  `ifdef SIM_FAST_HDD
+    `define __HDD_PRESENT
+  `endif
 `else
+  `define __HDD_PRESENT
+`endif
+`ifdef __HDD_PRESENT
     hdd hdd(
         .CLK_14M(CLK_14M),
         .IO_SELECT(IO_SELECT[7]),
@@ -555,6 +589,12 @@ module apple2_top(
         .ram_do(HDD_RAM_DO),
         .ram_we(HDD_RAM_WE)
     );
+`else
+    // SIM_FAST: no HDD - 6502 sees an empty slot 7
+    assign HDD_DO     = 8'b0;
+    assign HDD_SECTOR = 16'b0;
+    assign HDD_READ   = 1'b0;
+    assign HDD_WRITE  = 1'b0;
 `endif
 
 `ifdef SIM_FAST

@@ -1,0 +1,113 @@
+ op | WDC suite    | 6502 suite   | new obs      | golden obs   | WDC-vs-6502
+------------------------------------------------------------------------------------
+04 | RRRRW:50     | RRR:50       | RRRRW:50     | RRRWW:50     | DIFF
+06 | RRRRW:50     | RRRWW:50     | RRRRW:50     | RRRWW:50     | DIFF
+07 | RRRRW:50     | RRRWW:50     | RRRRW:50     | RRRRR:50     | DIFF
+0c | RRRRRW:50    | RRRR:50      | RRRRRW:50    | RRRRWW:50    | DIFF
+0e | RRRRRW:50    | RRRRWW:50    | RRRRRW:50    | RRRRWW:50    | DIFF
+0f | RRRRR:27 +2  | RRRRWW:50    | RRRRR:27 +2  | RRRRR:26 +4  | DIFF
+11 | RRRRRR:28 +1 | RRRRRR:28 +1 | RRRRRR:28 +1 | RRRRRR:28 +1 | same
+14 | RRRRW:50     | RRRR:50      | RRRRW:50     | RRRWW:50     | DIFF
+16 | RRRRRW:50    | RRRRWW:50    | RRRRRW:50    | RRRRWW:50    | DIFF
+17 | RRRRW:50     | RRRRWW:50    | RRRRW:50     | RRRRR:49 +1  | DIFF
+19 | RRRR:30 +1   | RRRR:26 +1   | RRRR:30 +1   | RRRR:30 +1   | same
+1c | RRRRRW:50    | RRRRR:30 +1  | RRRRRW:50    | RRRRWW:50    | DIFF
+1d | RRRRR:28 +1  | RRRR:25 +1   | RRRRR:28 +1  | RRRRR:28 +1  | DIFF
+1e | RRRRRW:27 +1 | RRRRRWW:50   | RRRRRW:27 +1 | RRRRRW:27 +1 | DIFF
+1f | RRRRR:33 +2  | RRRRRWW:50   | RRRRR:33 +2  | RRRRR:33 +4  | DIFF
+26 | RRRRW:50     | RRRWW:50     | RRRRW:50     | RRRWW:50     | DIFF
+27 | RRRRW:50     | RRRWW:50     | RRRRW:50     | RRRRR:49 +1  | DIFF
+2e | RRRRRW:50    | RRRRWW:50    | RRRRRW:50    | RRRRWW:50    | DIFF
+2f | RRRRR:26 +2  | RRRRWW:50    | RRRRR:26 +2  | RRRRR:24 +4  | DIFF
+31 | RRRRRR:27 +1 | RRRRR:30 +1  | RRRRRR:27 +1 | RRRRRR:27 +1 | DIFF
+36 | RRRRRW:50    | RRRRWW:50    | RRRRRW:50    | RRRRWW:50    | DIFF
+37 | RRRRW:50     | RRRRWW:50    | RRRRW:50     | RRRRR:48 +1  | DIFF
+39 | RRRR:29 +1   | RRRR:26 +1   | RRRR:29 +1   | RRRR:29 +1   | same
+3c | RRRR:27 +1   | RRRR:29 +1   | RRRR:27 +1   | RRRR:27 +1   | same
+3d | RRRRR:29 +1  | RRRR:29 +1   | RRRRR:29 +1  | RRRRR:29 +1  | DIFF
+3e | RRRRRW:25 +1 | RRRRRWW:50   | RRRRRW:25 +1 | RRRRRW:25 +1 | DIFF
+3f | RRRRR:32 +2  | RRRRRWW:50   | RRRRR:32 +2  | RRRRR:31 +5  | DIFF
+44 | RRR:50       | RRR:50       | RRR:50       | RRR:50       | same
+46 | RRRRW:50     | RRRWW:50     | RRRRW:50     | RRRWW:50     | DIFF
+47 | RRRRW:50     | RRRWW:50     | RRRRW:50     | RRRRR:48 +1  | DIFF
+4e | RRRRRW:50    | RRRRWW:50    | RRRRRW:50    | RRRRWW:50    | DIFF
+4f | RRRRR:28 +2  | RRRRWW:50    | RRRRR:28 +2  | RRRRR:28 +4  | DIFF
+51 | RRRRRR:30 +1 | RRRRRR:30 +1 | RRRRRR:30 +1 | RRRRRR:30 +1 | same
+54 | RRRR:50      | RRRR:50      | RRRR:50      | RRRR:50      | same
+56 | RRRRRW:50    | RRRRWW:50    | RRRRRW:50    | RRRRWW:50    | DIFF
+57 | RRRRW:50     | RRRRWW:50    | RRRRW:50     | RRRRR:48 +1  | DIFF
+59 | RRRR:33 +1   | RRRRR:25 +1  | RRRR:33 +1   | RRRR:33 +1   | DIFF
+5c | RRRR:50      | RRRR:27 +1   | RRRR:50      | RRRR:50      | same
+5d | RRRR:27 +1   | RRRR:26 +1   | RRRR:27 +1   | RRRR:27 +1   | same
+5e | RRRRRW:32 +1 | RRRRRWW:50   | RRRRRW:32 +1 | RRRRRW:32 +1 | DIFF
+5f | RRRRR:28 +2  | RRRRRWW:50   | RRRRR:28 +2  | RRRRR:27 +5  | DIFF
+61 | RRRRRRR:25 +1 | RRRRRR:50    | RRRRRRR:25 +1 | RRRRRRR:25 +1 | DIFF
+65 | RRR:26 +1    | RRR:50       | RRR:26 +1    | RRR:26 +1    | same
+66 | RRRRW:50     | RRRWW:50     | RRRRW:50     | RRRWW:50     | DIFF
+67 | RRRRW:50     | RRRWW:50     | RRRRW:50     | RRRRR:49 +1  | DIFF
+69 | RR:25 +1     | RR:50        | RR:25 +1     | RR:25 +1     | same
+6c | RRRRRR:50    | RRRRR:50     | RRRRRR:50    | RRRRRR:50    | DIFF
+6d | RRRRR:26 +1  | RRRR:50      | RRRRR:26 +1  | RRRRR:26 +1  | DIFF
+6e | RRRRRW:50    | RRRRWW:50    | RRRRRW:50    | RRRRWW:50    | DIFF
+6f | RRRRR:31 +2  | RRRRWW:50    | RRRRR:31 +2  | RRRRR:29 +6  | DIFF
+71 | RRRRRR:19 +2 | RRRRR:25 +1  | RRRRRR:19 +2 | RRRRRR:19 +2 | DIFF
+72 | RRRRRR:27 +1 | RRRRRRRRRRR:50 | RRRRRR:27 +1 | RRRRRR:27 +1 | DIFF
+75 | RRRR:27 +1   | RRRR:50      | RRRR:27 +1   | RRRR:27 +1   | same
+76 | RRRRRW:50    | RRRRWW:50    | RRRRRW:50    | RRRRWW:50    | DIFF
+77 | RRRRW:50     | RRRRWW:50    | RRRRW:50     | RRRRR:48 +1  | DIFF
+79 | RRRRR:25 +2  | RRRR:26 +1   | RRRRR:25 +2  | RRRRR:25 +2  | DIFF
+7c | RRRRRR:50    | RRRRR:30 +1  | RRRRRR:50    | RRRRRR:50    | DIFF
+7d | RRRRR:28 +2  | RRRR:30 +1   | RRRRR:28 +2  | RRRRR:28 +2  | DIFF
+7e | RRRRRW:26 +1 | RRRRRWW:50   | RRRRRW:26 +1 | RRRRRW:26 +1 | DIFF
+7f | RRRRR:23 +2  | RRRRRWW:50   | RRRRR:23 +2  | RRRRR:21 +6  | DIFF
+87 | RRRRW:50     | RRW:50       | RRRRW:50     | RRRRR:50     | DIFF
+8f | RRRRR:24 +2  | RRRW:50      | RRRRR:24 +2  | RRRRR:24 +5  | DIFF
+91 | RRRRRW:50    | RRRRRW:50    | RRRRRW:50    | RRRRRW:50    | same
+97 | RRRRW:50     | RRRW:50      | RRRRW:50     | RRRRR:46 +1  | DIFF
+99 | RRRRW:50     | RRRRW:50     | RRRRW:50     | RRRRW:50     | same
+9d | RRRRW:50     | RRRRW:50     | RRRRW:50     | RRRRW:50     | same
+9e | RRRRW:50     | RRRRW:50     | RRRRW:50     | RRRRW:50     | same
+9f | RRRRR:29 +2  | RRRRW:50     | RRRRR:29 +2  | RRRRR:28 +5  | DIFF
+a7 | RRRRW:50     | RRR:50       | RRRRW:50     | RRRRR:50     | DIFF
+af | RRRRR:27 +2  | RRRR:50      | RRRRR:27 +2  | RRRRR:26 +6  | DIFF
+b1 | RRRRRR:25 +1 | RRRRRR:30 +1 | RRRRRR:25 +1 | RRRRRR:25 +1 | same
+b7 | RRRRW:50     | RRRR:50      | RRRRW:50     | RRRRR:48 +1  | DIFF
+b9 | RRRR:26 +1   | RRRRR:27 +1  | RRRR:26 +1   | RRRR:26 +1   | DIFF
+bc | RRRRR:26 +1  | RRRR:27 +1   | RRRRR:26 +1  | RRRRR:26 +1  | DIFF
+bd | RRRR:26 +1   | RRRR:28 +1   | RRRR:26 +1   | RRRR:26 +1   | same
+be | RRRRR:29 +1  | RRRR:26 +1   | RRRRR:29 +1  | RRRRR:29 +1  | DIFF
+bf | RRRRR:23 +2  | RRRRR:29 +1  | RRRRR:23 +2  | RRRRR:22 +4  | same
+c6 | RRRRW:50     | RRRWW:50     | RRRRW:50     | RRRWW:50     | DIFF
+c7 | RRRRW:50     | RRRWW:50     | RRRRW:50     | RRRRR:50     | DIFF
+ce | RRRRRW:50    | RRRRWW:50    | RRRRRR:50    | RRRRRR:43 +2 | DIFF
+cf | RRRRR:30 +2  | RRRRWW:50    | RRRRR:30 +3  | RRRRR:30 +3  | DIFF
+d1 | RRRRRR:25 +1 | RRRRRR:28 +1 | RRRRRR:25 +1 | RRRRRR:25 +1 | same
+d4 | RRRR:50      | RRRR:50      | RRRR:50      | RRRR:50      | same
+d6 | RRRRRW:50    | RRRRWW:50    | RRRRWR:50    | RRRRRR:46 +2 | DIFF
+d7 | RRRRW:50     | RRRRWW:50    | RRRRR:49 +1  | RRRRR:49 +1  | DIFF
+d9 | RRRR:26 +1   | RRRRR:25 +1  | RRWR:26 +1   | RRWR:26 +1   | DIFF
+dc | RRRR:50      | RRRR:26 +1   | RRRR:50      | RRRR:50      | same
+dd | RRRRR:27 +1  | RRRR:27 +1   | RRRRR:27 +1  | RRRRR:25 +2  | DIFF
+de | RRRRRRW:50   | RRRRRWW:50   | RRRRRRR:41 +3 | RRRRRRR:41 +4 | DIFF
+df | RRRRRR:24 +2 | RRRRRWW:50   | RRRRRR:24 +2 | RRRRRR:24 +2 | DIFF
+e1 | RRRRRRR:26 +1 | RRRRRR:50    | RRRRRRR:23 +5 | RRRRRR:23 +5 | DIFF
+e5 | RRR:27 +1    | RRR:50       | RRR:27 +1    | RRR:27 +1    | same
+e6 | RRRRW:50     | RRRWW:50     | RRRRR:48 +1  | RRRRR:48 +1  | DIFF
+e7 | RRRRW:50     | RRRWW:50     | RRRRR:50     | RRRRR:50     | DIFF
+e9 | RR:25 +1     | RR:50        | RR:25 +1     | RR:25 +1     | same
+ed | RRRR:26 +1   | RRRR:50      | RRRR:26 +1   | RRRR:26 +1   | same
+ee | RRRRRW:50    | RRRRWW:50    | RRRRRR:48 +1 | RRRRRR:46 +1 | DIFF
+ef | RRRRR:24 +2  | RRRRWW:50    | RRRRR:24 +2  | RRRRR:24 +2  | DIFF
+f1 | RRRRRR:23 +2 | RRRRR:29 +1  | RRRRRR:20 +5 | RRRRRR:19 +4 | DIFF
+f2 | RRRRRR:29 +1 | RRRRRRRRRRR:50 | RRRRRR:29 +1 | RRRRRR:26 +4 | DIFF
+f4 | RRRR:50      | RRRR:50      | RRRR:50      | RRRR:50      | same
+f5 | RRRR:30 +1   | RRRR:50      | RRRR:30 +1   | RRRR:30 +2   | same
+f6 | RRRRRW:50    | RRRRWW:50    | RRRRRR:45 +1 | RRRRRR:43 +1 | DIFF
+f7 | RRRRW:50     | RRRRWW:50    | RRRRR:50     | RRRRR:50     | DIFF
+f9 | RRRRR:21 +2  | RRRRR:27 +1  | RRRRR:19 +5  | RRRRR:19 +5  | same
+fc | RRRR:50      | RRRR:25 +1   | RRRR:50      | RRRR:50      | same
+fd | RRRRR:26 +2  | RRRRR:30 +1  | RRRRR:26 +2  | RRRRR:26 +2  | same
+fe | RRRRRRW:50   | RRRRRWW:50   | n/a          | n/a          | DIFF
+ff | RRRRR:29 +2  | RRRRRWW:50   | n/a          | n/a          | DIFF
+
+opcodes where WDC suite diverges from 6502 suite: 79/109

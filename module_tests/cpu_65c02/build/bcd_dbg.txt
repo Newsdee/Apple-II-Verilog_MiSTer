@@ -1,0 +1,22 @@
+ DBG pre-capture cyc=0 en=0 PC=6204 myAddr=6204 A=00 S=00 nmiReg=1 irqReg=1 procIrq=0 irqAct=0 opcIRQ=0 di=69
+ DBG c0 cyc=0 en=0 PC=6204 myAddr=6204 A=00 S=00 nwe=0 di=69 nmiReg=1 irqReg=1 procIrq=0 irqAct=0 opcIRQ=0
+ DBG c1 cyc=1 en=1 PC=6204 myAddr=6205 A=00 S=00 nwe=0 di=90 nmiReg=1 irqReg=1 procIrq=0 irqAct=0 opcIRQ=0
+ DBG c2 cyc=0 en=1 PC=6206 myAddr=6206 A=6b S=9e nwe=0 di=2e nmiReg=1 irqReg=1 procIrq=0 irqAct=0 opcIRQ=0
+ DBG c3 cyc=1 en=1 PC=6206 myAddr=6207 A=61 S=9e nwe=0 di=ee nmiReg=1 irqReg=1 procIrq=0 irqAct=0 opcIRQ=0
+ DBG c4 cyc=2 en=1 PC=6208 myAddr=6208 A=61 S=9e nwe=0 di=ee nmiReg=1 irqReg=1 procIrq=0 irqAct=0 opcIRQ=0
+ DBG c5 cyc=8 en=1 PC=6209 myAddr=eeee A=61 S=9e nwe=0 di=ee nmiReg=1 irqReg=1 procIrq=0 irqAct=0 opcIRQ=0
+ DBG c6 cyc=10 en=1 PC=6209 myAddr=eeee A=61 S=9e nwe=1 di=ee nmiReg=1 irqReg=1 procIrq=0 irqAct=0 opcIRQ=0
+ DBG c7 cyc=12 en=1 PC=6209 myAddr=eeee A=61 S=9e nwe=1 di=ee nmiReg=1 irqReg=1 procIrq=0 irqAct=0 opcIRQ=0
+ DBG c8 cyc=0 en=1 PC=6209 myAddr=6209 A=61 S=9e nwe=0 di=ee nmiReg=1 irqReg=1 procIrq=0 irqAct=0 opcIRQ=0
+ DBG c9 cyc=1 en=1 PC=6209 myAddr=620a A=61 S=9e nwe=0 di=ee nmiReg=1 irqReg=1 procIrq=0 irqAct=0 opcIRQ=0
+ DBG c10 cyc=2 en=1 PC=620b myAddr=620b A=61 S=9e nwe=0 di=ee nmiReg=1 irqReg=1 procIrq=0 irqAct=0 opcIRQ=0
+ DBG c11 cyc=8 en=1 PC=620c myAddr=eeee A=61 S=9e nwe=0 di=dd nmiReg=1 irqReg=1 procIrq=0 irqAct=0 opcIRQ=0
+ DBG c12 cyc=10 en=1 PC=620c myAddr=eeee A=61 S=9e nwe=1 di=dd nmiReg=1 irqReg=1 procIrq=0 irqAct=0 opcIRQ=0
+ DBG c13 cyc=12 en=1 PC=620c myAddr=eeee A=61 S=9e nwe=1 di=dd nmiReg=1 irqReg=1 procIrq=0 irqAct=0 opcIRQ=0
+ DBG c14 cyc=0 en=1 PC=620c myAddr=620c A=61 S=9e nwe=0 di=ee nmiReg=1 irqReg=1 procIrq=0 irqAct=0 opcIRQ=0
+ DBG c15 cyc=1 en=1 PC=620c myAddr=620d A=61 S=9e nwe=0 di=ee nmiReg=1 irqReg=1 procIrq=0 irqAct=0 opcIRQ=0
+R65Cx2 sst batch complete
+- module_tests/cpu_65c02\r65cx2_sst_tb.sv:196: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.050 2026-07-01
+- Verilator: $finish at 1us; walltime 0.001 s; speed 1.013 ms/s
+- Verilator: cpu 0.000 s on 1 threads; allocated 5 MB

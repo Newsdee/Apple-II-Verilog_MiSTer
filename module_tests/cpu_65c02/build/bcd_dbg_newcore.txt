@@ -1,0 +1,22 @@
+dbg_idx=0
+ DBG c0 st=0 ir=00 dl=00 ea=0000 ic=0 n8=0 sync=0 pc=6204
+ DBG c1 st=1 ir=69 dl=00 ea=0000 ic=0 n8=0 sync=0 pc=6205
+ DBG c2 st=11 ir=69 dl=00 ea=0000 ic=0 n8=0 sync=0 pc=6206
+ DBG c3 st=0 ir=69 dl=00 ea=0000 ic=0 n8=0 sync=1 pc=6206
+ DBG c4 st=1 ir=2e dl=00 ea=0000 ic=0 n8=0 sync=0 pc=6207
+ DBG c5 st=4 ir=2e dl=ee ea=0000 ic=0 n8=0 sync=0 pc=6208
+ DBG c6 st=10 ir=2e dl=ee ea=eeee ic=0 n8=0 sync=0 pc=6209
+ DBG c7 st=12 ir=2e dl=ee ea=eeee ic=0 n8=0 sync=0 pc=6209
+ DBG c8 st=13 ir=2e dl=ee ea=eeee ic=0 n8=0 sync=0 pc=6209
+ DBG c9 st=0 ir=2e dl=ee ea=eeee ic=0 n8=0 sync=1 pc=6209
+ DBG c10 st=1 ir=ee dl=ee ea=eeee ic=0 n8=0 sync=0 pc=620a
+ DBG c11 st=4 ir=ee dl=ee ea=eeee ic=0 n8=0 sync=0 pc=620b
+ DBG c12 st=10 ir=ee dl=ee ea=eeee ic=0 n8=0 sync=0 pc=620c
+ DBG c13 st=12 ir=ee dl=dd ea=eeee ic=0 n8=0 sync=0 pc=620c
+ DBG c14 st=13 ir=ee dl=dd ea=eeee ic=0 n8=0 sync=0 pc=620c
+ DBG c15 st=0 ir=ee dl=dd ea=eeee ic=0 n8=0 sync=1 pc=620c
+cpu_65c02 sst batch complete
+- module_tests/cpu_65c02\cpu65_sst_tb.sv:206: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.050 2026-07-01
+- Verilator: $finish at 851ns; walltime 0.001 s; speed 851.468 us/s
+- Verilator: cpu 0.000 s on 1 threads; allocated 5 MB

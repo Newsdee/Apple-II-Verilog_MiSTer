@@ -1,0 +1,567 @@
+{
+ "0f": [
+  750,
+  [
+   "cyc3: addr 04AE != expected 00EB",
+   "cyc3: data 05 != expected E6",
+   "cyc4: addr 04AF != expected 04AE",
+   "cyc4: data 7B != expected 05"
+  ]
+ ],
+ "11": [
+  850,
+  [
+   "cyc4: addr 9947 != expected 7C5C",
+   "cyc4: data EE != expected AF",
+   "cyc4: illegal access 9947"
+  ]
+ ],
+ "19": [
+  1250,
+  [
+   "cyc3: addr F51D != expected 50EB",
+   "cyc3: data EE != expected F5",
+   "cyc3: illegal access F51D"
+  ]
+ ],
+ "1d": [
+  1450,
+  [
+   "cyc3: addr 0490 != expected 1EE8",
+   "cyc3: data EE != expected 04",
+   "cyc3: illegal access 0490"
+  ]
+ ],
+ "1e": [
+  1501,
+  [
+   "cyc3: addr 7719 != expected A658",
+   "cyc3: data EE != expected 77",
+   "cyc3: illegal access 7719"
+  ]
+ ],
+ "1f": [
+  1550,
+  [
+   "cyc3: addr 42F0 != expected 0038",
+   "cyc3: data C9 != expected 0F",
+   "cyc4: addr 42F1 != expected 42F0",
+   "cyc4: data EE != expected C9",
+   "cyc4: illegal access 42F1"
+  ]
+ ],
+ "2f": [
+  2350,
+  [
+   "cyc3: addr 24EB != expected 00DE",
+   "cyc3: data D9 != expected D7",
+   "cyc4: addr 24EC != expected 24EB",
+   "cyc4: data EE != expected D9",
+   "cyc4: illegal access 24EC"
+  ]
+ ],
+ "31": [
+  2450,
+  [
+   "cyc4: addr CCF5 != expected 8BF8",
+   "cyc4: data EE != expected 19",
+   "cyc4: illegal access CCF5"
+  ]
+ ],
+ "39": [
+  2852,
+  [
+   "cyc3: addr 7EAC != expected 3C9A",
+   "cyc3: data EE != expected 7E",
+   "cyc3: illegal access 7EAC"
+  ]
+ ],
+ "3c": [
+  3000,
+  [
+   "cyc3: addr F97C != expected B1EB",
+   "cyc3: data EE != expected F9",
+   "cyc3: illegal access F97C"
+  ]
+ ],
+ "3d": [
+  3050,
+  [
+   "cyc3: addr D110 != expected C5DE",
+   "cyc3: data EE != expected D1",
+   "cyc3: illegal access D110"
+  ]
+ ],
+ "3e": [
+  3102,
+  [
+   "cyc3: addr 0021 != expected A6D4",
+   "cyc3: data EE != expected 00",
+   "cyc3: illegal access 0021"
+  ]
+ ],
+ "3f": [
+  3150,
+  [
+   "cyc3: addr 4970 != expected 009F",
+   "cyc3: data A0 != expected 81",
+   "cyc4: addr 4971 != expected 4970",
+   "cyc4: data CE != expected A0"
+  ]
+ ],
+ "4f": [
+  3950,
+  [
+   "cyc3: addr 5FA5 != expected 00FD",
+   "cyc3: data C3 != expected BA",
+   "cyc4: addr 5FA6 != expected 5FA5",
+   "cyc4: data EE != expected C3",
+   "cyc4: illegal access 5FA6"
+  ]
+ ],
+ "51": [
+  4051,
+  [
+   "cyc4: addr 49C2 != expected 6010",
+   "cyc4: data EE != expected 97",
+   "cyc4: illegal access 49C2"
+  ]
+ ],
+ "59": [
+  4454,
+  [
+   "cyc3: addr CF53 != expected F82A",
+   "cyc3: data EE != expected CF",
+   "cyc3: illegal access CF53"
+  ]
+ ],
+ "5c": [
+  4600,
+  [
+   "cyc3: addr 5AC9 != expected D221",
+   "cyc3: data EE != expected 5A",
+   "cyc3: illegal access 5AC9"
+  ]
+ ],
+ "5d": [
+  4650,
+  [
+   "cyc3: addr F54D != expected 4A6B",
+   "cyc3: data EE != expected F5",
+   "cyc3: illegal access F54D"
+  ]
+ ],
+ "5e": [
+  4701,
+  [
+   "cyc3: addr 7F57 != expected EA6A",
+   "cyc3: data EE != expected 7F",
+   "cyc3: illegal access 7F57"
+  ]
+ ],
+ "5f": [
+  4750,
+  [
+   "cyc3: addr C003 != expected 0014",
+   "cyc3: data 25 != expected 05",
+   "cyc4: addr C004 != expected C003",
+   "cyc4: data 0D != expected 25"
+  ]
+ ],
+ "61": [
+  4850,
+  [
+   "cyc6: addr 18BC != expected C3A5",
+   "cyc6: data 95 != expected 34"
+  ]
+ ],
+ "65": [
+  5050,
+  [
+   "cyc3: addr E353 != expected 0025",
+   "cyc3: data 3E != expected DA",
+   "final p 7D != 2D (masked)"
+  ]
+ ],
+ "69": [
+  5254,
+  [
+   "cyc2: addr 6206 != expected 007F",
+   "cyc2: data 2E != expected 0E"
+  ]
+ ],
+ "6c": [
+  5400,
+  [
+   "cyc4: addr D1EC != expected D1ED",
+   "cyc4: data 12 != expected 7D"
+  ]
+ ],
+ "6d": [
+  5453,
+  [
+   "cyc4: addr 6A27 != expected 05D7",
+   "cyc4: data 3D != expected C5"
+  ]
+ ],
+ "6f": [
+  5550,
+  [
+   "cyc3: addr 48F3 != expected 002C",
+   "cyc3: data F1 != expected 40",
+   "cyc4: addr 48F4 != expected 48F3",
+   "cyc4: data EE != expected F1",
+   "cyc4: illegal access 48F4"
+  ]
+ ],
+ "71": [
+  5650,
+  [
+   "cyc4: addr F366 != expected 6FB1",
+   "cyc4: data EE != expected 39",
+   "cyc4: illegal access F366",
+   "cyc6: addr 6FB2 != expected F466",
+   "cyc6: data E8 != expected E6",
+   "final p B9 != E9 (masked)"
+  ]
+ ],
+ "72": [
+  5700,
+  [
+   "cyc5: addr E256 != expected 67F9",
+   "cyc5: data AB != expected 2E"
+  ]
+ ],
+ "75": [
+  5852,
+  [
+   "cyc4: addr 2B72 != expected 0024",
+   "cyc4: data 49 != expected C3"
+  ]
+ ],
+ "79": [
+  6050,
+  [
+   "cyc3: addr 7C1E != expected 59D2",
+   "cyc3: data EE != expected 7C",
+   "cyc3: illegal access 7C1E"
+  ]
+ ],
+ "7c": [
+  6200,
+  [
+   "cyc3: addr E137 != expected E135",
+   "cyc3: data EE != expected 85",
+   "cyc3: illegal access E137"
+  ]
+ ],
+ "7d": [
+  6250,
+  [
+   "cyc3: addr 2E3D != expected 4898",
+   "cyc3: data EE != expected 2E",
+   "cyc3: illegal access 2E3D"
+  ]
+ ],
+ "7e": [
+  6301,
+  [
+   "cyc3: addr F06C != expected 489F",
+   "cyc3: data EE != expected F0",
+   "cyc3: illegal access F06C"
+  ]
+ ],
+ "7f": [
+  6350,
+  [
+   "cyc3: addr 75A0 != expected 00BC",
+   "cyc3: data EA != expected E5",
+   "cyc4: addr 75A1 != expected 75A0",
+   "cyc4: data EE != expected EA",
+   "cyc4: illegal access 75A1"
+  ]
+ ],
+ "8f": [
+  7150,
+  [
+   "cyc3: addr 50E1 != expected 001F",
+   "cyc3: data 6B != expected D6",
+   "cyc4: addr 50E2 != expected 50E1",
+   "cyc4: data EE != expected 6B",
+   "cyc4: illegal access 50E2"
+  ]
+ ],
+ "91": [
+  7250,
+  [
+   "cyc4: addr 50AF != expected CF4B",
+   "cyc4: data EE != expected BE"
+  ]
+ ],
+ "99": [
+  7650,
+  [
+   "cyc3: addr 9099 != expected 5DE1",
+   "cyc3: data EE != expected 90",
+   "cyc3: illegal access 9099"
+  ]
+ ],
+ "9d": [
+  7850,
+  [
+   "cyc3: addr 4B06 != expected DEE8",
+   "cyc3: data EE != expected 4B",
+   "cyc3: illegal access 4B06"
+  ]
+ ],
+ "9e": [
+  7900,
+  [
+   "cyc3: addr 1369 != expected 86D7",
+   "cyc3: data EE != expected 13"
+  ]
+ ],
+ "9f": [
+  7950,
+  [
+   "cyc3: addr 79CC != expected 005E",
+   "cyc3: data F1 != expected AA",
+   "cyc4: addr 79CD != expected 79CC",
+   "cyc4: data E3 != expected F1"
+  ]
+ ],
+ "af": [
+  8750,
+  [
+   "cyc3: addr 23EB != expected 00D0",
+   "cyc3: data 51 != expected D8",
+   "cyc4: addr 23EC != expected 23EB",
+   "cyc4: data EE != expected 51",
+   "cyc4: illegal access 23EC"
+  ]
+ ],
+ "b1": [
+  8850,
+  [
+   "cyc4: addr EE1F != expected CE3A",
+   "cyc4: data EE != expected E0",
+   "cyc4: illegal access EE1F"
+  ]
+ ],
+ "b9": [
+  9250,
+  [
+   "cyc3: addr EA0A != expected AD5E",
+   "cyc3: data EE != expected EA",
+   "cyc3: illegal access EA0A"
+  ]
+ ],
+ "bc": [
+  9403,
+  [
+   "cyc3: addr 391E != expected 88FA",
+   "cyc3: data EE != expected 39",
+   "cyc3: illegal access 391E"
+  ]
+ ],
+ "bd": [
+  9451,
+  [
+   "cyc3: addr 5DC3 != expected 25B7",
+   "cyc3: data EE != expected 5D",
+   "cyc3: illegal access 5DC3"
+  ]
+ ],
+ "be": [
+  9500,
+  [
+   "cyc3: addr CF2F != expected 9D56",
+   "cyc3: data EE != expected CF",
+   "cyc3: illegal access CF2F"
+  ]
+ ],
+ "bf": [
+  9550,
+  [
+   "cyc3: addr A144 != expected 0060",
+   "cyc3: data B6 != expected EE",
+   "cyc4: addr A145 != expected A144",
+   "cyc4: data F9 != expected B6",
+   "cyc6: addr A1FB != expected A145",
+   "cyc6: data EE != expected F9"
+  ]
+ ],
+ "cf": [
+  10300,
+  [
+   "cyc3: addr 0CB7 != expected 00CA",
+   "cyc3: data CF != expected 7E",
+   "cyc4: addr 0CB8 != expected 0CB7",
+   "cyc4: data 88 != expected CF"
+  ]
+ ],
+ "d1": [
+  10400,
+  [
+   "cyc4: addr 8674 != expected 5A12",
+   "cyc4: data EE != expected A6",
+   "cyc4: illegal access 8674"
+  ]
+ ],
+ "d9": [
+  10800,
+  [
+   "cyc3: addr BC9B != expected 0EA3",
+   "cyc3: data EE != expected BC",
+   "cyc3: illegal access BC9B"
+  ]
+ ],
+ "dc": [
+  10900,
+  [
+   "cyc3: addr C2BF != expected 0C12",
+   "cyc3: data EE != expected C2",
+   "cyc3: illegal access C2BF"
+  ]
+ ],
+ "dd": [
+  10950,
+  [
+   "cyc3: addr 9F06 != expected 3CA7",
+   "cyc3: data EE != expected 9F",
+   "cyc3: illegal access 9F06"
+  ]
+ ],
+ "de": [
+  11000,
+  [
+   "cyc3: addr B219 != expected C283",
+   "cyc3: data EE != expected B2",
+   "cyc3: illegal access B219"
+  ]
+ ],
+ "df": [
+  11050,
+  [
+   "cyc3: addr AB52 != expected 00F6",
+   "cyc3: data 19 != expected A1",
+   "cyc4: addr AB53 != expected AB52",
+   "cyc4: data 2B != expected 19"
+  ]
+ ],
+ "e1": [
+  11150,
+  [
+   "cyc6: addr FD07 != expected 4F4C",
+   "cyc6: data EE != expected E3",
+   "cyc6: illegal access FD07"
+  ]
+ ],
+ "e5": [
+  11350,
+  [
+   "cyc3: addr 8DCD != expected 0066",
+   "cyc3: data EE != expected 58",
+   "cyc3: illegal access 8DCD"
+  ]
+ ],
+ "e9": [
+  11552,
+  [
+   "cyc2: addr 0248 != expected 0000",
+   "cyc2: data EE != expected 4D",
+   "cyc2: illegal access 0248"
+  ]
+ ],
+ "ed": [
+  11750,
+  [
+   "cyc4: addr 4029 != expected 8BC1",
+   "cyc4: data EE != expected 11",
+   "cyc4: illegal access 4029"
+  ]
+ ],
+ "ef": [
+  11850,
+  [
+   "cyc3: addr 970C != expected 00D4",
+   "cyc3: data 82 != expected EA",
+   "cyc4: addr 970D != expected 970C",
+   "cyc4: data 2F != expected 82",
+   "cyc6: addr 978F != expected 970D",
+   "cyc6: data EE != expected 2F"
+  ]
+ ],
+ "f1": [
+  11950,
+  [
+   "cyc4: addr 7F51 != expected C978",
+   "cyc4: data EE != expected D4",
+   "cyc4: illegal access 7F51",
+   "cyc6: addr C979 != expected 8051",
+   "cyc6: data EE != expected 0D",
+   "cyc6: illegal access C979"
+  ]
+ ],
+ "f2": [
+  12000,
+  [
+   "cyc5: addr A928 != expected B6C5",
+   "cyc5: data EE != expected 45",
+   "cyc5: illegal access A928"
+  ]
+ ],
+ "f5": [
+  12150,
+  [
+   "cyc4: addr F966 != expected 001A",
+   "cyc4: data EE != expected BE",
+   "cyc4: illegal access F966"
+  ]
+ ],
+ "f9": [
+  12350,
+  [
+   "cyc3: addr 2359 != expected 158A",
+   "cyc3: data EE != expected 23",
+   "cyc3: illegal access 2359",
+   "cyc5: addr 158B != expected 2459",
+   "cyc5: data EE != expected 41",
+   "cyc5: illegal access 158B"
+  ]
+ ],
+ "fc": [
+  12500,
+  [
+   "cyc3: addr 80D1 != expected F28E",
+   "cyc3: data EE != expected 80",
+   "cyc3: illegal access 80D1"
+  ]
+ ],
+ "fd": [
+  12550,
+  [
+   "cyc4: addr 471F != expected B69A",
+   "cyc4: data EE != expected 6F",
+   "cyc4: illegal access 471F"
+  ]
+ ],
+ "fe": [
+  12600,
+  [
+   "cyc3: addr 7F1E != expected 09B7",
+   "cyc3: data EE != expected 7F",
+   "cyc3: illegal access 7F1E"
+  ]
+ ],
+ "ff": [
+  12650,
+  [
+   "cyc3: addr 2FAB != expected 00B6",
+   "cyc3: data 9B != expected 35",
+   "cyc4: addr 2FAC != expected 2FAB",
+   "cyc4: data EE != expected 9B",
+   "cyc4: illegal access 2FAC"
+  ]
+ ]
+}
