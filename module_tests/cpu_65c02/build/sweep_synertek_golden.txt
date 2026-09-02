@@ -1,0 +1,1675 @@
+batch: 12800 tests (reconstructed; see rebuild_summary.py)
+results parsed: 12800
+
+=== synertek65c02: 8125/12800 pass ===
+  00: PASS
+  01: PASS
+  02: PASS
+  03: PASS
+  04: FAIL 50/50
+    #200 [04 fd b0]
+      cyc3: rw W != expected read
+    #201 [04 c5 d9]
+      cyc3: rw W != expected read
+    #202 [04 92 57]
+      cyc3: rw W != expected read
+  05: PASS
+  06: FAIL 50/50
+    #300 [06 8e a9]
+      cyc3: rw W != expected read
+    #301 [06 24 7d]
+      cyc3: rw W != expected read
+    #302 [06 95 31]
+      cyc3: rw W != expected read
+  07: FAIL 50/50
+    #350 [07 6c 46]
+      cyc2: addr 6662 != expected 006C
+      cyc2: data 6C != expected F4
+      final pc 6664 != 6663
+    #351 [07 a3 07]
+      cyc2: addr CB83 != expected 00A3
+      cyc2: data A3 != expected C1
+    #352 [07 3f 1b]
+      cyc2: addr 8F84 != expected 003F
+      cyc2: data 3F != expected B4
+  08: PASS
+  09: PASS
+  0a: PASS
+  0b: PASS
+  0c: FAIL 50/50
+    #600 [0c 83 7b]
+      cyc4: rw W != expected read
+    #601 [0c b1 69]
+      cyc4: rw W != expected read
+    #602 [0c bc f7]
+      cyc4: rw W != expected read
+  0d: PASS
+  0e: FAIL 50/50
+    #700 [0e 3f 4a]
+      cyc4: rw W != expected read
+    #701 [0e 3b e4]
+      cyc4: rw W != expected read
+    #702 [0e 14 57]
+      cyc4: rw W != expected read
+  0f: FAIL 50/50
+    #750 [0f 8c 10]
+      cyc2: addr 958F != expected 9590
+      cyc2: data 8C != expected 10
+      complete: row 3 not a fetch at final pc 9591 (got 9590/R)
+    #751 [0f a2 cd]
+      cyc2: addr 10DF != expected 10E0
+      cyc2: data A2 != expected CD
+      complete: row 3 not a fetch at final pc 10E1 (got 10E0/R)
+    #752 [0f f4 87]
+      cyc2: addr BDCF != expected BDD0
+      cyc2: data F4 != expected 87
+      complete: row 3 not a fetch at final pc BDD1 (got BDD0/R)
+  10: PASS
+  11: FAIL 19/50
+    #850 [11 41 c6]
+      cyc4: addr EFA2 != expected 79B3
+      cyc4: data EE != expected 41
+      cyc4: illegal access EFA2
+    #855 [11 e5 c3]
+      cyc4: addr 2528 != expected 452B
+      cyc4: data EE != expected E5
+      cyc4: illegal access 2528
+    #856 [11 5e 8e]
+      cyc4: addr 4377 != expected 5FFE
+      cyc4: data EE != expected 5E
+      cyc4: illegal access 4377
+  12: PASS
+  13: PASS
+  14: FAIL 50/50
+    #1000 [14 f1 68]
+      cyc3: rw W != expected read
+    #1001 [14 1d 88]
+      cyc3: rw W != expected read
+    #1002 [14 f9 a0]
+      cyc3: rw W != expected read
+  15: PASS
+  16: FAIL 50/50
+    #1100 [16 d8 e8]
+      cyc4: rw W != expected read
+    #1101 [16 f9 e3]
+      cyc4: rw W != expected read
+    #1102 [16 57 06]
+      cyc4: rw W != expected read
+  17: FAIL 50/50
+    #1150 [17 b2 28]
+      cyc2: addr 19F3 != expected 00B2
+      cyc2: data B2 != expected 82
+      cyc3: addr 19F4 != expected 0096
+      cyc3: data 28 != expected 6A
+      final pc 19F5 != 19F4
+      complete: row 4 not a fetch at final pc 19F4 (got 0028/R)
+    #1151 [17 9f ba]
+      cyc2: addr 3A7C != expected 009F
+      cyc2: data 9F != expected EB
+      cyc3: addr 3A7D != expected 0055
+      cyc3: data BA != expected CE
+    #1152 [17 66 94]
+      cyc2: addr F184 != expected 0066
+      cyc2: data 66 != expected 4E
+      cyc3: addr F185 != expected 00BA
+      cyc3: data 94 != expected 7C
+      final pc F186 != F185
+      complete: row 4 not a fetch at final pc F185 (got 0094/R)
+  18: PASS
+  19: FAIL 29/50
+    #1251 [19 7f 96]
+      cyc3: addr 9665 != expected 0AB8
+      cyc3: data EE != expected 96
+      cyc3: illegal access 9665
+    #1255 [19 eb d8]
+      cyc3: addr D8BB != expected 1923
+      cyc3: data EE != expected D8
+      cyc3: illegal access D8BB
+    #1256 [19 90 1b]
+      cyc3: addr 1B7E != expected 7DB4
+      cyc3: data EE != expected 1B
+      cyc3: illegal access 1B7E
+  1a: PASS
+  1b: PASS
+  1c: FAIL 50/50
+    #1400 [1c 33 37]
+      cyc4: rw W != expected read
+    #1401 [1c b0 12]
+      cyc4: rw W != expected read
+    #1402 [1c f2 c2]
+      cyc4: rw W != expected read
+  1d: FAIL 29/50
+    #1450 [1d c7 d9]
+      cyc3: addr D920 != expected 1A57
+      cyc3: data EE != expected D9
+      cyc3: illegal access D920
+    #1451 [1d 73 02]
+      cyc3: addr 022A != expected 4C61
+      cyc3: data EE != expected 02
+      cyc3: illegal access 022A
+    #1452 [1d 8d 67]
+      cyc3: addr 6782 != expected E98D
+      cyc3: data EE != expected 67
+      cyc3: illegal access 6782
+  1e: FAIL 50/50
+    #1500 [1e ff 01]
+      cyc3: addr 013A != expected 1064
+      cyc3: data EE != expected 01
+      cyc3: illegal access 013A
+      cyc5: rw W != expected read
+    #1501 [1e fe 13]
+      cyc3: addr 1347 != expected B0BA
+      cyc3: data EE != expected 13
+      cyc3: illegal access 1347
+      cyc5: rw W != expected read
+    #1502 [1e 9e 38]
+      cyc3: addr 384E != expected 605B
+      cyc3: data EE != expected 38
+      cyc3: illegal access 384E
+      cyc5: rw W != expected read
+  1f: FAIL 50/50
+    #1550 [1f a8 7f]
+      cyc2: addr BCF9 != expected BCFA
+      cyc2: data A8 != expected 7F
+      final pc BCFA != BCFB
+      final y  5A != F6
+      final p 3D != 2F (masked)
+      complete: row 4 not a fetch at final pc BCFB (got BCFA/R)
+    #1551 [1f 22 b5]
+      cyc2: addr 5842 != expected 5843
+      cyc2: data 22 != expected B5
+    #1552 [1f 70 c1]
+      cyc2: addr CCA8 != expected CCA9
+      cyc2: data 70 != expected C1
+  20: PASS
+  21: PASS
+  22: PASS
+  23: PASS
+  24: PASS
+  25: PASS
+  26: FAIL 50/50
+    #1900 [26 cb d6]
+      cyc3: rw W != expected read
+    #1901 [26 fc fc]
+      cyc3: rw W != expected read
+    #1902 [26 13 a8]
+      cyc3: rw W != expected read
+  27: FAIL 50/50
+    #1950 [27 6b 84]
+      cyc2: addr 3F66 != expected 006B
+      cyc2: data 6B != expected B1
+    #1951 [27 cb fb]
+      cyc2: addr 68F3 != expected 00CB
+      cyc2: data CB != expected 27
+    #1952 [27 5f d0]
+      cyc2: addr 8892 != expected 005F
+      cyc2: data 5F != expected A5
+  28: PASS
+  29: PASS
+  2a: PASS
+  2b: PASS
+  2c: PASS
+  2d: PASS
+  2e: FAIL 50/50
+    #2300 [2e be 50]
+      cyc4: rw W != expected read
+    #2301 [2e 23 f8]
+      cyc4: rw W != expected read
+    #2302 [2e ef 97]
+      cyc4: rw W != expected read
+  2f: FAIL 50/50
+    #2350 [2f b2 84]
+      cyc2: addr 468F != expected 4690
+      cyc2: data B2 != expected 84
+      complete: row 3 not a fetch at final pc 4691 (got 4690/R)
+    #2351 [2f 8d 33]
+      cyc2: addr 036F != expected 0370
+      cyc2: data 8D != expected 33
+      complete: row 3 not a fetch at final pc 0371 (got 0370/R)
+    #2352 [2f 26 af]
+      cyc2: addr B62E != expected B62F
+      cyc2: data 26 != expected AF
+      complete: row 3 not a fetch at final pc B630 (got B62F/R)
+  30: PASS
+  31: FAIL 26/50
+    #2450 [31 c8 14]
+      cyc4: addr 9F33 != expected DD2D
+      cyc4: data EE != expected C8
+      cyc4: illegal access 9F33
+    #2451 [31 f8 c9]
+      cyc4: addr DE1C != expected 00AF
+      cyc4: data EE != expected F8
+      cyc4: illegal access DE1C
+    #2453 [31 31 5c]
+      cyc4: addr F439 != expected C4D5
+      cyc4: data EE != expected 31
+      cyc4: illegal access F439
+  32: PASS
+  33: PASS
+  34: PASS
+  35: PASS
+  36: FAIL 50/50
+    #2700 [36 d7 9a]
+      cyc4: rw W != expected read
+    #2701 [36 ae 81]
+      cyc4: rw W != expected read
+    #2702 [36 07 59]
+      cyc4: rw W != expected read
+  37: FAIL 50/50
+    #2750 [37 4e 7c]
+      cyc2: addr 4E64 != expected 004E
+      cyc2: data 4E != expected E5
+      cyc3: addr 4E65 != expected 009F
+      cyc3: data 7C != expected 44
+      final pc 4E67 != 4E65
+      complete: row 4 not a fetch at final pc 4E65 (got 4E66/R)
+    #2751 [37 b4 b9]
+      cyc2: addr DA8A != expected 00B4
+      cyc2: data B4 != expected E3
+      cyc3: addr DA8B != expected 002B
+      cyc3: data B9 != expected 64
+      final pc DA8C != DA8B
+      complete: row 4 not a fetch at final pc DA8B (got 00B9/R)
+    #2752 [37 e7 b5]
+      cyc2: addr 6A2E != expected 00E7
+      cyc2: data E7 != expected 31
+      cyc3: addr 6A2F != expected 00BB
+      cyc3: data B5 != expected B1
+  38: PASS
+  39: FAIL 28/50
+    #2850 [39 3c 66]
+      cyc3: addr 6618 != expected AED1
+      cyc3: data EE != expected 66
+      cyc3: illegal access 6618
+    #2851 [39 ed cc]
+      cyc3: addr CC2F != expected 8296
+      cyc3: data EE != expected CC
+      cyc3: illegal access CC2F
+    #2853 [39 ee b4]
+      cyc3: addr B488 != expected 5584
+      cyc3: data EE != expected B4
+      cyc3: illegal access B488
+  3a: PASS
+  3b: PASS
+  3c: FAIL 17/50
+    #3005 [3c ab 73]
+      cyc3: addr 7329 != expected 4EDD
+      cyc3: data EE != expected 73
+      cyc3: illegal access 7329
+    #3008 [3c a5 a9]
+      cyc3: addr A955 != expected E445
+      cyc3: data EE != expected A9
+      cyc3: illegal access A955
+    #3012 [3c 67 c2]
+      cyc3: addr C221 != expected D02C
+      cyc3: data EE != expected C2
+      cyc3: illegal access C221
+  3d: FAIL 31/50
+    #3050 [3d e3 da]
+      cyc3: addr DA80 != expected B419
+      cyc3: data EE != expected DA
+      cyc3: illegal access DA80
+    #3051 [3d 3c 52]
+      cyc3: addr 5206 != expected F7FD
+      cyc3: data EE != expected 52
+      cyc3: illegal access 5206
+    #3052 [3d c5 fc]
+      cyc3: addr FC0E != expected 92FE
+      cyc3: data EE != expected FC
+      cyc3: illegal access FC0E
+  3e: FAIL 50/50
+    #3100 [3e 45 87]
+      cyc5: data 5F != expected BE
+      complete: row 6 not a fetch at final pc 0667 (got 876A/W)
+      final ram[876A] = 95 != 190
+    #3101 [3e 7d 65]
+      cyc3: addr 657B != expected 21CE
+      cyc3: data EE != expected 65
+      cyc3: illegal access 657B
+      cyc5: rw W != expected read
+    #3102 [3e 48 08]
+      cyc3: addr 080A != expected 26FE
+      cyc3: data EE != expected 08
+      cyc3: illegal access 080A
+      cyc5: rw W != expected read
+  3f: FAIL 50/50
+    #3150 [3f c0 d1]
+      cyc2: addr 5EC6 != expected 5EC7
+      cyc2: data C0 != expected D1
+      final p F8 != E9 (masked)
+    #3151 [3f 3d 6a]
+      cyc2: addr 7EE7 != expected 7EE8
+      cyc2: data 3D != expected 6A
+      final pc 7EEA != 7EE9
+    #3152 [3f fa 36]
+      cyc2: addr 5BE2 != expected 5BE3
+      cyc2: data FA != expected 36
+      final pc 5BE3 != 5BE4
+      final sp 75 != 74
+      complete: row 4 not a fetch at final pc 5BE4 (got 0174/R)
+  40: FAIL 2/50
+    #3232 [40 44 6e]
+      cyc5: addr 0200 != expected 0100
+      cyc5: data EE != expected 16
+      cyc5: illegal access 0200
+      final pc EE24 != 1624
+      complete: row 6 not a fetch at final pc 1624 (got EE24/R)
+    #3241 [40 b1 0a]
+      cyc5: addr 0200 != expected 0100
+      cyc5: data EE != expected 00
+      cyc5: illegal access 0200
+      final pc EE6B != 006B
+      complete: row 6 not a fetch at final pc 006B (got EE6B/R)
+  41: PASS
+  42: PASS
+  43: PASS
+  44: FAIL 50/50
+    #3400 [44 2c 05]
+      cyc2: addr 28FD != expected 002C
+      cyc2: data 05 != expected A5
+      final pc 28FF != 28FD
+      complete: row 3 not a fetch at final pc 28FD (got 28FE/R)
+    #3401 [44 5b 66]
+      cyc2: addr F9A0 != expected 005B
+      cyc2: data 66 != expected F0
+      final pc F9A2 != F9A0
+      complete: row 3 not a fetch at final pc F9A0 (got F9A1/R)
+    #3402 [44 b0 45]
+      cyc2: addr 24FA != expected 00B0
+      cyc2: data 45 != expected 29
+      final pc 24FC != 24FA
+      complete: row 3 not a fetch at final pc 24FA (got 24FB/R)
+  45: PASS
+  46: FAIL 50/50
+    #3500 [46 55 4d]
+      cyc3: rw W != expected read
+    #3501 [46 5c 08]
+      cyc3: rw W != expected read
+    #3502 [46 69 d4]
+      cyc3: rw W != expected read
+  47: FAIL 50/50
+    #3550 [47 c8 60]
+      cyc2: addr 91AD != expected 00C8
+      cyc2: data C8 != expected 4C
+    #3551 [47 31 13]
+      cyc2: addr 98E3 != expected 0031
+      cyc2: data 31 != expected E1
+      final pc 98E5 != 98E4
+    #3552 [47 e2 c8]
+      cyc2: addr 9E37 != expected 00E2
+      cyc2: data E2 != expected D2
+      final pc 9E39 != 9E38
+  48: PASS
+  49: PASS
+  4a: PASS
+  4b: PASS
+  4c: PASS
+  4d: PASS
+  4e: FAIL 50/50
+    #3900 [4e 40 b0]
+      cyc4: rw W != expected read
+    #3901 [4e ab cb]
+      cyc4: rw W != expected read
+    #3902 [4e e8 af]
+      cyc4: rw W != expected read
+  4f: FAIL 50/50
+    #3950 [4f a6 47]
+      cyc2: addr 102F != expected 1030
+      cyc2: data A6 != expected 47
+      complete: row 3 not a fetch at final pc 1031 (got 1030/R)
+    #3951 [4f b3 2f]
+      cyc2: addr 630F != expected 6310
+      cyc2: data B3 != expected 2F
+      final pc 6310 != 6311
+      complete: row 3 not a fetch at final pc 6311 (got 6310/R)
+    #3952 [4f 32 39]
+      cyc2: addr 62A7 != expected 62A8
+      cyc2: data 32 != expected 39
+      complete: row 3 not a fetch at final pc 62A9 (got 62A8/R)
+  50: PASS
+  51: FAIL 23/50
+    #4051 [51 29 47]
+      cyc4: addr 3B00 != expected 24F9
+      cyc4: data EE != expected 29
+      cyc4: illegal access 3B00
+    #4052 [51 37 4c]
+      cyc4: addr 1293 != expected 5D8B
+      cyc4: data EE != expected 37
+      cyc4: illegal access 1293
+    #4053 [51 be 6d]
+      cyc4: addr D2AA != expected 197A
+      cyc4: data EE != expected BE
+      cyc4: illegal access D2AA
+  52: PASS
+  53: PASS
+  54: FAIL 50/50
+    #4200 [54 9d 4a]
+      cyc2: addr A8C8 != expected 009D
+      cyc2: data 4A != expected 95
+      cyc3: addr A8C9 != expected 006D
+      cyc3: data EE != expected 8A
+      cyc3: illegal access A8C9
+      final pc A8C9 != A8C8
+      final a  0D != 1B
+      final p 35 != 26 (masked)
+    #4201 [54 96 13]
+      cyc2: addr 9649 != expected 0096
+      cyc2: data 13 != expected 57
+      cyc3: addr 964A != expected 0026
+      cyc3: data EE != expected 97
+      cyc3: illegal access 964A
+      final pc 964A != 9649
+      complete: row 4 not a fetch at final pc 9649 (got 964A/R)
+    #4202 [54 d4 0c]
+      cyc2: addr 27FA != expected 00D4
+      cyc2: data 0C != expected B3
+      cyc3: addr 27FB != expected 00DA
+      cyc3: data EE != expected 36
+      cyc3: illegal access 27FB
+      final pc 27FD != 27FA
+      complete: row 4 not a fetch at final pc 27FA (got 27FC/R)
+  55: PASS
+  56: FAIL 50/50
+    #4300 [56 58 1c]
+      cyc4: rw W != expected read
+    #4301 [56 9f a5]
+      cyc4: rw W != expected read
+    #4302 [56 18 78]
+      cyc4: rw W != expected read
+  57: FAIL 50/50
+    #4350 [57 e2 56]
+      cyc2: addr D0CE != expected 00E2
+      cyc2: data E2 != expected 30
+      cyc3: addr D0CF != expected 0024
+      cyc3: data 56 != expected 46
+      final pc D0D0 != D0CF
+      complete: row 4 not a fetch at final pc D0CF (got D0D0/R)
+    #4351 [57 90 8e]
+      cyc2: addr F284 != expected 0090
+      cyc2: data 90 != expected 12
+      cyc3: addr F285 != expected 0073
+      cyc3: data 8E != expected 81
+      final pc F286 != F285
+      complete: row 4 not a fetch at final pc F285 (got F286/R)
+    #4352 [57 03 dc]
+      cyc2: addr 94BF != expected 0003
+      cyc2: data 03 != expected 9E
+      cyc3: addr 94C0 != expected 0042
+      cyc3: data DC != expected 4A
+  58: PASS
+  59: FAIL 25/50
+    #4451 [59 ea d3]
+      cyc3: addr D331 != expected 0223
+      cyc3: data EE != expected D3
+      cyc3: illegal access D331
+    #4456 [59 86 72]
+      cyc3: addr 7225 != expected 95DE
+      cyc3: data EE != expected 72
+      cyc3: illegal access 7225
+    #4457 [59 5a 7a]
+      cyc3: addr 7A3F != expected 993E
+      cyc3: data EE != expected 7A
+      cyc3: illegal access 7A3F
+  5a: PASS
+  5b: PASS
+  5c: FAIL 50/50
+    #4600 [5c b7 b2]
+      cyc3: addr B2B7 != expected ED65
+      cyc3: data EE != expected B2
+      cyc3: illegal access B2B7
+    #4601 [5c ad 1e]
+      cyc3: addr 1EAD != expected 7D52
+      cyc3: data EE != expected 1E
+      cyc3: illegal access 1EAD
+    #4602 [5c 11 78]
+      cyc3: addr 7811 != expected 8D1C
+      cyc3: data EE != expected 78
+      cyc3: illegal access 7811
+  5d: FAIL 20/50
+    #4651 [5d bd d8]
+      cyc3: addr D870 != expected 0890
+      cyc3: data EE != expected D8
+      cyc3: illegal access D870
+    #4654 [5d 99 ab]
+      cyc3: addr AB01 != expected 8C37
+      cyc3: data EE != expected AB
+      cyc3: illegal access AB01
+    #4660 [5d cf a2]
+      cyc3: addr A2C4 != expected 038C
+      cyc3: data EE != expected A2
+      cyc3: illegal access A2C4
+  5e: FAIL 50/50
+    #4700 [5e 2f 79]
+      cyc5: data 18 != expected 0C
+      complete: row 6 not a fetch at final pc 73E3 (got 79F4/W)
+      final ram[79F4] = 24 != 12
+    #4701 [5e f9 f3]
+      cyc3: addr F30F != expected 6A60
+      cyc3: data EE != expected F3
+      cyc3: illegal access F30F
+      cyc5: rw W != expected read
+    #4702 [5e 40 d3]
+      cyc5: data 30 != expected 18
+      final p 37 != 24 (masked)
+      complete: row 6 not a fetch at final pc BACA (got D3FB/W)
+      final ram[D3FB] = 48 != 24
+  5f: FAIL 50/50
+    #4750 [5f 2f e0]
+      cyc2: addr C908 != expected C909
+      cyc2: data 2F != expected E0
+      final pc C909 != C90A
+      complete: row 4 not a fetch at final pc C90A (got C909/R)
+    #4751 [5f 6d 93]
+      cyc2: addr A87A != expected A87B
+      cyc2: data 6D != expected 93
+      final pc A87D != A87C
+    #4752 [5f 74 a4]
+      cyc2: addr 0500 != expected 0501
+      cyc2: data 74 != expected A4
+      complete: row 4 not a fetch at final pc 0502 (got 00A4/R)
+  60: PASS
+  61: FAIL 27/50
+    #4850 [61 cb 08]
+      cyc6: addr 50F0 != expected 9F42
+      cyc6: data 08 != expected A6
+      final pc 50F1 != 50F0
+      final sp 4E != 4F
+      complete: row 7 not a fetch at final pc 50F0 (got 50F1/R)
+    #4851 [61 f7 28]
+      cyc6: addr 4B50 != expected 72BA
+      cyc6: data 28 != expected 04
+      final pc 4B51 != 4B50
+      final sp 70 != 6F
+      complete: row 7 not a fetch at final pc 4B50 (got 4B51/R)
+    #4852 [61 5e 41]
+      cyc6: addr 2ECB != expected 5BE4
+      cyc6: data 41 != expected 84
+      final pc 2ECD != 2ECB
+      complete: row 7 not a fetch at final pc 2ECB (got 2ECC/R)
+  62: PASS
+  63: PASS
+  64: PASS
+  65: FAIL 26/50
+    #5051 [65 57 07]
+      cyc3: addr F28D != expected 0057
+      cyc3: data 07 != expected D6
+      final pc F28E != F28D
+      complete: row 4 not a fetch at final pc F28D (got F28E/R)
+    #5052 [65 75 11]
+      cyc3: addr EFE5 != expected 0075
+      cyc3: data 11 != expected A3
+      final pc EFE7 != EFE5
+      complete: row 4 not a fetch at final pc EFE5 (got EFE6/R)
+    #5053 [65 81 b4]
+      cyc3: addr 0111 != expected 0081
+      cyc3: data B4 != expected BD
+      final pc 0113 != 0111
+      complete: row 4 not a fetch at final pc 0111 (got 0112/R)
+  66: FAIL 50/50
+    #5100 [66 0b 5b]
+      cyc3: rw W != expected read
+    #5101 [66 1d 8e]
+      cyc3: rw W != expected read
+    #5102 [66 7b 65]
+      cyc3: rw W != expected read
+  67: FAIL 50/50
+    #5150 [67 87 41]
+      cyc2: addr F021 != expected 0087
+      cyc2: data 87 != expected D3
+    #5151 [67 7b f5]
+      cyc2: addr 5363 != expected 007B
+      cyc2: data 7B != expected 66
+    #5152 [67 58 b7]
+      cyc2: addr B62A != expected 0058
+      cyc2: data 58 != expected FC
+  68: PASS
+  69: FAIL 26/50
+    #5252 [69 09 d8]
+      cyc2: addr 5D7F != expected 0056
+      cyc2: data D8 != expected 03
+      final pc 5D80 != 5D7F
+      complete: row 3 not a fetch at final pc 5D7F (got 5D80/R)
+    #5253 [69 0b 62]
+      cyc2: addr 7A32 != expected 0056
+      cyc2: data 62 != expected BC
+      final pc 7A34 != 7A32
+      complete: row 3 not a fetch at final pc 7A32 (got 7A33/R)
+    #5254 [69 0b c4]
+      cyc2: addr 9891 != expected 0056
+      cyc2: data C4 != expected C1
+      final pc 9893 != 9891
+      complete: row 3 not a fetch at final pc 9891 (got 9892/R)
+  6a: PASS
+  6b: PASS
+  6c: FAIL 50/50
+    #5400 [6c 37 99]
+      cyc5: addr 81D8 != expected 9938
+      cyc5: data E7 != expected 81
+      final pc 81D9 != 81D8
+      complete: row 6 not a fetch at final pc 81D8 (got 81D9/R)
+    #5401 [6c f8 c8]
+      cyc5: addr 465B != expected C8F9
+      cyc5: data E9 != expected 46
+      final pc 465D != 465B
+      complete: row 6 not a fetch at final pc 465B (got 465C/R)
+    #5402 [6c 39 d1]
+      cyc5: addr 8044 != expected D13A
+      cyc5: data 6E != expected 80
+      final pc 8046 != 8044
+      complete: row 6 not a fetch at final pc 8044 (got 8045/R)
+  6d: FAIL 25/50
+    #5452 [6d 2c 1b]
+      cyc4: addr EC23 != expected 1B2C
+      cyc4: data 25 != expected C4
+      final pc EC25 != EC23
+      complete: row 5 not a fetch at final pc EC23 (got EC24/R)
+    #5454 [6d 16 83]
+      cyc4: addr 3BD0 != expected 8316
+      cyc4: data 02 != expected 3A
+      final pc 3BD2 != 3BD0
+      complete: row 5 not a fetch at final pc 3BD0 (got 3BD1/R)
+    #5455 [6d da ce]
+      cyc4: addr F43B != expected CEDA
+      cyc4: data 3D != expected 3A
+      final pc F43D != F43B
+      complete: row 5 not a fetch at final pc F43B (got F43C/R)
+  6e: FAIL 50/50
+    #5500 [6e 30 e7]
+      cyc4: rw W != expected read
+    #5501 [6e 10 be]
+      cyc4: rw W != expected read
+    #5502 [6e 08 6a]
+      cyc4: rw W != expected read
+  6f: FAIL 50/50
+    #5550 [6f 33 97]
+      cyc2: addr 6F35 != expected 6F36
+      cyc2: data 33 != expected 97
+      final pc 6F36 != 6F37
+      complete: row 3 not a fetch at final pc 6F37 (got 6F36/R)
+    #5551 [6f c9 c2]
+      cyc2: addr 3075 != expected 3076
+      cyc2: data C9 != expected C2
+      complete: row 3 not a fetch at final pc 3077 (got 3076/R)
+    #5552 [6f 8d bb]
+      cyc2: addr A489 != expected A48A
+      cyc2: data 8D != expected BB
+      complete: row 3 not a fetch at final pc A48B (got A48A/R)
+  70: PASS
+  71: FAIL 38/50
+    #5650 [71 c7 ac]
+      cyc4: addr 76AD != expected 0436
+      cyc4: data EE != expected C7
+      cyc4: illegal access 76AD
+    #5651 [71 eb 02]
+      cyc4: addr E8ED != expected 37AE
+      cyc4: data EE != expected EB
+      cyc4: illegal access E8ED
+    #5652 [71 f0 e9]
+      cyc4: addr 8057 != expected 1814
+      cyc4: data EE != expected F0
+      cyc4: illegal access 8057
+      cyc6: addr 1815 != expected 8157
+      cyc6: data E9 != expected DB
+      final pc 1817 != 1815
+      complete: row 7 not a fetch at final pc 1815 (got 1816/R)
+  72: FAIL 21/50
+    #5703 [72 df 0f]
+      cyc5: addr FEAD != expected CAE9
+      cyc5: data 0F != expected 79
+      final pc FEAE != FEAD
+      complete: row 6 not a fetch at final pc FEAD (got FEAE/R)
+    #5704 [72 46 31]
+      cyc5: addr 407A != expected B70E
+      cyc5: data 31 != expected CD
+      final pc 407C != 407A
+      complete: row 6 not a fetch at final pc 407A (got 407B/R)
+    #5705 [72 5e 65]
+      cyc5: addr DFFC != expected 379B
+      cyc5: data 65 != expected 83
+      final pc DFFE != DFFC
+      complete: row 6 not a fetch at final pc DFFC (got DFFD/R)
+  73: PASS
+  74: PASS
+  75: FAIL 26/50
+    #5850 [75 12 85]
+      cyc4: addr 6CE1 != expected 0039
+      cyc4: data 85 != expected 5A
+      final pc 6CE3 != 6CE1
+      complete: row 5 not a fetch at final pc 6CE1 (got 6CE2/R)
+    #5851 [75 7f 4c]
+      cyc4: addr 4EE9 != expected 00D2
+      cyc4: data 4C != expected F6
+      final pc 4EEB != 4EE9
+      complete: row 5 not a fetch at final pc 4EE9 (got 4EEA/R)
+    #5852 [75 83 97]
+      cyc4: addr A936 != expected 0098
+      cyc4: data 97 != expected 4E
+      final pc A937 != A936
+      complete: row 5 not a fetch at final pc A936 (got A937/R)
+  76: FAIL 50/50
+    #5900 [76 33 e3]
+      cyc4: rw W != expected read
+    #5901 [76 c6 c2]
+      cyc4: rw W != expected read
+    #5902 [76 ed 1d]
+      cyc4: rw W != expected read
+  77: FAIL 50/50
+    #5950 [77 c0 5f]
+      cyc2: addr 22AD != expected 00C0
+      cyc2: data C0 != expected 06
+      cyc3: addr 22AE != expected 00EC
+      cyc3: data 5F != expected 42
+      final pc 22AF != 22AE
+      complete: row 4 not a fetch at final pc 22AE (got 22AF/R)
+    #5951 [77 92 3c]
+      cyc2: addr 67CA != expected 0092
+      cyc2: data 92 != expected 41
+      cyc3: addr 67CB != expected 00BA
+      cyc3: data 3C != expected 1B
+      final pc 67CC != 67CB
+      complete: row 4 not a fetch at final pc 67CB (got 003C/R)
+    #5952 [77 a3 44]
+      cyc2: addr E1F0 != expected 00A3
+      cyc2: data A3 != expected E7
+      cyc3: addr E1F1 != expected 00B4
+      cyc3: data 44 != expected 31
+  78: PASS
+  79: FAIL 32/50
+    #6051 [79 ce 98]
+      cyc3: addr 9886 != expected 51A0
+      cyc3: data EE != expected 98
+      cyc3: illegal access 9886
+      cyc5: addr 51A1 != expected 9986
+      cyc5: data C9 != expected AF
+      final pc 51A3 != 51A1
+      complete: row 6 not a fetch at final pc 51A1 (got 51A2/R)
+    #6054 [79 69 91]
+      cyc3: addr 910D != expected A35D
+      cyc3: data EE != expected 91
+      cyc3: illegal access 910D
+      cyc5: addr A35E != expected 920D
+      cyc5: data 6C != expected 14
+      final pc A360 != A35E
+      complete: row 6 not a fetch at final pc A35E (got A35F/R)
+    #6056 [79 00 87]
+      cyc4: addr 18C6 != expected 87A5
+      cyc4: data C2 != expected 25
+      final pc 18C8 != 18C6
+      complete: row 5 not a fetch at final pc 18C6 (got 18C7/R)
+  7a: PASS
+  7b: PASS
+  7c: FAIL 50/50
+    #6200 [7c 07 e3]
+      cyc3: addr E3E0 != expected B42A
+      cyc3: data 5B != expected 07
+      cyc4: addr E3E1 != expected E3E0
+      cyc4: data 33 != expected 5B
+      cyc5: addr 335B != expected E3E1
+      cyc5: data 16 != expected 33
+      final pc 335D != 335B
+      complete: row 6 not a fetch at final pc 335B (got 335C/R)
+    #6201 [7c 92 1b]
+      cyc3: addr 1C3A != expected 5E14
+      cyc3: data F9 != expected 92
+      cyc4: addr 1C3B != expected 1C3A
+      cyc4: data 19 != expected F9
+      cyc5: addr 19F9 != expected 1C3B
+      cyc5: data 5D != expected 19
+      final pc 19FB != 19F9
+      complete: row 6 not a fetch at final pc 19F9 (got 19FA/R)
+    #6202 [7c 12 41]
+      cyc3: addr 413C != expected 54AB
+      cyc3: data C1 != expected 12
+      cyc4: addr 413D != expected 413C
+      cyc4: data 84 != expected C1
+      cyc5: addr 84C1 != expected 413D
+      cyc5: data 51 != expected 84
+      final pc 84C3 != 84C1
+      complete: row 6 not a fetch at final pc 84C1 (got 84C2/R)
+  7d: FAIL 32/50
+    #6250 [7d 40 fd]
+      cyc4: addr 0EBF != expected FD66
+      cyc4: data DB != expected 0D
+      final pc 0EC0 != 0EBF
+      complete: row 5 not a fetch at final pc 0EBF (got 0EC0/R)
+    #6253 [7d bf c1]
+      cyc3: addr C149 != expected 38EB
+      cyc3: data EE != expected C1
+      cyc3: illegal access C149
+    #6254 [7d de 7b]
+      cyc4: addr F300 != expected 7BED
+      cyc4: data 42 != expected AF
+      final pc F302 != F300
+      complete: row 5 not a fetch at final pc F300 (got F301/R)
+  7e: FAIL 50/50
+    #6300 [7e 36 aa]
+      cyc3: addr AA30 != expected 88A4
+      cyc3: data EE != expected AA
+      cyc3: illegal access AA30
+      cyc5: rw W != expected read
+    #6301 [7e f6 31]
+      cyc3: addr 31B1 != expected FB31
+      cyc3: data EE != expected 31
+      cyc3: illegal access 31B1
+      cyc5: rw W != expected read
+    #6302 [7e 5c 1d]
+      cyc5: data 70 != expected 38
+      complete: row 6 not a fetch at final pc 7F0C (got 1D6D/W)
+      final ram[1D6D] = 112 != 56
+  7f: FAIL 50/50
+    #6350 [7f 69 96]
+      cyc2: addr 941B != expected 941C
+      cyc2: data 69 != expected 96
+      final a  8E != F8
+      final p B1 != 60 (masked)
+    #6351 [7f da 17]
+      cyc2: addr 80BB != expected 80BC
+      cyc2: data DA != expected 17
+      final pc 80BC != 80BD
+      final sp 2B != 2C
+      complete: row 4 not a fetch at final pc 80BD (got 012C/W)
+    #6352 [7f 27 e0]
+      cyc2: addr DCD5 != expected DCD6
+      cyc2: data 27 != expected E0
+      final pc DCD6 != DCD7
+      complete: row 4 not a fetch at final pc DCD7 (got DCD6/R)
+  80: PASS
+  81: PASS
+  82: PASS
+  83: PASS
+  84: PASS
+  85: PASS
+  86: PASS
+  87: FAIL 50/50
+    #6750 [87 fc 52]
+      cyc2: addr 327D != expected 00FC
+      cyc2: data FC != expected 34
+      final pc 327F != 327E
+    #6751 [87 f3 77]
+      cyc2: addr 48D6 != expected 00F3
+      cyc2: data F3 != expected E8
+    #6752 [87 29 86]
+      cyc2: addr E22F != expected 0029
+      cyc2: data 29 != expected 4A
+      final pc E231 != E230
+  88: PASS
+  89: PASS
+  8a: PASS
+  8b: PASS
+  8c: PASS
+  8d: PASS
+  8e: PASS
+  8f: FAIL 50/50
+    #7150 [8f 81 7d]
+      cyc2: addr C655 != expected C656
+      cyc2: data 81 != expected 7D
+      complete: row 3 not a fetch at final pc C657 (got C656/R)
+    #7151 [8f 2f e7]
+      cyc2: addr 8A6C != expected 8A6D
+      cyc2: data 2F != expected E7
+      final pc 8A6D != 8A6E
+      complete: row 3 not a fetch at final pc 8A6E (got 8A6D/R)
+    #7152 [8f 7b cf]
+      cyc2: addr 4088 != expected 4089
+      cyc2: data 7B != expected CF
+      final pc 4089 != 408A
+      complete: row 3 not a fetch at final pc 408A (got 4089/R)
+  90: PASS
+  91: FAIL 50/50
+    #7250 [91 c0 4c]
+      cyc4: addr 782F != expected 7467
+      cyc4: data EE != expected C0
+      cyc4: illegal access 782F
+    #7251 [91 74 e9]
+      cyc4: addr 1A0E != expected F7DF
+      cyc4: data EE != expected 74
+      cyc4: illegal access 1A0E
+    #7252 [91 4a ab]
+      cyc4: addr F1B7 != expected 060E
+      cyc4: data EE != expected 4A
+      cyc4: illegal access F1B7
+  92: PASS
+  93: PASS
+  94: PASS
+  95: PASS
+  96: PASS
+  97: FAIL 50/50
+    #7550 [97 ac 40]
+      cyc2: addr 5757 != expected 00AC
+      cyc2: data AC != expected AE
+      cyc3: addr 5758 != expected 0069
+      cyc3: data 40 != expected 2B
+      final pc 575A != 5758
+      complete: row 4 not a fetch at final pc 5758 (got 5759/R)
+    #7551 [97 10 e8]
+      cyc2: addr 3FD3 != expected 0010
+      cyc2: data 10 != expected D0
+      cyc3: addr 3FD4 != expected 0020
+      cyc3: data E8 != expected CB
+      final pc 3FD5 != 3FD4
+      complete: row 4 not a fetch at final pc 3FD4 (got 3FD5/R)
+    #7552 [97 b6 8b]
+      cyc2: addr 1011 != expected 00B6
+      cyc2: data B6 != expected F9
+      cyc3: addr 1012 != expected 002C
+      cyc3: data 8B != expected 17
+      final pc 1013 != 1012
+      complete: row 4 not a fetch at final pc 1012 (got 008B/R)
+  98: PASS
+  99: FAIL 50/50
+    #7650 [99 b3 87]
+      cyc3: addr 8760 != expected 5474
+      cyc3: data EE != expected 87
+      cyc3: illegal access 8760
+    #7651 [99 46 e1]
+      cyc3: addr E1FF != expected 3271
+      cyc3: data EE != expected E1
+    #7652 [99 1c 00]
+      cyc3: addr 001D != expected C32F
+      cyc3: data EE != expected 00
+  9a: PASS
+  9b: PASS
+  9c: PASS
+  9d: FAIL 50/50
+    #7850 [9d e3 13]
+      cyc3: addr 13D6 != expected 13B2
+      cyc3: data EE != expected 13
+      cyc3: illegal access 13D6
+    #7851 [9d e3 36]
+      cyc3: addr 36F1 != expected FE8C
+      cyc3: data EE != expected 36
+    #7852 [9d 18 ce]
+      cyc3: addr CE59 != expected EA9B
+      cyc3: data EE != expected CE
+  9e: FAIL 50/50
+    #7900 [9e 03 56]
+      cyc3: addr 56EB != expected 1819
+      cyc3: data EE != expected 56
+    #7901 [9e 1c 59]
+      cyc3: addr 594F != expected 7FE2
+      cyc3: data EE != expected 59
+    #7902 [9e 59 12]
+      cyc3: addr 1251 != expected 9903
+      cyc3: data EE != expected 12
+      cyc3: illegal access 1251
+  9f: FAIL 50/50
+    #7950 [9f b1 78]
+      cyc2: addr D6DB != expected D6DC
+      cyc2: data B1 != expected 78
+      complete: row 4 not a fetch at final pc D6DD (got 0078/R)
+    #7951 [9f 1f 93]
+      cyc2: addr CD22 != expected CD23
+      cyc2: data 1F != expected 93
+      final pc CD23 != CD24
+      complete: row 4 not a fetch at final pc CD24 (got CD23/R)
+    #7952 [9f f7 cf]
+      cyc2: addr 33D8 != expected 33D9
+      cyc2: data F7 != expected CF
+      final pc 33D9 != 33DA
+      complete: row 4 not a fetch at final pc 33DA (got 33D9/R)
+  a0: PASS
+  a1: PASS
+  a2: PASS
+  a3: PASS
+  a4: PASS
+  a5: PASS
+  a6: PASS
+  a7: FAIL 50/50
+    #8350 [a7 09 11]
+      cyc2: addr E017 != expected 0009
+      cyc2: data 09 != expected F1
+      final pc E019 != E018
+    #8351 [a7 48 1d]
+      cyc2: addr 2A70 != expected 0048
+      cyc2: data 48 != expected 1F
+      final sp B5 != B6
+    #8352 [a7 b1 ce]
+      cyc2: addr 5127 != expected 00B1
+      cyc2: data B1 != expected BD
+      final pc 5129 != 5128
+  a8: PASS
+  a9: PASS
+  aa: PASS
+  ab: PASS
+  ac: PASS
+  ad: PASS
+  ae: PASS
+  af: FAIL 50/50
+    #8750 [af 7a 31]
+      cyc2: addr 84A5 != expected 84A6
+      cyc2: data 7A != expected 31
+      final pc 84A6 != 84A7
+      final sp 4C != 4B
+      complete: row 3 not a fetch at final pc 84A7 (got 84A6/R)
+    #8751 [af b7 bc]
+      cyc2: addr 2396 != expected 2397
+      cyc2: data B7 != expected BC
+      final pc 2397 != 2398
+      complete: row 3 not a fetch at final pc 2398 (got 2397/R)
+    #8752 [af 55 95]
+      cyc2: addr 8543 != expected 8544
+      cyc2: data 55 != expected 95
+      complete: row 3 not a fetch at final pc 8545 (got 8544/R)
+  b0: PASS
+  b1: FAIL 24/50
+    #8853 [b1 55 93]
+      cyc4: addr 5F45 != expected 1170
+      cyc4: data EE != expected 55
+      cyc4: illegal access 5F45
+    #8858 [b1 21 e9]
+      cyc4: addr 7B7B != expected C77B
+      cyc4: data EE != expected 21
+      cyc4: illegal access 7B7B
+    #8860 [b1 67 0d]
+      cyc4: addr B9CE != expected 59AE
+      cyc4: data EE != expected 67
+      cyc4: illegal access B9CE
+  b2: PASS
+  b3: PASS
+  b4: PASS
+  b5: PASS
+  b6: PASS
+  b7: FAIL 50/50
+    #9150 [b7 2b 74]
+      cyc2: addr 5ECE != expected 002B
+      cyc2: data 2B != expected D9
+      cyc3: addr 5ECF != expected 00A7
+      cyc3: data 74 != expected 40
+    #9151 [b7 b0 ef]
+      cyc2: addr 3148 != expected 00B0
+      cyc2: data B0 != expected B8
+      cyc3: addr 3149 != expected 0028
+      cyc3: data EF != expected AB
+      final pc 314A != 3149
+      complete: row 4 not a fetch at final pc 3149 (got 314A/R)
+    #9152 [b7 bd b5]
+      cyc2: addr 6A71 != expected 00BD
+      cyc3: addr 6A72 != expected 00C0
+      cyc3: data B5 != expected 7E
+      final pc 6A74 != 6A72
+      complete: row 4 not a fetch at final pc 6A72 (got 6A73/R)
+  b8: PASS
+  b9: FAIL 26/50
+    #9250 [b9 84 82]
+      cyc3: addr 8276 != expected EF5A
+      cyc3: data EE != expected 82
+      cyc3: illegal access 8276
+    #9251 [b9 dd 19]
+      cyc3: addr 1939 != expected 3821
+      cyc3: data EE != expected 19
+      cyc3: illegal access 1939
+    #9254 [b9 a1 74]
+      cyc3: addr 748B != expected B4A1
+      cyc3: data EE != expected 74
+      cyc3: illegal access 748B
+  ba: PASS
+  bb: PASS
+  bc: FAIL 30/50
+    #9402 [bc ae d2]
+      cyc3: addr D291 != expected 3D4D
+      cyc3: data EE != expected D2
+      cyc3: illegal access D291
+    #9403 [bc 9c 0d]
+      cyc3: addr 0D37 != expected 8E52
+      cyc3: data EE != expected 0D
+      cyc3: illegal access 0D37
+    #9404 [bc bf 67]
+      cyc3: addr 677C != expected D943
+      cyc3: data EE != expected 67
+      cyc3: illegal access 677C
+  bd: FAIL 29/50
+    #9451 [bd a7 e6]
+      cyc3: addr E6A4 != expected 40A4
+      cyc3: data EE != expected E6
+      cyc3: illegal access E6A4
+    #9453 [bd 72 76]
+      cyc3: addr 764A != expected 86EB
+      cyc3: data EE != expected 76
+      cyc3: illegal access 764A
+    #9456 [bd 97 57]
+      cyc3: addr 5761 != expected B0A0
+      cyc3: data EE != expected 57
+      cyc3: illegal access 5761
+  be: FAIL 25/50
+    #9501 [be 5a 43]
+      cyc3: addr 4304 != expected 79EB
+      cyc3: data EE != expected 43
+      cyc3: illegal access 4304
+    #9503 [be 7b de]
+      cyc3: addr DE57 != expected 7601
+      cyc3: data EE != expected DE
+      cyc3: illegal access DE57
+    #9508 [be d9 b3]
+      cyc3: addr B35D != expected 83A9
+      cyc3: data EE != expected B3
+      cyc3: illegal access B35D
+  bf: FAIL 50/50
+    #9550 [bf 1d d6]
+      cyc2: addr B765 != expected B766
+      cyc2: data 1D != expected D6
+      final pc B768 != B767
+    #9551 [bf e5 78]
+      cyc2: addr 6B53 != expected 6B54
+      cyc2: data E5 != expected 78
+      complete: row 4 not a fetch at final pc 6B55 (got 0078/R)
+    #9552 [bf 1f 10]
+      cyc2: addr 1FDD != expected 1FDE
+      cyc2: data 1F != expected 10
+      final pc 1FDE != 1FDF
+      complete: row 4 not a fetch at final pc 1FDF (got 1FDE/R)
+  c0: PASS
+  c1: PASS
+  c2: PASS
+  c3: PASS
+  c4: PASS
+  c5: PASS
+  c6: FAIL 50/50
+    #9900 [c6 4c de]
+      cyc3: rw W != expected read
+    #9901 [c6 5d b8]
+      cyc3: rw W != expected read
+    #9902 [c6 c8 f0]
+      cyc3: rw W != expected read
+  c7: FAIL 50/50
+    #9950 [c7 db 2a]
+      cyc2: addr D273 != expected 00DB
+      cyc2: data DB != expected F1
+    #9951 [c7 e4 10]
+      cyc2: addr 97BE != expected 00E4
+      cyc2: data E4 != expected D8
+      final pc 97C0 != 97BF
+    #9952 [c7 7b 60]
+      cyc2: addr EEC9 != expected 007B
+      cyc2: data 7B != expected D4
+  c8: PASS
+  c9: PASS
+  ca: PASS
+  cb: PASS
+  cc: PASS
+  cd: PASS
+  ce: FAIL 50/50
+    #10300 [ce 2f 2e]
+      cyc4: rw W != expected read
+    #10301 [ce 2c 65]
+      cyc4: rw W != expected read
+    #10302 [ce 00 d2]
+      cyc4: rw W != expected read
+  cf: FAIL 50/50
+    #10350 [cf 01 36]
+      cyc2: addr D1AB != expected D1AC
+      cyc2: data 01 != expected 36
+      complete: row 3 not a fetch at final pc D1AD (got D1AC/R)
+    #10351 [cf b1 4e]
+      cyc2: addr B6C6 != expected B6C7
+      cyc2: data B1 != expected 4E
+      complete: row 3 not a fetch at final pc B6C8 (got B6C7/R)
+    #10352 [cf bc 6f]
+      cyc2: addr C6DC != expected C6DD
+      cyc2: data BC != expected 6F
+      complete: row 3 not a fetch at final pc C6DE (got C6DD/R)
+  d0: PASS
+  d1: FAIL 24/50
+    #10451 [d1 ec e0]
+      cyc4: addr 8488 != expected 6089
+      cyc4: data EE != expected EC
+      cyc4: illegal access 8488
+    #10452 [d1 4a ee]
+      cyc4: addr EF97 != expected B376
+      cyc4: data EE != expected 4A
+      cyc4: illegal access EF97
+    #10453 [d1 15 e3]
+      cyc4: addr BE17 != expected CE5C
+      cyc4: data EE != expected 15
+      cyc4: illegal access BE17
+  d2: PASS
+  d3: PASS
+  d4: FAIL 50/50
+    #10600 [d4 11 9a]
+      cyc2: addr A8B6 != expected 0011
+      cyc2: data 9A != expected D5
+      cyc3: addr A8B7 != expected 002A
+      cyc3: data EE != expected B4
+      cyc3: illegal access A8B7
+      final pc A8B7 != A8B6
+      final sp 19 != AE
+      complete: row 4 not a fetch at final pc A8B6 (got A8B7/R)
+    #10601 [d4 7c bc]
+      cyc2: addr 751A != expected 007C
+      cyc2: data BC != expected D0
+      cyc3: addr 751B != expected 00F3
+      cyc3: data EE != expected 73
+      cyc3: illegal access 751B
+      final pc 751D != 751A
+      complete: row 4 not a fetch at final pc 751A (got 751C/R)
+    #10602 [d4 ba 8b]
+      cyc2: addr 8B29 != expected 00BA
+      cyc2: data 8B != expected 56
+      cyc3: addr 8B2A != expected 0012
+      cyc3: data EE != expected 0C
+      cyc3: illegal access 8B2A
+      final pc 8B2A != 8B29
+      complete: row 4 not a fetch at final pc 8B29 (got 8B2A/R)
+  d5: PASS
+  d6: FAIL 50/50
+    #10700 [d6 60 2f]
+      cyc4: rw W != expected read
+    #10701 [d6 61 e9]
+      cyc4: rw W != expected read
+    #10702 [d6 4d c9]
+      cyc4: rw W != expected read
+  d7: FAIL 50/50
+    #10750 [d7 7d a6]
+      cyc2: addr B1C9 != expected 007D
+      cyc2: data 7D != expected 37
+      cyc3: addr B1CA != expected 0006
+      cyc3: data A6 != expected 5C
+      final pc B1CC != B1CA
+      complete: row 4 not a fetch at final pc B1CA (got B1CB/R)
+    #10751 [d7 35 e4]
+      cyc2: addr 81B8 != expected 0035
+      cyc2: data 35 != expected 92
+      cyc3: addr 81B9 != expected 00C6
+      cyc3: data E4 != expected 17
+      final pc 81BA != 81B9
+      complete: row 4 not a fetch at final pc 81B9 (got 00E4/R)
+    #10752 [d7 81 ca]
+      cyc2: addr 5A7E != expected 0081
+      cyc2: data 81 != expected 0E
+      cyc3: addr 5A7F != expected 00BA
+      cyc3: data CA != expected E5
+      final pc 5A80 != 5A7F
+      complete: row 4 not a fetch at final pc 5A7F (got 00CA/R)
+  d8: PASS
+  d9: FAIL 29/50
+    #10850 [d9 34 21]
+      cyc3: addr 2132 != expected 6DDC
+      cyc3: data EE != expected 21
+      cyc3: illegal access 2132
+    #10851 [d9 74 3f]
+      cyc3: addr 3F5D != expected C9D5
+      cyc3: data EE != expected 3F
+      cyc3: illegal access 3F5D
+    #10853 [d9 bb 49]
+      cyc3: addr 4980 != expected B96C
+      cyc3: data EE != expected 49
+      cyc3: illegal access 4980
+  da: PASS
+  db: FAIL 50/50
+    #10950 [db 8b 51]
+      cyc2: addr E5F9 != expected 008B
+      cyc2: data 8B != expected 76
+      cyc3: addr E5FA != expected 00D5
+      cyc3: data 51 != expected B1
+    #10951 [db 3f 59]
+      cyc2: addr 6F50 != expected 003F
+      cyc2: data 3F != expected 16
+      cyc3: addr 6F51 != expected 004F
+      cyc3: data 59 != expected C9
+    #10952 [db b3 3e]
+      cyc2: addr 3BAB != expected 00B3
+      cyc2: data B3 != expected 5E
+      cyc3: addr 3BAC != expected 003E
+      cyc3: data 3E != expected E2
+  dc: FAIL 50/50
+    #11000 [dc 80 fa]
+      cyc3: addr FA80 != expected 6630
+      cyc3: data EE != expected FA
+      cyc3: illegal access FA80
+    #11001 [dc 34 d2]
+      cyc3: addr D234 != expected 558F
+      cyc3: data EE != expected D2
+      cyc3: illegal access D234
+    #11002 [dc 8c 14]
+      cyc3: addr 148C != expected 4F39
+      cyc3: data EE != expected 14
+      cyc3: illegal access 148C
+  dd: FAIL 26/50
+    #11052 [dd f6 1b]
+      cyc3: addr 1BC4 != expected 6410
+      cyc3: data EE != expected 1B
+      cyc3: illegal access 1BC4
+    #11053 [dd 48 28]
+      cyc3: addr 283C != expected A292
+      cyc3: data EE != expected 28
+      cyc3: illegal access 283C
+    #11054 [dd f4 57]
+      cyc3: addr 57AE != expected 0492
+      cyc3: data EE != expected 57
+      cyc3: illegal access 57AE
+  de: FAIL 50/50
+    #11100 [de 04 77]
+      cyc3: addr 772B != expected 0A86
+      cyc3: data 8A != expected 77
+      cyc5: rw W != expected read
+    #11101 [de 7e ff]
+      cyc3: addr FFB3 != expected 8825
+      cyc3: data 4D != expected FF
+      cyc5: rw W != expected read
+    #11102 [de 8b bf]
+      cyc3: addr BF47 != expected 36D8
+      cyc3: data EE != expected BF
+      cyc3: illegal access BF47
+      cyc5: rw W != expected read
+  df: FAIL 50/50
+    #11150 [df e7 bb]
+      cyc2: addr A6A6 != expected A6A7
+      cyc2: data E7 != expected BB
+      final pc A6A7 != A6A8
+      complete: row 4 not a fetch at final pc A6A8 (got A6A7/R)
+    #11151 [df d5 51]
+      cyc2: addr E3D1 != expected E3D2
+      cyc2: data D5 != expected 51
+      complete: row 4 not a fetch at final pc E3D3 (got 0051/R)
+    #11152 [df 67 16]
+      cyc2: addr B42A != expected B42B
+      cyc2: data 67 != expected 16
+      final pc B42B != B42C
+      complete: row 4 not a fetch at final pc B42C (got B42B/R)
+  e0: PASS
+  e1: FAIL 26/50
+    #11253 [e1 8014]
+      cyc6: addr 24BB != expected C05A
+      cyc6: data EE != expected AF
+      cyc6: illegal access 24BB
+      final pc 24BD != 24BB
+      complete: row 7 not a fetch at final pc 24BB (got 24BC/R)
+    #11255 [e1 513]
+      cyc6: addr ACA4 != expected 346C
+      cyc6: data EE != expected 82
+      cyc6: illegal access ACA4
+      final pc ACA6 != ACA4
+      complete: row 7 not a fetch at final pc ACA4 (got ACA5/R)
+    #11258 [e1 2113]
+      cyc6: addr 4076 != expected F299
+      cyc6: data EE != expected 53
+      cyc6: illegal access 4076
+      final pc 4078 != 4076
+      complete: row 7 not a fetch at final pc 4076 (got 4077/R)
+  e2: PASS
+  e3: PASS
+  e4: PASS
+  e5: FAIL 25/50
+    #11452 [e5 9011]
+      cyc3: addr 8875 != expected 006E
+      cyc3: data EE != expected 7B
+      cyc3: illegal access 8875
+      final pc 8877 != 8875
+      complete: row 4 not a fetch at final pc 8875 (got 8876/R)
+    #11454 [e5 4138]
+      cyc3: addr 560A != expected 0068
+      cyc3: data EE != expected F2
+      cyc3: illegal access 560A
+      final pc 560C != 560A
+      complete: row 4 not a fetch at final pc 560A (got 560B/R)
+    #11462 [e5 862]
+      cyc3: addr 0EC1 != expected 0002
+      cyc3: data EE != expected EB
+      cyc3: illegal access 0EC1
+      final pc 0EC3 != 0EC1
+      complete: row 4 not a fetch at final pc 0EC1 (got 0EC2/R)
+  e6: FAIL 50/50
+    #11500 [e6 12 ee]
+      cyc3: rw W != expected read
+    #11501 [e6 6a 4d]
+      cyc3: rw W != expected read
+    #11502 [e6 9b d3]
+      cyc3: rw W != expected read
+  e7: FAIL 50/50
+    #11550 [e7 65 5f]
+      cyc2: addr 0820 != expected 0065
+      cyc2: data 65 != expected 9A
+      final pc 0822 != 0821
+    #11551 [e7 1b 62]
+      cyc2: addr 9F0D != expected 001B
+      cyc2: data 1B != expected D6
+    #11552 [e7 1f 49]
+      cyc2: addr E0D2 != expected 001F
+      cyc2: data 1F != expected 56
+  e8: PASS
+  e9: FAIL 19/50
+    #11650 [e9 5149]
+      cyc2: addr 58D1 != expected 0000
+      cyc2: data EE != expected 65
+      cyc2: illegal access 58D1
+      final pc 58D3 != 58D1
+      complete: row 3 not a fetch at final pc 58D1 (got 58D2/R)
+    #11651 [e9 4933]
+      cyc2: addr 1E38 != expected 0000
+      cyc2: data EE != expected 92
+      cyc2: illegal access 1E38
+      final pc 1E3A != 1E38
+      complete: row 3 not a fetch at final pc 1E38 (got 1E39/R)
+    #11652 [e9 8344]
+      cyc2: addr 7CCF != expected 0000
+      cyc2: data EE != expected F7
+      cyc2: illegal access 7CCF
+      final pc 7CD1 != 7CCF
+      complete: row 3 not a fetch at final pc 7CCF (got 7CD0/R)
+  ea: PASS
+  eb: PASS
+  ec: PASS
+  ed: FAIL 29/50
+    #11850 [ed 2436]
+      cyc4: addr 28A5 != expected AEC4
+      cyc4: data EE != expected A5
+      cyc4: illegal access 28A5
+      final pc 28A7 != 28A5
+      complete: row 5 not a fetch at final pc 28A5 (got 28A6/R)
+    #11851 [ed 6484]
+      cyc4: addr 202C != expected B36A
+      cyc4: data EE != expected 5A
+      cyc4: illegal access 202C
+      final pc 202E != 202C
+      complete: row 5 not a fetch at final pc 202C (got 202D/R)
+    #11852 [ed 5070]
+      cyc4: addr 2DA3 != expected 8A9D
+      cyc4: data EE != expected B0
+      cyc4: illegal access 2DA3
+      final pc 2DA5 != 2DA3
+      complete: row 5 not a fetch at final pc 2DA3 (got 2DA4/R)
+  ee: FAIL 50/50
+    #11900 [ee fc ce]
+      cyc4: rw W != expected read
+    #11901 [ee 11 a8]
+      cyc4: rw W != expected read
+    #11902 [ee 2f b8]
+      cyc4: rw W != expected read
+  ef: FAIL 50/50
+    #11950 [ef 2b b5]
+      cyc2: addr DF72 != expected DF73
+      cyc2: data 2B != expected B5
+      final pc DF73 != DF74
+      complete: row 3 not a fetch at final pc DF74 (got DF73/R)
+    #11951 [ef 17 22]
+      cyc2: addr 70FB != expected 70FC
+      cyc2: data 17 != expected 22
+      final pc 70FC != 70FD
+      complete: row 3 not a fetch at final pc 70FD (got 70FC/R)
+    #11952 [ef 14 0f]
+      cyc2: addr FE8E != expected FE8F
+      cyc2: data 14 != expected 0F
+      complete: row 3 not a fetch at final pc FE90 (got FE8F/R)
+  f0: PASS
+  f1: FAIL 39/50
+    #12050 [f1 9860]
+      cyc4: addr 4163 != expected E234
+      cyc4: data EE != expected 65
+      cyc4: illegal access 4163
+    #12051 [f1 9885]
+      cyc5: addr 615C != expected 77E4
+      cyc5: data EE != expected 00
+      cyc5: illegal access 615C
+      final pc 615E != 615C
+      complete: row 6 not a fetch at final pc 615C (got 615D/R)
+    #12053 [f1 3466]
+      cyc4: addr DD9E != expected 7DEB
+      cyc4: data EE != expected 1B
+      cyc4: illegal access DD9E
+      cyc6: addr 7DEC != expected DE9E
+      cyc6: data EE != expected A9
+      cyc6: illegal access 7DEC
+      final pc 7DEE != 7DEC
+      complete: row 7 not a fetch at final pc 7DEC (got 7DED/R)
+  f2: FAIL 21/50
+    #12100 [f2 1298]
+      cyc5: addr 0CE2 != expected 5FCD
+      cyc5: data EE != expected F3
+      cyc5: illegal access 0CE2
+      final pc 0CE4 != 0CE2
+      complete: row 6 not a fetch at final pc 0CE2 (got 0CE3/R)
+    #12102 [f2 5267]
+      cyc5: addr 4A75 != expected 69C4
+      cyc5: data EE != expected 48
+      cyc5: illegal access 4A75
+      final pc 4A77 != 4A75
+      complete: row 6 not a fetch at final pc 4A75 (got 4A76/R)
+    #12105 [f2 9582]
+      cyc5: addr B223 != expected A482
+      cyc5: data EE != expected A6
+      cyc5: illegal access B223
+      final pc B225 != B223
+      complete: row 6 not a fetch at final pc B223 (got B224/R)
+  f3: PASS
+  f4: FAIL 50/50
+    #12200 [f4 bf 46]
+      cyc2: addr 025B != expected 00BF
+      cyc2: data 46 != expected CA
+      cyc3: addr 025C != expected 003C
+      cyc3: data EE != expected 01
+      cyc3: illegal access 025C
+      final pc 025D != 025B
+      complete: row 4 not a fetch at final pc 025B (got 00EE/R)
+    #12201 [f4 fe 51]
+      cyc2: addr B075 != expected 00FE
+      cyc2: data 51 != expected 5A
+      cyc3: addr B076 != expected 0035
+      cyc3: data EE != expected BD
+      cyc3: illegal access B076
+      final pc B077 != B075
+      complete: row 4 not a fetch at final pc B075 (got 00EE/R)
+    #12202 [f4 61 9f]
+      cyc2: addr 6C7E != expected 0061
+      cyc2: data 9F != expected 8C
+      cyc3: addr 6C7F != expected 00B7
+      cyc3: data EE != expected 55
+      cyc3: illegal access 6C7F
+      final pc 6C7F != 6C7E
+      complete: row 4 not a fetch at final pc 6C7E (got 6C7F/R)
+  f5: FAIL 28/50
+    #12250 [f5 8817]
+      cyc4: addr 7B69 != expected 00D8
+      cyc4: data EE != expected 08
+      cyc4: illegal access 7B69
+      final pc 7B6B != 7B69
+      complete: row 5 not a fetch at final pc 7B69 (got 7B6A/R)
+    #12252 [f5 2585]
+      cyc4: addr 4858 != expected 0061
+      cyc4: data EE != expected 99
+      cyc4: illegal access 4858
+      final pc 485A != 4858
+      complete: row 5 not a fetch at final pc 4858 (got 4859/R)
+    #12255 [f5 5621]
+      cyc4: addr 61A3 != expected 000F
+      cyc4: data EE != expected B5
+      cyc4: illegal access 61A3
+      final pc 61A5 != 61A3
+      complete: row 5 not a fetch at final pc 61A3 (got 61A4/R)
+  f6: FAIL 50/50
+    #12300 [f6 43 40]
+      cyc4: rw W != expected read
+    #12301 [f6 3e 2d]
+      cyc4: rw W != expected read
+    #12302 [f6 f8 58]
+      cyc4: rw W != expected read
+  f7: FAIL 50/50
+    #12350 [f7 7b e4]
+      cyc2: addr 9A2D != expected 007B
+      cyc2: data 7B != expected 62
+      cyc3: addr 9A2E != expected 00CE
+      cyc3: data E4 != expected CF
+    #12351 [f7 0b a0]
+      cyc2: addr 6D7B != expected 000B
+      cyc2: data 0B != expected 38
+      cyc3: addr 6D7C != expected 00C0
+      cyc3: data A0 != expected D9
+    #12352 [f7 fe 41]
+      cyc2: addr 64AB != expected 00FE
+      cyc2: data FE != expected F4
+      cyc3: addr 64AC != expected 0030
+      cyc3: data 41 != expected 73
+      final pc 64AE != 64AC
+      complete: row 4 not a fetch at final pc 64AC (got 64AD/R)
+  f8: PASS
+  f9: FAIL 35/50
+    #12450 [f9 8230]
+      cyc3: addr 607E != expected 494C
+      cyc3: data EE != expected 60
+      cyc3: illegal access 607E
+    #12451 [f9 3772]
+      cyc3: addr 138C != expected 25F1
+      cyc3: data EE != expected 13
+      cyc3: illegal access 138C
+    #12452 [f9 2594]
+      cyc3: addr 5057 != expected 0FB7
+      cyc3: data EE != expected 50
+      cyc3: illegal access 5057
+  fa: PASS
+  fb: PASS
+  fc: FAIL 50/50
+    #12600 [fc f1 c5]
+      cyc3: addr C5F1 != expected 230E
+      cyc3: data EE != expected C5
+      cyc3: illegal access C5F1
+    #12601 [fc 26 e7]
+      cyc3: addr E726 != expected B5C9
+      cyc3: data EE != expected E7
+      cyc3: illegal access E726
+    #12602 [fc 0f 4c]
+      cyc3: addr 4C0F != expected DC3F
+      cyc3: data EE != expected 4C
+      cyc3: illegal access 4C0F
+  fd: FAIL 38/50
+    #12650 [fd 3453]
+      cyc3: addr 9E91 != expected AD50
+      cyc3: data EE != expected 9E
+      cyc3: illegal access 9E91
+    #12653 [fd 2607]
+      cyc4: addr A774 != expected 5824
+      cyc4: data EE != expected 9D
+      cyc4: illegal access A774
+      final pc A776 != A774
+      complete: row 5 not a fetch at final pc A774 (got A775/R)
+    #12654 [fd 36]
+      cyc4: addr 8430 != expected 0D67
+      cyc4: data EE != expected F7
+      cyc4: illegal access 8430
+      final pc 8432 != 8430
+      complete: row 5 not a fetch at final pc 8430 (got 8431/R)
+  fe: FAIL 50/50
+    #12700 [fe 57 9f]
+      cyc3: addr 9F0B != expected 8490
+      cyc3: data EE != expected 9F
+      cyc3: illegal access 9F0B
+      cyc5: rw W != expected read
+    #12701 [fe 15 76]
+      cyc3: addr 7657 != expected 34CF
+      cyc3: data F6 != expected 76
+      cyc5: rw W != expected read
+    #12702 [fe 9c 68]
+      cyc3: addr 6847 != expected 3B63
+      cyc3: data EE != expected 68
+      cyc3: illegal access 6847
+      cyc5: rw W != expected read
+  ff: FAIL 50/50
+    #12750 [ff 22 d2]
+      cyc2: addr 8869 != expected 886A
+      cyc2: data 22 != expected D2
+    #12751 [ff b1 bc]
+      cyc2: addr 5767 != expected 5768
+      cyc2: data B1 != expected BC
+      complete: row 4 not a fetch at final pc 5769 (got 00BC/R)
+    #12752 [ff 27 b6]
+      cyc2: addr 9BA6 != expected 9BA7
+      cyc2: data 27 != expected B6
+      final pc 9BA7 != 9BA8
+      complete: row 4 not a fetch at final pc 9BA8 (got 9BA7/R)

@@ -6,6 +6,12 @@ Resume point for the WDC 65x02 single-step harness work. Read this top to bottom
 shipped; nothing remains except user decisions (Quartus compile, I/O impact
 review, BCD N/V fix-or-document, commit-on-request).**
 
+**v2 UPDATE (2026-09-03): the user-provided `rtl/new_cpu_v2/` core has been
+swept on all four suites — it is the clear 65C02 match (WDC 12106/12700,
+Rockwell 12155/12800, Synertek 10964/12800 vs golden ~8.1k each; MOS 6283,
+−423 vs v1 by design). Full handover incl. the crash-point
+`final_offset` bug: `V2_HANDOVER.md`. Read that first for any v2 work.**
+
 1. **Step 6 — MOS (6502) suite sweep: DONE.** Both SST binaries run the full
    MOS suite with the identical selection scheme (sample=50 seed=1, 256 ops,
    12800 tests; the MOS files are clean of empty/>64-RAM cases). Raw results:

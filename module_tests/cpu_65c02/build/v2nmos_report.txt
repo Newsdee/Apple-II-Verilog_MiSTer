@@ -1,0 +1,10 @@
+# v2 WDC_MODE=0 (NMOS bus-convention mode) — MOS 6502 suite report
+# regenerated from retained raw results with the current sst_driver.compare()
+# (includes the instruction-complete check); raw results untouched.
+v2 WDC_MODE=0 vs golden (6502): both-pass=7749 both-fail=4827 v2nmos-only-pass=224 NEW-ONLY-FAIL(v2nmos loses)=0
+  new-only-fail ops (0): 
+WDC_MODE=0 vs WDC_MODE=1 (same v2 RTL, MOS suite): fixed=1990 regressed=0
+  fixed ops:   06:50 0e:50 16:50 1e:50 26:50 2e:50 36:50 3e:50 46:50 4e:50 56:50 5e:50 66:50 6c:50 6e:50 76:50 7e:50 91:50 99:50 9d:50 c6:50 ce:50 d6:50 de:50 e6:50 ee:50 f6:50 fe:50 51:30 b1:30 11:28 d1:28 b9:27 fd:27 f9:26 1d:25 59:25 71:25 d9:25 19:24 39:24 5d:24 be:24 bc:23 dd:23 00:22 79:22 bd:22 3d:21 31:20 7d:20 f1:20 3c:5
+  regressed:   none
+
+remaining new-only-fail kinds (v2nmos):

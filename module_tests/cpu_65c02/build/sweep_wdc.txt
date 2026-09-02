@@ -1,4 +1,4 @@
-batch: 12700 tests -> E:\MiSTer\Apple-II_FPGAdev\Apple-II-Verilog_MiSTer/module_tests/cpu_65c02/build/sst_batch.txt
+batch: 12700 tests (reconstructed; see rebuild_summary.py)
 results parsed: 12700
 
 === wdc65c02: 10302/12700 pass ===

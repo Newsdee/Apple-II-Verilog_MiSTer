@@ -1,5 +1,10 @@
 # 65C02 core — final verdict (SST sweep campaign closeout)
 
+> **Superseded for v2 claims:** this document covers the v1 core
+> (`rtl/new_cpu/`). See `V2_VERDICT.md` (2026-09-03) for the v2 verdict,
+> the strengthened instruction-completion checker, and the corrected
+> classifications (op 7c, JAM/SLO family, BCD −0x10, NMOS mode naming).
+
 Machine clock 2026-09-02. This document folds together the single-step-test
 campaign results (WDC + MOS suites), the r65-pair semantic equivalence, the
 T65 baseline, and the Priority-3 directed cases into one verdict on

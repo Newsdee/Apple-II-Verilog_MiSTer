@@ -6,6 +6,7 @@ cpu65_sst_tb.sv, runs the Verilator binary, and compares:
   * per-cycle bus operations (address, read/write, data) for the expected
     cycle count of each test,
   * illegal memory accesses (addresses outside initial.ram | final.ram),
+  * instruction completion (next opcode fetch at the expected final PC),
   * final register state (P compared with bits 7/4 masked).
 
 Usage:
@@ -66,7 +67,22 @@ def parse_results(path):
     return res
 
 def compare(test, groups, final_offset=0):
-    """Return list of failure strings (empty = pass)."""
+    """Return list of failure strings (empty = pass).
+
+    Checks, per test:
+      * per-cycle bus operations (addr, read/write, data) for the expected
+        cycle count,
+      * illegal memory accesses (addresses outside initial.ram | final.ram),
+      * instruction completion: row ncyc (the row of the next opcode
+        fetch, independent of final_offset, which only shifts the register
+        sampling row for R65Cx2's late A/flag commit) must be a READ at
+        the expected final PC. Catches instructions that overrun the
+        suite's expected cycle count (stray post-instruction activity the
+        per-cycle comparison never sees) and confirms the bus actually
+        reached the final PC,
+      * final register state (P compared with bits 7/4 masked),
+      * final RAM at the listed addresses.
+    """
     fails = []
     exp_cyc = test['cycles']
     ncyc = len(exp_cyc)
@@ -109,6 +125,15 @@ def compare(test, groups, final_offset=0):
     if y  != f['y']:  fails.append(f'final y  {y:02X} != {f["y"]:02X}')
     if (p & MASK_PB) != (f['p'] & MASK_PB):
         fails.append(f'final p {p:02X} != {f["p"]:02X} (masked)')
+
+    # instruction-complete check (see docstring): the next opcode fetch
+    # always lands on row ncyc; final_offset only shifts the register row.
+    if ncyc < W:
+        bus, _ = groups[ncyc]
+        if bus[4] != 'R' or int(bus[0:4], 16) != f['pc']:
+            fails.append('complete: row %d not a fetch at final pc %04X '
+                         '(got %04X/%s)' % (ncyc, f['pc'],
+                                            int(bus[0:4], 16), bus[4]))
 
     # final RAM at listed addresses
     for addr, val in test['final']['ram']:

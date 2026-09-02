@@ -1,0 +1,30 @@
+=== wdc65c02: sel=12700 v1lines=12700 v2lines=12700 goldlines=12700 (header 8093/12700)
+   golden pass total with final_offset=0: 1986
+   golden pass total with final_offset=1: 8093  <-- MATCHES header
+   verified golden final_offset = 1
+   v1: both-pass=8093 both-fail=1902 golden-only-fail=2705 NEW-ONLY-FAIL=0 (ops=0)
+   v2: both-pass=8093 both-fail=594 golden-only-fail=4013 NEW-ONLY-FAIL=0 (ops=0)
+
+=== 6502: sel=12800 v1lines=12800 v2lines=12800 goldlines=12800 (header 7869/12800)
+   golden pass total with final_offset=0: 2378
+   golden pass total with final_offset=1: 7869  <-- MATCHES header
+   verified golden final_offset = 1
+   v1: both-pass=6305 both-fail=4530 golden-only-fail=401 NEW-ONLY-FAIL=1564 (ops=43)
+      top ops: 06:50 0e:50 16:50 26:50 2e:50 36:50 3e:50 46:50 4e:50 56:50 5e:50 66:50
+   v2: both-pass=5882 both-fail=4530 golden-only-fail=401 NEW-ONLY-FAIL=1987 (ops=53)
+      top ops: 06:50 0e:50 16:50 26:50 2e:50 36:50 3e:50 46:50 4e:50 56:50 5e:50 66:50
+
+=== rockwell65c02: sel=12800 v1lines=12800 v2lines=12800 goldlines=12800 (header 8132/12800)
+   golden pass total with final_offset=0: 2023
+   golden pass total with final_offset=1: 8132  <-- MATCHES header
+   verified golden final_offset = 1
+   v1: both-pass=8132 both-fail=1971 golden-only-fail=2697 NEW-ONLY-FAIL=0 (ops=0)
+   v2: both-pass=8132 both-fail=645 golden-only-fail=4023 NEW-ONLY-FAIL=0 (ops=0)
+
+=== synertek65c02: sel=12800 v1lines=12800 v2lines=12800 goldlines=12800 (header 8125/12800)
+   golden pass total with final_offset=0: 1991
+   golden pass total with final_offset=1: 8125  <-- MATCHES header
+   verified golden final_offset = 1
+   v1: both-pass=8125 both-fail=2368 golden-only-fail=2307 NEW-ONLY-FAIL=0 (ops=0)
+   v2: both-pass=8125 both-fail=1836 golden-only-fail=2839 NEW-ONLY-FAIL=0 (ops=0)
+
