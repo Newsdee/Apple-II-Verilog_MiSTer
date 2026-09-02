@@ -70,6 +70,14 @@ FINAL_SKIP = {'P_B': 'structural constant 1 in new core (reg_p hardwires R=B=1)'
 CFLOW_OPS = ({0x20, 0x4C, 0x6C, 0x7C, 0x60, 0x40}             # JSR JMP* RTS RTI
              | {0x80, 0xF0, 0xD0, 0xB0, 0x90, 0x30, 0x10, 0x50, 0x70})  # BRA + branches
 
+# PLP/RTI write the flag registers mid-instruction at different phases in the
+# two TBs, so the one-fetch skew model breaks exactly at the boundary after a
+# PLP/RTI: there, golden_fetchrow[i] equals new_fetchrow[i] (both sides show
+# the post-writeback state at their own fetch row). Flag columns at those
+# boundaries accept the unshifted match and report it.
+PLP_RTI_OPS = {0x28, 0x40}
+FLAG_COLS = {'P_N', 'P_V', 'P_D', 'P_I', 'P_Z', 'P_C'}
+
 
 def fail(msg):
     print(f'ERROR: {msg}', file=sys.stderr)
@@ -172,6 +180,7 @@ def main():
 
     # ---- 2. fetch pairing --------------------------------------------------
     pair_ok = len(gf) == len(nf)
+    pair_note = None
     pair_mismatch = []
     m = min(len(gf), len(nf))
     for i in range(m):
@@ -180,7 +189,20 @@ def main():
                 f'fetch#{i}: G@{cyc(gf[i], gi)} {gf[i][gi["ADDR"]]}:{gf[i][gi["DI"]]}'
                 f' N@{cyc(nf[i], ni)} {nf[i][ni["ADDR"]]}:{nf[i][ni["DI"]]}')
     if not pair_ok:
-        problem('fetch_pair', f'fetch count differs: golden={len(gf)} new={len(nf)}')
+        # A whitelisted per-instruction length delta (LEN entry) shifts the
+        # park-loop phase, so one trace can fit an extra park fetch in the
+        # fixed window. Accept when every unmatched extra fetch repeats the
+        # last paired (addr, op) — both cores are parked in the same loop.
+        longer = gf if len(gf) > len(nf) else nf
+        idx_l = gi if len(gf) > len(nf) else ni
+        last = ((gf[m - 1][gi['ADDR']], gf[m - 1][gi['DI']]) if m else None)
+        ok_tail = (last is not None and
+                   all((r[idx_l['ADDR']], r[idx_l['DI']]) == last for r in longer[m:]))
+        if ok_tail:
+            pair_note = (f'fetch count differs golden={len(gf)} new={len(nf)} '
+                         f'(park-loop phase; extra rows repeat {last[0]}:{last[1]})')
+        else:
+            problem('fetch_pair', f'fetch count differs: golden={len(gf)} new={len(nf)}')
     for p in pair_mismatch[:10]:
         problem('fetch_pair', p)
     if len(pair_mismatch) > 10:
@@ -211,9 +233,11 @@ def main():
     # ---- 4. state at fetch boundaries --------------------------------------
     sp_unshifted = []
     cflow_pc = []
+    rti_flag_unshifted = []
     state_bad = []
     for i in range(1, m):
         g, nprev, ncur = gf[i], nf[i - 1], nf[i]
+        prev_op = int(gf[i - 1][gi['DI']], 16)
         for col in STATE_COLS:
             if col == 'SP':
                 if g[gi['SP']] == nprev[ni['SP']]:
@@ -225,7 +249,13 @@ def main():
                     continue
                 state_bad.append(f'fetch#{i} SP: G={g[gi["SP"]]} '
                                  f'N-shifted={nprev[ni["SP"]]} N-unshifted={ncur[ni["SP"]]}')
-            elif g[gi[col]] != nprev[ni['col'] if False else ni[col]]:
+            elif g[gi[col]] != nprev[ni[col]]:
+                if prev_op in PLP_RTI_OPS and col in FLAG_COLS \
+                        and g[gi[col]] == ncur[ni[col]]:
+                    rti_flag_unshifted.append(
+                        f'fetch#{i} {col}: G={g[gi[col]]} == N-unshifted '
+                        f'(PLP/RTI writeback phase)')
+                    continue
                 state_bad.append(
                     f'fetch#{i} {col}: G={g[gi[col]]} N-shifted={nprev[ni[col]]}')
         # PC column at the boundary row (last row of instruction i-1,
@@ -306,10 +336,30 @@ def main():
 
     # ---- 7. final row state -------------------------------------------------
     gl, nl = gr[-1], nr[-1]
+
+    def last_fetch_addr(rows, idx):
+        for r in reversed(rows):
+            if r[idx['SYNC']] == '1':
+                return int(r[idx['ADDR']], 16)
+        return None
+
+    g_last_a = last_fetch_addr(gr, gi)
+    n_last_a = last_fetch_addr(nr, ni)
     final_state = {}
     final_ok = True
     for col in ['PC', 'SP', 'A', 'X', 'Y', 'P_N', 'P_V', 'P_D', 'P_I', 'P_Z', 'P_C']:
         gv, nv = gl[gi[col]], nl[ni[col]]
+        if col == 'PC' and gv != nv and g_last_a is not None and g_last_a == n_last_a:
+            # Both cores ended in the same self-JMP park loop: the PC column
+            # cycles with the loop phase and the golden column lags one row,
+            # so equal last-fetch address plus a small column delta is loop
+            # phase, not an architectural difference (architectural PC is
+            # proven by fetch-pair identity).
+            dpc = (int(nv, 16) - int(gv, 16)) % 65536
+            if dpc <= 3 or dpc >= 65536 - 3:
+                final_state[col] = {'golden': gv, 'new': nv, 'equal': True,
+                                    'phase': f'park loop phase (last fetch {g_last_a:#04x})'}
+                continue
         final_state[col] = {'golden': gv, 'new': nv, 'equal': gv == nv}
         if gv != nv:
             final_ok = False
@@ -370,7 +420,8 @@ def main():
             },
             'fetch_pair_identity': {
                 'compared': m, 'mismatches': len(pair_mismatch),
-                'pass': pair_ok and not pair_mismatch,
+                'count_note': pair_note,
+                'pass': (pair_ok or pair_note is not None) and not pair_mismatch,
             },
             'instruction_length': {
                 'compared': max(0, m - 1), 'mismatches': len(len_bad),
@@ -378,13 +429,17 @@ def main():
             },
             'state_at_boundaries': {
                 'rule': 'golden_fetchrow[i] vs new_fetchrow[i-1] (one-fetch skew); '
-                        'SP also accepts unshifted; PC column dPC in {0,1} or cflow',
+                        'SP also accepts unshifted; flag columns after PLP/RTI '
+                        'also accept unshifted (writeback phase); '
+                        'PC column dPC in {0,1} or cflow',
                 'boundaries_compared': max(0, m - 1),
                 'mismatches': len(state_bad),
                 'sp_unshifted_reported': len(sp_unshifted),
                 'sp_unshifted': sp_unshifted[:20],
                 'cflow_pc_reported': len(cflow_pc),
                 'cflow_pc': cflow_pc[:20],
+                'rti_flag_unshifted_reported': len(rti_flag_unshifted),
+                'rti_flag_unshifted': rti_flag_unshifted[:20],
                 'pass': not state_bad,
             },
             'write_events': {

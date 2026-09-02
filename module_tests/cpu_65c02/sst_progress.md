@@ -2,6 +2,103 @@
 
 Resume point for the WDC 65x02 single-step harness work. Read this top to bottom, then continue at "Next steps".
 
+**Current state (2026-09-04): Priority 3 PHASE 1 DONE — all 8 directed cases green on the canonical base image.**
+`p3_cases.py` full run (MSYS Python from repo root): p3-brk PASS, p3-rti PASS,
+p3-irq-masked PASS, p3-irq-unmask EXPECTED, p3-nmi-priority EXPECTED,
+p3-nmi-during-irq EXPECTED, p3-adj-shift EXPECTED, p3-jmpax PASS (exit 0;
+artifacts per case under `build/p3/<case>/`, rollup `build/p3/summary.json`).
+Findings baked into the harness/checker this session:
+- **Stale-base-image artifact resolved.** The earlier 6-case FAIL batch ran
+  against a hex left by a crashed session (0600=`4C 08 09`, 0908=`08`); the
+  canonical `r65_mem_init.hex` (0600=`A1 D0 B1…`, 0908/090B self-JMP parks,
+  0A00-0B00 sequential filler) is restored and verified; every trace was
+  regenerated against it.
+- **Stack model verified on both cores:** push (PHA/PHP/BRK/interrupt entry)
+  = store at [S] then S←S-1; RTI = P←[S+1], PC_lo←[S+2], PC_hi←[S+3], S←S+3.
+- **RTI D-force expectation retracted.** R65Cx2's `T <= di|0x30` (calcT,
+  PLP/RTI) shows only transiently in T/dout; the D flag register is NOT
+  forced on either core — both restore N,V,D,I,Z,C identically from the stack
+  byte, and PHP pushes the B|D-forced status (30) on BOTH cores. p3-rti now
+  expects a clean pass (target = base's own `JMP $0908` at 0905; no park
+  clobber). The old `expect='rti-d-flag'` path was removed from evaluate().
+- **Entry-latency model confirmed** on all four pulse cases: golden has
+  exactly one extra dummy entry fetch per entry (its address equals that
+  entry's pushed return PC); the new core pushes one instruction earlier.
+  `check_entry_latency` resync: identical (addr,op) prefix, ≤1 extra golden
+  row per entry, push-triple pairing with return-PC delta ∈ {0,1,2} (status
+  must match at a shared boundary), park-loop tails (length delta ≤ 2 — the
+  new core parks earlier in the fixed 400-cycle window and gets more park
+  fetches; its remainder is tail, not a stream mismatch), final state equal
+  except PC within the park window.
+- **p3-jmpax redesigned** (old layout clobbered both base parks): stage 2
+  lives in the 0A0B filler region; ptr1 @0A07 → 0A0B; ptr2 @**0B00** —
+  `JMP ($0A01,X)` with X=FF computes EA = 0A01+FF = **0B00** (low-byte wrap
+  WITH page carry; the old comment "EA=0AFF" was an arithmetic error); target
+  = base park at 0908, untouched.
+- **semantic_compare.py additions** (behavior-preserving for previously
+  passing cases; all report-and-accept, never silent):
+  1. state_at_boundaries: after PLP/RTI, flag columns also accept the
+     UNSHIFTED match (writeback lands mid-instruction at different phases;
+     both cores agree at their own fetch row) — reported as
+     `rti_flag_unshifted`.
+  2. final_state: PC park-loop phase tolerance — if both last fetches are at
+     the same address and the PC-column delta ≤ 3, it is self-JMP loop phase
+     (golden PC column lags one row), reported, not failed. p3-brk's earlier
+     pass was a phase coincidence; this makes it robust.
+  3. fetch_pair: count mismatch accepted when every extra row of the longer
+     trace repeats the last paired (addr,op) — park-loop phase from
+     whitelisted LEN deltas (e.g. `LEN -1 7c`: JMP (abs,X) is 5c golden /
+     6c new; two instances shift the park entry by 2 cycles and one trace
+     fits one more park fetch in the window). Reported as `count_note`.
+- **Remaining for Priority 3:** phase 2 (TB plusargs `+RESETAT`, write-toggle
+  memory for mid-stream reset + side-effecting RMW), then closeout per the
+  recommendations doc. Then Priority 4 and the final verdict (next steps 5–7).
+
+**Current state (2026-09-03, cont. 3): Priority 3 STARTED — directed coverage gaps.**
+Both r65-pair TBs inspected for the case harness design:
+- `module_tests/cpu_65c02/cpu65_r65_tb.sv` (new core) and
+  `module_tests/r65c02/r65c02_verilog_tb.sv` (golden) both take plusargs
+  `+IRQPULSE=<cyc>` / `+NMIPULSE=<cyc>` (8-cycle pulse from <cyc>, 0 =
+  disabled) and `+TOTAL=<cyc>` (default 4000). Reset window is hardcoded to
+  cycles 0..3 in both (active-high sync in the new-core TB, active-low in
+  the golden TB).
+- **Both TBs hardcode the memory image path**
+  (`$readmemh("module_tests/r65c02/build/r65_mem_init.hex", mem)`)
+  **and the output trace path** (golden → `module_tests/r65c02/build/
+  verilog_trace.csv`, new core → `module_tests/cpu_65c02/build/
+  r65_trace.csv`), CWD = repo root. No rebuild needed for directed cases:
+  swap the hex file per case (back up + restore in a finally block), run
+  both exes with the same plusargs, copy both CSVs to
+  `module_tests/cpu_65c02/build/p3/<case>/` before the next run.
+- Golden TB header documents: "The DUT samples the interrupt lines only on
+  non-fetch/non-branch-taken cycles, so a 1-cycle pulse can be missed
+  depending on instruction phase" — relevant to IRQ/NMI timing cases; our
+  pulses are 8 cycles so they cannot be missed, but entry latency is
+  phase-dependent (that is what the cases measure).
+- New-core TB: `SYNC_IRQ = sync && int_seq` (int_active stays high through
+  the whole interrupt sequence); write commit at posedge where registered
+  `we` is high. Golden: write commit where registered `nwe` is low.
+- Mid-stream reset and side-effecting-I/O RMW cases REQUIRE TB changes
+  (proposed optional plusargs, behavior-preserving defaults): `+RESETAT=<cyc>`
+  (re-assert reset for 4 cycles at <cyc>, 0 = disabled) and a write-toggle
+  memory mode (e.g. `+WRTOGGLE=1`: write commit does `mem[addr] <= dout^1`,
+  so any extra write strobe changes the final byte — makes the golden RMW
+  pre-write visible to final write-map equality). Phase these after the
+  no-TB-change cases.
+Phase-1 case list (no TB change, hex-swap only): BRK push+vector entry;
+RTI restoration (read R65Cx2.sv RTI/BRK semantics first — R65Cx2 has
+documented non-standard RTI behavior); IRQ while masked + unmask timing;
+NMI/IRQ priority + NMI during IRQ handling; interrupt request adjacent to
+a length-differing instruction (.ax shift); JMP (abs,X) with X≠0, page
+carry near $FF, boundary addresses. Each case gets a coverage gate via
+`semantic_compare.py --gate NAME=ADDR` proving the intended path executed,
+plus case-specific expected-difference handling where a documented delta is
+the point of the case (e.g. RMW pre-write under WRTOGGLE).
+Harness file planned: `module_tests/cpu_65c02/p3_cases.py` (case table +
+hex patching from the original r65 image + run + compare + summary).
+
+**Current state (2026-09-03, cont. 2): Priority 2 DONE — `cpu_cycle_analysis.md` corrected** per the recommendations doc: narrowed headline (architectural vs bus-protocol equality separated), precise check names (final write-map equality ≠ transaction equality; ordered write events = 98 vs 70 rows, exactly 28 whitelisted RMW pre-writes), BRK marked source-level-only, RTI/interrupt-return marked not covered, IRQ vector fixed to `$FFFE/$FFFF`, 1504-fetch composition explained (766 distinct + 738 park-loop repetitions), §4.1 delta table now carries whitelist IDs shared with `semantic_whitelist.txt`. Next: Priority 3 directed coverage.
+
 **Current state (2026-09-03, continued): Priority 1 DONE — semantic checker built and validated.**
 New `module_tests/cpu_65c02/semantic_compare.py` + `semantic_whitelist.txt`
 (named entries). On the regenerated r65 pair it reports **PASS (exit 0)**:
@@ -315,17 +412,27 @@ The remaining work is now organized by `CPU_COMPARISON_RECOMMENDATIONS.md`
    initial whitelist = the §4.1 four-opcode table with stable IDs; "final
    write-map equality" as a separately named sub-check). Validate with a
    mutated-trace negative test before trusting it.
-3. **Priority 2 — correct `cpu_cycle_analysis.md`**: narrow headline to the
+3. ~~**Priority 2 — correct `cpu_cycle_analysis.md`**: narrow headline to the
    exact r65 stimulus; precise transaction wording; architectural vs
    bus-protocol separation; BRK = source-level reasoning; RTI/interrupt-return
    not covered; fix IRQ vector `$FFFC/$FFFD` → `$FFFE/$FFFF` (§4.4); explain
    1504 fetches = repeated park loop; accepted-differences table shares IDs
-   with the whitelist.
-4. **Priority 3 — directed coverage gaps**: BRK, RTI (document R65Cx2's
-   non-standard semantics first), IRQ masked/unmask timing, NMI edge +
-   priority, interrupt return/nesting, mid-stream reset at each phase,
-   JMP (abs,X) X≠0/cross/boundary, RMW into side-effecting I/O (write-strobe
-   counter in the TB memory model). Coverage gate per case.
+   with the whitelist.~~ **DONE 2026-09-03**: all eight items applied and
+   trace-verified (IRQ vector read at G cycles 736/737 = `$FFFE/$FFFF`;
+   park loop = 738 repeated fetches of the single `4C` @ $0908; 766
+   non-park fetches each at a distinct address: 760 program + 6 handler;
+   28 RMW pre-write instances enumerated per opcode in §4.1). Step 2 now
+   documents why fetch selection is `SYNC=1` alone (G marks the whole 7-row
+   entry sequence with SYNC_IRQ, N only the entry fetch + reset first
+   fetch); Step 4 carries the verified one-fetch skew rule; Step 5 renamed
+   to final write-map equality with the first-write-wins measurement
+   caution; §6 lists `semantic_compare.py` as the primary maintained gate.
+4. **Priority 3 — directed coverage gaps: PHASE 1 DONE (2026-09-04, see
+   state block at top); phase 2 remains.** Phase 1 shipped all eight no-TB-
+   change cases green (BRK, RTI, IRQ masked/unmask timing, NMI priority +
+   NMI-during-IRQ, adjacent length-delta IRQ, JMP (abs,X) wrap+carry). Phase
+   2 = optional-plusarg TB edits (`RESETAT`, write-toggle memory) for
+   mid-stream reset at each phase and RMW into side-effecting I/O.
 5. **Priority 4 — finish independent comparisons**: T65 VHDL→Verilog baseline
    first, then phase-A/B alignment; SST re-description as a 50-sample sweep;
    `build/fail_sigs.py` for the 30 both-suites-agree opcodes; provenance
