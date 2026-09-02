@@ -47,7 +47,7 @@ module hdd(
     input             RD;
     input      [7:0]  D_IN;
     output reg [7:0]  D_OUT;
-    output reg [15:0] sector;
+    output wire [15:0] sector;
     output reg        hdd_read;
     output reg        hdd_write;
     input             hdd_mounted;

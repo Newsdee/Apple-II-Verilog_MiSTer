@@ -43,10 +43,31 @@ Implements Priority 1 of CPU_COMPARISON_RECOMMENDATIONS.md:
 "Final write-map equality" (last-write-wins RAM reconstruction) is reported
 as a separately named sub-check. It is NOT transaction equality.
 
+Mid-stream reset (--reset-at CYC, matching the TBs' +RESETAT=<cycle> 4-cycle
+re-reset window):
+  * pre-segment (cycle < CYC): the shorter fetch stream must be an exact
+    (addr, op) prefix of the longer one, with at most 2 extra fetches (the
+    two cores can be up to one instruction apart in phase at the reset
+    moment); a divergence inside the shared prefix fails the run.
+  * post-segment (cycle >= CYC+4): the full positional comparison runs on
+    post-reset rows only — the reset re-synchronizes the pair, so the usual
+    one-fetch skew model applies from the first post-reset fetch.
+  * gates and final write-map equality use the FULL trace (pre + post).
+  * --compare-from ADDR: state-boundary comparison starts at the fetch of
+    ADDR (fetch index k; boundaries G[k] vs N[k-1] onward). Needed because
+    the two cores have different reset contracts (golden R65Cx2 resets only
+    I/D and reloads PC — A/X/Y/S/N/V/Z/C are undefined-on-reset and retain
+    pre-reset values; the new core deterministically clears them), so state
+    legitimately differs until the post-reset program re-converges every
+    register. Pick ADDR one fetch after the first fully-converged fetch.
+    Fetch identity, instruction length, and write events are NOT relaxed:
+    writes are compared over the whole post-reset segment.
+
 Usage:
   python semantic_compare.py GOLDEN.csv NEW.csv \
       [--whitelist semantic_whitelist.txt] [--report-reads] \
-      [--gate NAME=ADDR ...] [--json-out FILE]
+      [--gate NAME=ADDR ...] [--reset-at CYC] [--compare-from ADDR] \
+      [--json-out FILE]
 
 Exit codes: 0 = pass, 2 = divergence found, 1 = usage/IO error.
 """
@@ -155,6 +176,13 @@ def main():
                     help='per-instruction ordered read events (report-only)')
     ap.add_argument('--gate', action='append', default=[], metavar='NAME=ADDR',
                     help='coverage gate: both traces must fetch ADDR (repeatable)')
+    ap.add_argument('--reset-at', type=int, default=0, metavar='CYC',
+                    help='mid-stream 4-cycle re-reset window at CYC (matches '
+                         'the TBs\' +RESETAT); see module docstring')
+    ap.add_argument('--compare-from', default=None, metavar='ADDR',
+                    help='start state-boundary comparison at the fetch of '
+                         'ADDR (see module docstring; for reset cases with '
+                         'differing reset contracts)')
     ap.add_argument('--json-out', default=None, help='also write JSON summary here')
     args = ap.parse_args()
 
@@ -168,6 +196,50 @@ def main():
     def problem(check, msg):
         result['pass'] = False
         problems.append(f'[{check}] {msg}')
+
+    # ---- 0. optional mid-stream reset split ---------------------------------
+    # full_* keep the whole trace for gates and final write-map equality;
+    # gr/nr become the post-reset segment for the positional checks.
+    full_gr, full_nr = gr, nr
+    reset_info = None
+    if args.reset_at:
+        R, W = args.reset_at, 4
+        pre_g = [r for r in gr if int(r[gi['CYCLE']]) < R]
+        pre_n = [r for r in nr if int(r[ni['CYCLE']]) < R]
+        gr = [r for r in gr if int(r[gi['CYCLE']]) >= R + W]
+        nr = [r for r in nr if int(r[ni['CYCLE']]) >= R + W]
+        pgf = [r for r in pre_g if r[gi['SYNC']] == '1']
+        pnf = [r for r in pre_n if r[ni['SYNC']] == '1']
+        mm = min(len(pgf), len(pnf))
+        diverge = None
+        for i in range(mm):
+            if (pgf[i][gi['ADDR']], pgf[i][gi['DI']]) != \
+                    (pnf[i][ni['ADDR']], pnf[i][ni['DI']]):
+                diverge = i
+                break
+        extra = abs(len(pgf) - len(pnf))
+        if not gr or not nr:
+            fail(f'--reset-at {R} leaves no post-reset rows (window beyond trace end)')
+        if diverge is not None:
+            problem('pre_reset_prefix',
+                    f'pre-reset fetch streams diverge at index {diverge}: '
+                    f'G={pgf[diverge][gi["ADDR"]]}:{pgf[diverge][gi["DI"]]} '
+                    f'N={pnf[diverge][ni["ADDR"]]}:{pnf[diverge][ni["DI"]]}')
+        elif extra > 2:
+            problem('pre_reset_prefix',
+                    f'pre-reset fetch count gap {extra} exceeds 2 '
+                    f'(golden={len(pgf)} new={len(pnf)})')
+        reset_info = {
+            'reset_at': R, 'window_cycles': [R, R + W],
+            'pre_rows': {'golden': len(pre_g), 'new': len(pre_n)},
+            'pre_fetches': {'golden': len(pgf), 'new': len(pnf)},
+            'extra_pre_fetches': extra,
+            'post_rows': {'golden': len(gr), 'new': len(nr)},
+            'rule': 'pre: shorter fetch stream must be an exact prefix of the '
+                    'longer (gap <= 2 = instruction phase at reset moment); '
+                    'post: full positional comparison (reset re-synchronizes)',
+            'pass': diverge is None and extra <= 2,
+        }
 
     # ---- 1. fetch selection ------------------------------------------------
     gfi = [i for i, r in enumerate(gr) if r[gi['SYNC']] == '1']
@@ -231,11 +303,31 @@ def main():
         problem('instruction_length', f'... and {len(len_bad) - 10} more')
 
     # ---- 4. state at fetch boundaries --------------------------------------
+    compare_from_idx = 0
+    compare_from_info = None
+    if args.compare_from:
+        a = args.compare_from.upper()
+        kg = next((i for i, r in enumerate(gf)
+                   if r[gi['ADDR']].upper() == a), None)
+        kn = next((i for i, r in enumerate(nf)
+                   if r[ni['ADDR']].upper() == a), None)
+        if kg is None or kn is None:
+            fail(f'--compare-from {a}: not fetched (golden={kg} new={kn})')
+        if kg != kn:
+            problem('compare_from',
+                    f'--compare-from {a}: fetch index differs golden={kg} '
+                    f'new={kn} (streams must be aligned there)')
+        compare_from_idx = max(0, min(kg, kn))
+        compare_from_info = {'addr': a, 'fetch_index': compare_from_idx,
+                             'rule': 'state boundaries compared from this '
+                                     'fetch onward; writes/fetches/lengths '
+                                     'unaffected'}
     sp_unshifted = []
     cflow_pc = []
     rti_flag_unshifted = []
     state_bad = []
-    for i in range(1, m):
+    state_start = max(1, compare_from_idx)
+    for i in range(state_start, m):
         g, nprev, ncur = gf[i], nf[i - 1], nf[i]
         prev_op = int(gf[i - 1][gi['DI']], 16)
         for col in STATE_COLS:
@@ -374,8 +466,9 @@ def main():
                           if v.get('equal') is False))
 
     # ---- 8. final write-map equality (NOT transaction equality) -------------
-    gmap = dict((r[gi['ADDR']], r[gi['DO']]) for r in gr if r[gi['RW']] == '0')
-    nmap = dict((r[ni['ADDR']], r[ni['DO']]) for r in nr if r[ni['RW']] == '0')
+    # Full trace: pre-reset writes count too (e.g. interrupted pushes).
+    gmap = dict((r[gi['ADDR']], r[gi['DO']]) for r in full_gr if r[gi['RW']] == '0')
+    nmap = dict((r[ni['ADDR']], r[ni['DO']]) for r in full_nr if r[ni['RW']] == '0')
     map_diffs = {a: (gmap.get(a), nmap.get(a))
                  for a in set(gmap) | set(nmap) if gmap.get(a) != nmap.get(a)}
     if map_diffs:
@@ -391,15 +484,19 @@ def main():
             fail(f'bad --gate {spec!r} (want NAME=ADDR)')
         name, addr = spec.split('=', 1)
         addr = addr.upper()
-        ghit = any(r[gi['ADDR']].upper() == addr for r in gf)
-        nhit = any(r[ni['ADDR']].upper() == addr for r in nf)
+        # Full trace: a gate may be satisfied pre- or post-reset.
+        ghit = any(r[gi['ADDR']].upper() == addr
+                   for r in [r for r in full_gr if r[gi['SYNC']] == '1'])
+        nhit = any(r[ni['ADDR']].upper() == addr
+                   for r in [r for r in full_nr if r[ni['SYNC']] == '1'])
         gates[name] = {'addr': addr, 'golden': ghit, 'new': nhit}
         if not (ghit and nhit):
             problem('gate', f'gate {name} ({addr}): golden={ghit} new={nhit}')
 
     # ---- summary -------------------------------------------------------------
     summary = {
-        'checker': 'semantic_compare.py v1',
+        'checker': 'semantic_compare.py v1.1',
+        'reset_at': reset_info,
         'inputs': {
             'golden': {'path': os.path.abspath(args.golden), 'sha256': gsha,
                        'rows': len(gr)},
@@ -432,7 +529,8 @@ def main():
                         'SP also accepts unshifted; flag columns after PLP/RTI '
                         'also accept unshifted (writeback phase); '
                         'PC column dPC in {0,1} or cflow',
-                'boundaries_compared': max(0, m - 1),
+                'compare_from': compare_from_info,
+                'boundaries_compared': max(0, m - state_start),
                 'mismatches': len(state_bad),
                 'sp_unshifted_reported': len(sp_unshifted),
                 'sp_unshifted': sp_unshifted[:20],

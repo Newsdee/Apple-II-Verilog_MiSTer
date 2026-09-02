@@ -24,6 +24,18 @@
 //   (The DUT samples the interrupt lines only on non-fetch/non-branch-taken
 //    cycles, so a 1-cycle pulse can be missed depending on instruction phase.)
 //   +TOTAL=<cycles>    trace length (default 4000)
+//   +RESETAT=<cycle>   re-assert reset for 4 cycles [cycle, cycle+4)
+//                      mid-stream (0 = disabled; behavior-preserving default).
+//                      Write commits are suppressed inside the window so a
+//                      stale strobe from an interrupted instruction cannot
+//                      corrupt the image.
+//   +WRTOGGLE=<0|1>    side-effecting-memory probe: when 1, every write
+//                      commit does mem[addr] <= mem[addr]^8'h01 (a stateful
+//                      toggle of the CURRENT byte) instead of mem[addr] <=
+//                      dout. One extra write strobe then flips the final
+//                      byte, so write-STROBE-COUNT differences (e.g. the
+//                      golden RMW old-value pre-write) become visible in
+//                      final-memory equality. Default 0 = plain commit.
 // A pulse set at cycle N is sampled by the DUT at posedge N.
 //
 // Output: module_tests/r65c02/build/verilog_trace.csv (CWD = repo root).
@@ -51,6 +63,12 @@ module r65c02_verilog_tb;
    integer irq_pulse = 0;
    integer nmi_pulse = 0;
    integer total_cycles = 0;
+   integer reset_at = 0;
+   integer wr_toggle = 0;
+   // High during a mid-stream re-reset window (RESETAT only; the initial
+   // window keeps its existing sim_go gating so default behavior is
+   // byte-identical).
+   reg in_reset_win = 0;
 
    // Single 64K image (pattern base + program + vectors).
    reg [7:0] mem [0:65535];
@@ -76,24 +94,28 @@ module r65c02_verilog_tb;
    assign di = mem[addr];
 
    // Commit writes at the posedge where the (registered) nwe strobe is low.
+   // WRTOGGLE: stateful toggle of the current byte (see header).
    always @(posedge clk) begin
-      if (sim_go && !nwe)
-         mem[addr] <= dout;
+      if (sim_go && !nwe && !in_reset_win)
+         mem[addr] <= wr_toggle ? (mem[addr] ^ 8'h01) : dout;
    end
 
    initial begin
       $value$plusargs("IRQPULSE=%d", irq_pulse);
       $value$plusargs("NMIPULSE=%d", nmi_pulse);
       $value$plusargs("TOTAL=%d", total_cycles);
+      $value$plusargs("RESETAT=%d", reset_at);
+      $value$plusargs("WRTOGGLE=%d", wr_toggle);
       if (total_cycles == 0) total_cycles = 4000;
       $readmemh("module_tests/r65c02/build/r65_mem_init.hex", mem);
    end
 
    task automatic apply_stimulus(input integer cycle);
       begin
-         reset_sig = (cycle < 4) ? 1'b0 : 1'b1;
-         irq_n     = (irq_pulse != 0 && cycle >= irq_pulse && cycle < irq_pulse + 8) ? 1'b0 : 1'b1;
-         nmi_n     = (nmi_pulse != 0 && cycle >= nmi_pulse && cycle < nmi_pulse + 8) ? 1'b0 : 1'b1;
+         in_reset_win = (reset_at != 0 && cycle >= reset_at && cycle < reset_at + 4);
+         reset_sig    = ((cycle < 4) || in_reset_win) ? 1'b0 : 1'b1;
+         irq_n        = (irq_pulse != 0 && cycle >= irq_pulse && cycle < irq_pulse + 8) ? 1'b0 : 1'b1;
+         nmi_n        = (nmi_pulse != 0 && cycle >= nmi_pulse && cycle < nmi_pulse + 8) ? 1'b0 : 1'b1;
       end
    endtask
 

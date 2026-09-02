@@ -2,6 +2,123 @@
 
 Resume point for the WDC 65x02 single-step harness work. Read this top to bottom, then continue at "Next steps".
 
+**Current state (machine clock 2026-09-02; supersedes the
+"Remaining: Priority 4 onward" line in the block below): PRIORITY 4
+COMPLETE — all five sub-items shipped and verified.**
+
+1. **T65 baseline + alignment: PASS.** The boot preamble fix (A9 21 A2 32
+   A0 43 at $6B4C–$6B51) was already in both `t65_vhdl_tb.vhd` and
+   `t65_verilog_tb.sv`; re-verified with `run_equivalence.ps1 -CompareOnly`:
+   `T65 EQUIVALENCE PASS rowsA=320 rowsB=500 fieldsA=3072 fieldsB=5784
+   ignored_metavalues=80 gate_checks=17`. (Full-repo `run_tests.ps1` and the
+   apple2 harness cycle-358 re-run remain as optional follow-ups.)
+2. **SST re-described as a 50-sample sweep + $DE decision closed.** New
+   maintained tool `rebuild_summary.py` reconstructs the deterministic
+   selection (`random.Random(1*1000+op).sample(tests, 50)` per op, cb/db
+   empty → 12700) and re-derives summaries from the raw traces:
+   `build/sweep_wdc_abxfix.txt` = **10798/12700** — exactly the recorded
+   Option-C state (diff vs the pre-rebuild summary shows only the M_ABX
+   family changed, as expected). $DE/$FE now PASS 50/50 on the new core;
+   decision: keep the Option C WDC-convention model (single write +
+   no-carry-EA dummy). Golden R65Cx2 still fails them per Category C.
+3. **`build/fail_sigs.py` shipped** → `build/fail_sigs_report.txt`: the 30
+   agreed-reference opcodes (WDC==MOS pattern) with true fail counts and
+   normalized signatures for both cores; golden-only / new-only (NONE) /
+   golden-only-fail (57 opcodes) / new-only (none) / both-fail (52
+   opcodes) sections. Agreed-reference totals: new core
+   667/1500, golden 1050/1500.
+4. **Categories kept separate** (WDC convention / MOS convention /
+   suite-generator quirk / core defect) — root-caused this session with
+   trace-level evidence (see `wdc_vs_6502_analysis.md` Category F, updated):
+   - Category D (bbb=4 "(zp),Y" generator convention): *perfect* Y-carry
+     correlation re-verified — 51: 30/30, b1: 25/25, d1: 25/25 of failures
+     are exactly the Y-page-cross tests; $91 fails all 50 on the core's
+     read-before-write at EA vs the suite's `pc+1` re-read.
+   - Category C (abs,X/abs,Y page-cross dummy): 19: 20/20 and 39: 21/21
+     failures are cross-only; f9 = 21 cross + 14 BCD D=1; golden-only
+     {3c 5d bd} loads + {9d 9e} stores (double-write RMW pre-write).
+   - Category G (BCD D=1 extra read): failures confined to the D=1 subset
+     of 65/69/e5/e9/ed/fd.
+   - Category I (undocumented decode): golden-only {44 54 d4 f4} — new core
+     implements the WDC suite's NOP model (`cpu_65c02.sv` decodes 54/d4/f4
+     as `C_NOP, M_ZPX`, cycle-for-cycle match with the suite) while R65Cx2
+     uses a shorter zp-style model; bf/dc/fc = undocumented/xF-column
+     conventions (suite final PCs there are nonsensical, e.g. $BF @A142 →
+     final A0FB — unreliable reference).
+   - NEW-ONLY-FAIL: none — the new core never fails where golden passes.
+5. **Provenance metadata shipped.** New maintained tool `provenance.py`
+   → `build/provenance.json`: suite commit 2f6980a (clean tree), seed=1,
+   per-opcode sampled test IDs (all 12700, verified to reproduce the
+   driver's selection exactly), SHA-256 of RTL (new core + ALU + R65Cx2),
+   TBs, checker tools, SST binaries, and every retained result file; zero
+   missing hashes. Re-run after any rebuild to refresh.
+
+**Remaining: optional MOS-suite sweep (Next step 6) and the final verdict
+doc (Next step 7).**
+
+**Current state (2026-09-02 machine clock, crash recovery; supersedes the
+"Remaining for Priority 3" line in the block below): Priority 3 COMPLETE —
+PHASE 2 shipped, all 12 directed cases green (exit 0).**
+`p3_cases.py` full run from repo root: p3-brk PASS, p3-rti PASS,
+p3-irq-masked PASS, p3-irq-unmask EXPECTED, p3-nmi-priority EXPECTED,
+p3-nmi-during-irq EXPECTED, p3-adj-shift EXPECTED, p3-jmpax PASS,
+p3-reset-park PASS, p3-reset-midinsn PASS, p3-reset-midpush PASS,
+p3-rmw-toggle PASS (rollup `build/p3/summary.json` with both exe SHA-256s).
+
+Phase 2 deliverables:
+- **TB plusargs in BOTH r65-pair TBs** (`cpu65_r65_tb.sv`,
+  `r65c02_verilog_tb.sv`; contracts documented in the golden TB header):
+  `+RESETAT=<cyc>` re-asserts reset for 4 cycles [cyc, cyc+4) mid-stream
+  (write commits suppressed inside the window so a stale strobe from an
+  interrupted instruction cannot corrupt the image) and `+WRTOGGLE=1` makes
+  every write commit a stateful toggle of the CURRENT byte
+  (`mem[addr] <= mem[addr]^8'h01`, dout discarded) so write-STROBE-COUNT
+  differences (the golden RMW old-value pre-write) become visible in final
+  memory. Both default-off and behavior-preserving: all phase-1 verdicts
+  unchanged.
+- **p3-reset-park** (reset in the self-JMP park operand phase),
+  **p3-reset-midinsn** (reset mid-JSR operand phase, before the push lands;
+  post-reset re-execution compared positionally via semantic_compare.py
+  `--reset-at` + `--compare-from`), **p3-reset-midpush** (reset inside a
+  PHA/PHP sequence with WRTOGGLE=1: any ungated stale commit during the
+  window flips write parity and fails final-memory equality).
+- **p3-rmw-toggle**: six absolute RMW instructions (ASL/EOR/INC/TSB/ROL/DEC
+  abs) over scratch $0200–$0205 with WRTOGGLE=1. Result: golden = exactly 2
+  strokes per address (pre-write + final → initial byte restored), new core
+  = exactly 1 stroke (→ initial^1); no other write addresses; parity equal
+  everywhere else. This empirically demonstrates the whitelisted
+  RMW_PREWRITE_GOLDEN class on side-effecting memory — a memory-mapped
+  device WOULD see the extra pre-update write strobe (the decision-policy
+  "Apple II I/O impact review" item now has an executable reference).
+- **Negative mutation validation of check_rmw_toggle**: dropping golden's
+  pre-write row at $0200 → DETECTED (final value + stroke count); appended
+  stray write to an unrelated address in golden only → DETECTED (parity).
+  DO corruption is the semantic checker's final write-map equality job
+  (negative-validated in the earlier session).
+
+Crash-recovery bug fixes in p3-rmw-toggle (the case was FAILing at crash
+time; NEITHER finding was an RTL bug):
+1. **Test program used zero-page opcodes, not absolute:** `06`/`E6`/`C6`
+   are ASL/INC/DEC **zp** (2-byte); absolute is `0E`/`EE`/`CE`. Both cores
+   decoded them correctly — the observed "broken walk" (RMWs at $0000/
+   $0002/$0005, park JMP eaten by the misaligned stream) was correct CPU
+   behavior on a wrong program. The misaligned walk then ran into base-
+   pattern code where WRTOGGLE parity differences (e.g. $0000 = 3c golden
+   vs 3d new) changed computed addresses ($3C4A vs $3D4A) and diverged the
+   streams at fetch #112 (golden=168 vs new=141). Fixed opcodes; the walk
+   now reaches the park cleanly and both streams are identical.
+2. **rmw_expect new-core values were `f(initial)^1` — wrong under pure
+   toggle semantics** (dout is discarded; each stroke flips bit 0 of the
+   CURRENT byte, so one stroke → `initial^1`). Fixed to initial^1 per
+   address. The computed f(initial) still lands on DO and is covered by the
+   semantic checker's final write-map equality (last-write-wins: golden's
+   last pre/post write and the new core's single write both carry
+   f(initial)).
+
+**Remaining: Priority 4 onward** (T65 VHDL→Verilog baseline + alignment,
+SST re-description as a 50-sample sweep, provenance metadata; optional MOS-
+suite sweep; final verdict) — see "Next steps" items 5–7.
+
 **Current state (2026-09-04): Priority 3 PHASE 1 DONE — all 8 directed cases green on the canonical base image.**
 `p3_cases.py` full run (MSYS Python from repo root): p3-brk PASS, p3-rti PASS,
 p3-irq-masked PASS, p3-irq-unmask EXPECTED, p3-nmi-priority EXPECTED,
@@ -202,7 +319,8 @@ Then produce the 3-way comparison table (suite vs golden vs new core) and final 
 | Pre-Option-C RTL snapshot | `build/cpu_65c02_preabxfix.sv` (= `/tmp/cpu_65c02.sv.pre-abxfix`; 17-line diff vs current, see Category C resolution) |
 | Regression gate | `build/regress_check.py` — per-test pass/fail diff of the two sweep files above; exit 1 on any pass→fail flip |
 | Comparison plan | `module_tests/cpu_65c02/CPU_COMPARISON_RECOMMENDATIONS.md` (priorities 1–4 + decision policy; policy (a) adopted 2026-09-02) |
-| **Semantic checker (Priority 1, 2026-09-03)** | `module_tests/cpu_65c02/semantic_compare.py` + `semantic_whitelist.txt`; JSON summary `build/semantic_summary.json`. Usage: `python semantic_compare.py <golden.csv> <new.csv> [--whitelist ...] [--report-reads] [--gate NAME=ADDR ...] [--json-out FILE]`; exit 0 pass / 2 divergence / 1 usage |
+| **Semantic checker (Priority 1, 2026-09-03)** | `module_tests/cpu_65c02/semantic_compare.py` + `semantic_whitelist.txt`; JSON summary `build/semantic_summary.json`. Usage: `python semantic_compare.py <golden.csv> <new.csv> [--whitelist ...] [--report-reads] [--gate NAME=ADDR ...] [--reset-at CYC --compare-from ADDR (phase-2) --json-out FILE]`; exit 0 pass / 2 divergence / 1 usage |
+| **Priority 3 directed-case harness** | `module_tests/cpu_65c02/p3_cases.py` — 12 cases (8 phase-1 + 4 phase-2), hex-swap per case with backup/restore of the shared image AND both canonical traces, probe run for anchor location, per-case artifacts under `build/p3/<case>/`, rollup `build/p3/summary.json`. Run: `/c/msys64/ucrt64/bin/python module_tests/cpu_65c02/p3_cases.py [--only NAME]` from repo root. Phase-2 TB plusargs `+RESETAT`/`+WRTOGGLE` documented in the golden TB header |
 | CPU analysis doc | `module_tests/cpu_65c02/cpu_cycle_analysis.md` (needs Priority-2 corrections; accepted-differences table must share IDs with the whitelist) |
 | WDC-vs-MOS attribution doc | `module_tests/cpu_65c02/wdc_vs_6502_analysis.md` (Categories A–I; G = ADC/SBC **D-flag** extra cycle — corrected 2026-09-03, the 09-02 "I-flag" attribution was a bit-index error; C resolved by Option C; I = illegal-opcode decode mismatch) |
 | BCD root-cause artifacts | `build/bcd_batch.py`, `build/bcd_batch.txt`, `build/bcd_dbg*.txt`, `build/bcd_results*.txt`, `build/bcd_matrix.py` |
@@ -427,17 +545,24 @@ The remaining work is now organized by `CPU_COMPARISON_RECOMMENDATIONS.md`
    fetch); Step 4 carries the verified one-fetch skew rule; Step 5 renamed
    to final write-map equality with the first-write-wins measurement
    caution; §6 lists `semantic_compare.py` as the primary maintained gate.
-4. **Priority 3 — directed coverage gaps: PHASE 1 DONE (2026-09-04, see
+4. ~~**Priority 3 — directed coverage gaps: PHASE 1 DONE (2026-09-04, see
    state block at top); phase 2 remains.** Phase 1 shipped all eight no-TB-
    change cases green (BRK, RTI, IRQ masked/unmask timing, NMI priority +
    NMI-during-IRQ, adjacent length-delta IRQ, JMP (abs,X) wrap+carry). Phase
    2 = optional-plusarg TB edits (`RESETAT`, write-toggle memory) for
-   mid-stream reset at each phase and RMW into side-effecting I/O.
-5. **Priority 4 — finish independent comparisons**: T65 VHDL→Verilog baseline
+   mid-stream reset at each phase and RMW into side-effecting I/O.~~ **DONE
+   (crash-recovery session): all 12 cases green, exit 0 — see top state
+   block. Every item on the recommendations-doc Priority-3 coverage list is
+   now covered with a gate.**
+5. ~~**Priority 4 — finish independent comparisons**: T65 VHDL→Verilog baseline
    first, then phase-A/B alignment; SST re-description as a 50-sample sweep;
    `build/fail_sigs.py` for the 30 both-suites-agree opcodes; provenance
    metadata (suite revision, seed=1, test IDs, RTL SHA-256s, checker version)
-   with every retained result.
+   with every retained result.~~ **DONE (machine clock 2026-09-02)** — see the
+   top state block: T65 PASS; `rebuild_summary.py` (10798/12700, $DE/$FE
+   closed); `fail_sigs_report.txt` (30 agreed opcodes + all-fail sections);
+   category root-cause re-verified at trace level; `provenance.py` →
+   `build/provenance.json`.
 6. **Optional: MOS-suite sweep** — run the `6502` suite through both SST
    binaries to directly prove "cores track MOS" for RMW/page-cross categories
    (same batch shape as the WDC sweeps).

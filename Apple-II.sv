@@ -365,7 +365,7 @@ apple2_top apple2_top
 
 	.reset_cold(RESET | status[0]),
 	.reset_warm(buttons[1]),
-	//.soft_reset(soft_reset),
+	.soft_reset(soft_reset),
 
 	.hblank(HBlank),
 	.vblank(VBlank),
@@ -388,7 +388,7 @@ apple2_top apple2_top
 	.joy(joyd),
 	.joy_an(joya),
 
-	.mb_enabled(~status[4]),
+	.mb_4_inslot(~status[4]),
 	
 	.TRACK1(TRACK1),
 	.TRACK1_ADDR(TRACK1_RAM_ADDR),

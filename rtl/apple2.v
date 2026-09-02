@@ -155,9 +155,20 @@ module apple2(
     wire [7:0]    T65_DI;
     wire [7:0]    T65_DO;
     wire          T65_WE_N;
-    wire [15:0]   R65C02_A;
-    wire [7:0]    R65C02_DO;
-    wire          R65C02_WE_N;
+    // cpu_65c02 (new W65C02S-style core; replaced R65Cx2/RC65x02 on 2026-09-02,
+    // see PLAN.md). Source: rtl/cpu_65c02.sv (+ rtl/cpu_alu.sv), copied from
+    // rtl/new_cpu/. R65Cx2 remains in the tree as the differential-test golden.
+    wire [15:0]   N65C02_A;
+    wire [7:0]    N65C02_DO;
+    wire          N65C02_WE;      // active-high write cycle
+    // GameKing-SoC-specific outputs, unused on the Apple II (collected into
+    // n65c02_unused_ok below so lint stays quiet)
+    wire          N65C02_SYNC;
+    wire          N65C02_VECTOR_PULL;
+    wire          N65C02_INT_SEQ;
+    wire          N65C02_RTI_DONE;
+    wire          N65C02_IN_WAI;
+    wire          N65C02_IN_STP;
     wire          we;
 
     // Main ROM signals
@@ -549,9 +560,9 @@ module apple2(
         .VIDEO(VIDEO)
     );
 
-    assign we = (cpu == 1'b0) ? (~T65_WE_N) : (~R65C02_WE_N);
-    assign A = (cpu == 1'b0) ? (T65_A[15:0]) : R65C02_A;
-    assign D_OUT = (cpu == 1'b0) ? T65_DO : R65C02_DO;
+    assign we = (cpu == 1'b0) ? (~T65_WE_N) : N65C02_WE;
+    assign A = (cpu == 1'b0) ? (T65_A[15:0]) : N65C02_A;
+    assign D_OUT = (cpu == 1'b0) ? T65_DO : N65C02_DO;
     assign T65_DI = (T65_WE_N == 1'b0) ? D_OUT : D_IN;
     assign DBG_DI = T65_DI;
     assign DBG_ROM_ADDR = rom_addr;
@@ -586,16 +597,45 @@ module apple2(
         .PRINT(CPU_PRINT)
     );
 
-    R65C02 cpu65c02(
-        .reset((~reset)),
+    // 65C02: new cpu_65c02 core (W65C02S-style, one bus access per cycle).
+    //   ce = CPU_EN: the PHASE_ZERO falling-edge pulse; on it the core samples
+    //        din and launches the next cycle's address/write - the exact edge
+    //        R65Cx2's enable used, so machine RAM/ROM timing is unchanged.
+    //   rdy = ~CPU_WAIT replaces the old enable-gating (CPU_EN & ~CPU_WAIT).
+    //   reset is active-HIGH synchronous here (R65Cx2 was active-low).
+    //   stp_nop=1: Apple II has no power switch, so STP ($DB) is a NOP.
+    //   stall + savestate bus are tied off for now; see PLAN.md section 6
+    //   (savestate support plan, not yet implemented).
+    wire [63:0] n65c02_ss_rdata_unused;
+    wire n65c02_unused_ok = &{1'b0, N65C02_SYNC, N65C02_VECTOR_PULL,
+                               N65C02_INT_SEQ, N65C02_RTI_DONE, N65C02_IN_WAI,
+                               N65C02_IN_STP, n65c02_ss_rdata_unused};
+    cpu_65c02 cpu65c02(
         .clk(CLK_14M),
-        .enable(CPU_EN & ~CPU_WAIT),
-        .nmi_n(NMI_n),
+        .ce(CPU_EN),
+        .ce_n(1'b0),
+        .reset(reset),
+        .stall(1'b0),
         .irq_n(IRQ_n),
-        .di(D_IN),
-        .dout(R65C02_DO),
-        .addr(R65C02_A),
-        .nwe(R65C02_WE_N)
+        .nmi_n(NMI_n),
+        .rdy(~CPU_WAIT),
+        .stp_nop(1'b1),
+        .addr(N65C02_A),
+        .dout(N65C02_DO),
+        .din(D_IN),
+        .we(N65C02_WE),
+        .sync(N65C02_SYNC),
+        .vector_pull(N65C02_VECTOR_PULL),
+        .int_seq(N65C02_INT_SEQ),
+        .rti_done(N65C02_RTI_DONE),
+        .in_wai(N65C02_IN_WAI),
+        .in_stp(N65C02_IN_STP),
+        // Savestate register bus: tied off until the machine-wide savestate
+        // walker exists (PLAN.md section 6).
+        .ss_addr(10'd0),
+        .ss_wdata(64'd0),
+        .ss_wren(1'b0),
+        .ss_rdata(n65c02_ss_rdata_unused)
     );
 
     // Original Apple had asynchronous ROMs.  We use a synchronous ROM

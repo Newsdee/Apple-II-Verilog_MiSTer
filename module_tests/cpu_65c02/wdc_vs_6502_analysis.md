@@ -152,6 +152,10 @@ the wdc65c02 and 6502 suites, not a WDC-specific divergence:
 3. **$D1/$F1 are modeled as read-only (zp),Y-style operations** — 50/50 of
    both suites' $D1 tests end in a READ at `{mem[zp+1], mem[zp]} + Y` with no
    store cycle at all. Both cores fail accordingly.
+   *(Post Option C, 2026-09-02: the new core now passes the no-Y-carry $D1
+   subset — 25/50 — because its page-cross dummy moved to the no-carry EA;
+   only the Y-carry tests still fail on the dummy address. $F1 fails 34/50
+   for the same reason plus the Category H second dummy condition.)*
 
 **Attribution: SST generator table convention shared by all its 65xx suites.**
 Textbook 6502 semantics differ, but *both reference models agree with each
@@ -331,11 +335,28 @@ wanted.
   WDC single-write + b2 re-read model).
 - ~~`$F1` subgroup split (cyc5=16/cyc6=23)~~ **RESOLVED (Category H,
   2026-09-02).**
-- The 30 divergent opcodes where WDC and MOS patterns *agree* (e.g. the
-  $x4-column NOPs, some JMP-indirect variants) still fail in both cores for
-  address/data reasons — covered by Categories D/E conventions or ordinary
-  core-vs-reference deltas; per-opcode signatures are in `build/fail_sigs.py`
-  output.
+- ~~The 30 divergent opcodes where WDC and MOS patterns *agree* …~~
+  **SIGNATURES SHIPPED (2026-09-02, machine clock):** `build/fail_sigs.py`
+  now generates `build/fail_sigs_report.txt` — the 30 agreed-reference
+  opcodes with true fail counts and normalized signatures for both cores,
+  plus golden-only / new-only (none) / both-fail sections. Every retained
+  result is pinned by `build/provenance.json` (suite commit 2f6980a clean,
+  seed=1, per-opcode sampled test IDs, SHA-256 of RTL/TBs/checkers/binaries/
+  result files). Trace-level re-verification this session confirmed the
+  category attributions: Category D holds with a *perfect* Y-carry
+  correlation (51: 30/30, b1: 25/25, d1: 25/25 of failures are exactly the
+  Y-page-cross tests; $91 fails all 50 on the core's read-before-write at EA
+  vs the suite's `pc+1` re-read); Category C holds for abs,Y (19: 20/20,
+  39: 21/21 cross-only; f9 = 21 cross + 14 BCD D=1); Category G holds for
+  the BCD opcodes (failures confined to the D=1 subset); golden-only-fail
+  within the agreed set is {3c 5d bd 9d 9e 44 54 d4 f4}: 3c/5d/bd are
+  abs,X loads failing on R65Cx2's cross-dummy address (Category C), 9d/9e
+  are abs,X stores failing on the golden double-write RMW pre-write + dummy
+  vs the WDC single-write + b2 re-read model (same family as the resolved
+  $DE/$FE), and 44/54/d4/f4 are undocumented aliases where the new core
+  implements the WDC suite's NOP model (`cpu_65c02.sv` decodes 54/d4/f4 as
+  `C_NOP, M_ZPX`, matching the suite cycle-for-cycle) while R65Cx2 uses a
+  shorter zp-style model (Category I).
 
 ## Answer to the original question
 
@@ -367,7 +388,27 @@ cd /e/MiSTer/Apple-II_FPGAdev/Apple-II-Verilog_MiSTer/module_tests/cpu_65c02/bui
 /c/msys64/ucrt64/bin/python3 regress_check.py # per-test pre/post Option C gate
 ```
 
+From the repo root (MSYS Python):
+
+```bash
+python module_tests/cpu_65c02/provenance.py   # refresh build/provenance.json
+python module_tests/cpu_65c02/rebuild_summary.py  # re-derive summaries from raw traces
+python module_tests/cpu_65c02/build/fail_sigs.py  # regenerate fail_sigs_report.txt
+```
+
+**What the 12,700-test runs are:** an all-opcode, **50-samples-per-opcode
+sweep** of the wdc65c02/v1 suite — for each opcode 00..ff, a deterministic
+`random.Random(1*1000+op).sample(tests, 50)` draw from that opcode's JSON
+(the full suite holds up to 10,000 tests per opcode, so this is a sample,
+NOT exhaustive coverage; `cb`/`db` have empty JSONs → 254×50 = 12,700
+tests). The exact sampled test IDs are recorded in `build/provenance.json`
+(seed 1, suite commit 2f6980a). Counts quoted from these runs (e.g.
+"fails 25/50") are properties of *this sample*; re-running with a different
+seed would shift the counts somewhat without changing the category
+attributions.
+
 Sweep artifacts (raw per-test trace lines, 12700 tests, seed 1):
 `sweep_wdc_results.txt` (pre-DEC_FIX-removal), `sweep_wdc_nobcdfix_results.txt`
 (baseline for Option C), `sweep_wdc_abxfix_results.txt` (current new-core
 state, post Option C), `sweep_wdc_golden_results.txt` (golden R65Cx2).
+Summaries are re-derived from the raw traces by `rebuild_summary.py`.
