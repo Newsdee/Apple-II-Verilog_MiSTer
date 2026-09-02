@@ -2,7 +2,65 @@
 
 Resume point for the WDC 65x02 single-step harness work. Read this top to bottom, then continue at "Next steps".
 
-**Current state (machine clock 2026-09-02; supersedes the
+**Current state (machine clock 2026-09-02): CAMPAIGN COMPLETE — steps 6 and 7
+shipped; nothing remains except user decisions (Quartus compile, I/O impact
+review, BCD N/V fix-or-document, commit-on-request).**
+
+1. **Step 6 — MOS (6502) suite sweep: DONE.** Both SST binaries run the full
+   MOS suite with the identical selection scheme (sample=50 seed=1, 256 ops,
+   12800 tests; the MOS files are clean of empty/>64-RAM cases). Raw results:
+   `build/sweep_6502_abxfix_results.txt` (new core) and
+   `build/sweep_6502_golden_results.txt` (golden, --final-offset 1);
+   per-opcode summaries `build/sweep_6502_abxfix.txt` / `sweep_6502_golden.txt`
+   via `rebuild_summary.py`; analysis tool + report `build/mos_analysis.py` /
+   `mos_analysis_report.txt` (CAVEAT: its func/time split counts
+   mid-instruction snapshots as "functional" — trust the per-opcode tables and
+   FINAL_VERDICT.md §2 over that split). Headline: new core 6706/12800, golden
+   7869/12800. Key findings (all trace-verified):
+   - **RMW write-back family (24 ops) is a perfect mirror**: WDC new 50/gold 0
+     vs MOS new 0/gold 50 (only blip: 1e gold MOS 49/50). Direct proof at suite
+     scale of policy (a): the new core follows WDC, golden follows MOS silicon.
+   - **Page-cross/JMP-indirect family**: MOS tracks golden (mostly 50/50), WDC
+     tracks the new core's Option C; both convention-correct in their family.
+     6c/7c remain unresolved in both cores on both suites (unreliable refs).
+   - **BCD** (re-verified at test level this session; tools
+     `build/bcd_classify.py` + `build/bcd_bus_check.py`): golden fails only
+     17/700 sampled BCD tests; new core fails **114/700**, in three classes:
+     (A) 50 P-only N/V failures — A ALWAYS correct; 45/50 have an invalid BCD
+     digit (nibble >9) in A or M, the other 5 have valid A with M not
+     derivable from initial.ram; none found with both operands fully valid —
+     new-core-only edge case, open fix-or-document decision;
+     (B) 47 bus-trace mismatches, ALL (abs,X) page-cross tests (7d:20, fd:30,
+     zero flat) = Category C Option-C dummy at suite scale; golden passes 47,
+     fails the same 3 fd tests as class C — policy (a), not a defect;
+     (C) 17 A-wrong in BOTH cores (e1:2 e5:3 e9:3 ed:3 f1:2 fd:4); 14
+     byte-identical traces, 3 = the fd page-cross pair above with one
+     differing dummy cycle but same wrong A — inherited convention.
+     ZERO new-core-only A corruption.
+   - **MOS suite reliability is file-dependent**: 64 opcode files are broken
+     references (both cores 0/50 on MOS while new core is 50/50 on WDC for the
+     same op; forensics: 02/12/32 = 100% of 10000 tests have final=initial+
+     pc+1 + vector-garbage traces; 14 = no BIT flag updates ever; 34 = no jump,
+     final pc+2). 23 ops are known-quirk on both suites (xF column, 5C, JAM,
+     CB/DB, DC). MOS pass totals therefore understate both cores; they are
+     directional evidence, not a quality score.
+   - New-core-only MOS passes: 40 (RTI edge), 44/54/d4/f4 (WDC NOP model — MOS
+     agrees with the new core there), 5a/7a/da/fa (undocumented ops).
+2. **Step 7 — final verdict doc: DONE.** `module_tests/cpu_65c02/FINAL_VERDICT.md`
+   folds Categories A–I + WDC/MOS sweeps + r65/T65/P3 results + policy (a) into
+   one verdict: the new core is a behaviorally faithful 65C02 within the
+   WDC/W65C02S convention family; complete list of new-core-only differences =
+   {BCD N/V on invalid digits, constant P_B, absent RMW pre-write (policy (a))};
+   remaining work = user decisions only (Quartus compile of the integrated
+   core, Apple II I/O impact review with the p3-rmw-toggle executable
+   reference, BCD fix-or-document, commit on request).
+   Step-7 session also fixed two analysis-tooling bugs found during doc
+   verification: `mos_analysis.py` parse_wdc_summary treated the failure count
+   in 'FAIL fl/n' lines as passes (regenerated report now correct; MOS columns
+   were unaffected) and the BCD section of FINAL_VERDICT.md was re-derived at
+   test level with the numbers above (supersedes the earlier 69=55+14 sketch).
+
+**Prior state (machine clock 2026-09-02; supersedes the
 "Remaining: Priority 4 onward" line in the block below): PRIORITY 4
 COMPLETE — all five sub-items shipped and verified.**
 
@@ -53,8 +111,8 @@ COMPLETE — all five sub-items shipped and verified.**
    TBs, checker tools, SST binaries, and every retained result file; zero
    missing hashes. Re-run after any rebuild to refresh.
 
-**Remaining: optional MOS-suite sweep (Next step 6) and the final verdict
-doc (Next step 7).**
+**Remaining: [SUPERSEDED — both done, see top state block.]** optional
+MOS-suite sweep (Next step 6) and the final verdict doc (Next step 7).
 
 **Current state (2026-09-02 machine clock, crash recovery; supersedes the
 "Remaining for Priority 3" line in the block below): Priority 3 COMPLETE —
@@ -321,6 +379,8 @@ Then produce the 3-way comparison table (suite vs golden vs new core) and final 
 | Comparison plan | `module_tests/cpu_65c02/CPU_COMPARISON_RECOMMENDATIONS.md` (priorities 1–4 + decision policy; policy (a) adopted 2026-09-02) |
 | **Semantic checker (Priority 1, 2026-09-03)** | `module_tests/cpu_65c02/semantic_compare.py` + `semantic_whitelist.txt`; JSON summary `build/semantic_summary.json`. Usage: `python semantic_compare.py <golden.csv> <new.csv> [--whitelist ...] [--report-reads] [--gate NAME=ADDR ...] [--reset-at CYC --compare-from ADDR (phase-2) --json-out FILE]`; exit 0 pass / 2 divergence / 1 usage |
 | **Priority 3 directed-case harness** | `module_tests/cpu_65c02/p3_cases.py` — 12 cases (8 phase-1 + 4 phase-2), hex-swap per case with backup/restore of the shared image AND both canonical traces, probe run for anchor location, per-case artifacts under `build/p3/<case>/`, rollup `build/p3/summary.json`. Run: `/c/msys64/ucrt64/bin/python module_tests/cpu_65c02/p3_cases.py [--only NAME]` from repo root. Phase-2 TB plusargs `+RESETAT`/`+WRTOGGLE` documented in the golden TB header |
+| **MOS sweep (step 6, 2026-09-02)** | raw: `build/sweep_6502_abxfix_results.txt` (new core), `build/sweep_6502_golden_results.txt` (golden); summaries: `build/sweep_6502_abxfix.txt`, `build/sweep_6502_golden.txt`; analysis: `build/mos_analysis.py` → `build/mos_analysis_report.txt` (per-opcode tables authoritative; func/time split is misleading — see caveat) |
+| **Final verdict (step 7, 2026-09-02)** | `module_tests/cpu_65c02/FINAL_VERDICT.md` — campaign closeout: verdict, evidence table, category status, complete new-core-only difference list, remaining user decisions, reproduction commands |
 | CPU analysis doc | `module_tests/cpu_65c02/cpu_cycle_analysis.md` (needs Priority-2 corrections; accepted-differences table must share IDs with the whitelist) |
 | WDC-vs-MOS attribution doc | `module_tests/cpu_65c02/wdc_vs_6502_analysis.md` (Categories A–I; G = ADC/SBC **D-flag** extra cycle — corrected 2026-09-03, the 09-02 "I-flag" attribution was a bit-index error; C resolved by Option C; I = illegal-opcode decode mismatch) |
 | BCD root-cause artifacts | `build/bcd_batch.py`, `build/bcd_batch.txt`, `build/bcd_dbg*.txt`, `build/bcd_results*.txt`, `build/bcd_matrix.py` |
@@ -563,11 +623,15 @@ The remaining work is now organized by `CPU_COMPARISON_RECOMMENDATIONS.md`
    closed); `fail_sigs_report.txt` (30 agreed opcodes + all-fail sections);
    category root-cause re-verified at trace level; `provenance.py` →
    `build/provenance.json`.
-6. **Optional: MOS-suite sweep** — run the `6502` suite through both SST
+6. ~~**Optional: MOS-suite sweep** — run the `6502` suite through both SST
    binaries to directly prove "cores track MOS" for RMW/page-cross categories
-   (same batch shape as the WDC sweeps).
-7. **Final verdict**: fold Categories A–I + three/four-way results + policy (a)
-   into `cpu_cycle_analysis.md` or a new summary doc; commit only when asked.
+   (same batch shape as the WDC sweeps).~~ **DONE (machine clock 2026-09-02)**
+   — see top state block; the hypothesis is false for the new core by design
+   (policy (a)) and true for golden, proven by the 24-opcode mirror table.
+7. ~~**Final verdict**: fold Categories A–I + three/four-way results + policy
+   (a) into `cpu_cycle_analysis.md` or a new summary doc; commit only when
+   asked.~~ **DONE (machine clock 2026-09-02)** — `FINAL_VERDICT.md`; commit
+   still only when asked.
 
 ## Git state (2026-09-02, post Option C)
 
@@ -591,6 +655,7 @@ were left out. Other sessions' modified files (Apple-II.qsf, vga_color_test/*,
 - `build/bcd_batch.py` / `bcd_batch.txt` / `bcd_dbg*.txt` / `bcd_matrix.py` = BCD root-cause
   artifacts (targeted D=1 batches, per-cycle FSM dumps, per-mode matrix).
 - `build/fail_examples.json` = first failure example per failing opcode (new core).
+- The MOS sweep raw results `build/sweep_6502_abxfix_results.txt` / `sweep_6502_golden_results.txt` (12800 R-lines each) — only copies of the step-6 simulation output; re-running is cheap but the files are the provenance anchor for FINAL_VERDICT.md §2.
 - The r65 pair traces: `module_tests/r65c02/build/verilog_trace.csv` (golden),
   `module_tests/cpu_65c02/build/r65_trace.csv` (new core).
 - T65 traces: `module_tests/t65/build/{verilog,vhdl}_{prog,boot}.csv`,

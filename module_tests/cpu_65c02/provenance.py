@@ -24,13 +24,14 @@ REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 MT = os.path.join(REPO, 'module_tests', 'cpu_65c02')
 BUILD = os.path.join(MT, 'build')
 SUITE_ROOT = r'E:\MiSTer\Apple-II_FPGAdev\65x02'
-SUITE_DIR = os.path.join(SUITE_ROOT, 'wdc65c02', 'v1')
+WDC_DIR = os.path.join(SUITE_ROOT, 'wdc65c02', 'v1')
+MOS_DIR = os.path.join(SUITE_ROOT, '6502', 'v1')
 
 # ---- sweep parameters (must match sst_driver.py defaults used for the runs)
 SEED = 1
 SAMPLE = 50
-EMPTY_OPS = ('cb', 'db')          # suite JSONs exist but contain no tests
-TOTAL_TESTS = 254 * SAMPLE        # 12700
+EMPTY_OPS = ('cb', 'db')          # wdc65c02 JSONs exist but contain no tests
+TOTAL_TESTS = 254 * SAMPLE        # 12700 (WDC); MOS has all 256 files -> 12800
 
 # ---- files whose hashes pin a retained result (path relative to repo root)
 RTL_FILES = {
@@ -51,6 +52,9 @@ TOOL_FILES = [
     'module_tests/cpu_65c02/build/fail_sigs.py',
     'module_tests/cpu_65c02/build/four_way.py',
     'module_tests/cpu_65c02/build/three_way.py',
+    'module_tests/cpu_65c02/build/mos_analysis.py',
+    'module_tests/cpu_65c02/build/bcd_classify.py',
+    'module_tests/cpu_65c02/build/bcd_bus_check.py',
 ]
 BINARY_FILES = {
     'new_core_sst':  'module_tests/cpu_65c02/build/sst_verilog/Vcpu65_sst_tb.exe',
@@ -71,6 +75,11 @@ RESULT_FILES = {
     'r65_pair_vhdl_trace':   'module_tests/r65c02/build/vhdl_trace.csv',
     'p3_summary':            'module_tests/cpu_65c02/build/p3/summary.json',
     'semantic_summary':      'module_tests/cpu_65c02/build/semantic_summary.json',
+    'mos_new_sweep_raw':     'module_tests/cpu_65c02/build/sweep_6502_abxfix_results.txt',
+    'mos_new_sweep_summary': 'module_tests/cpu_65c02/build/sweep_6502_abxfix.txt',
+    'mos_golden_sweep_raw':  'module_tests/cpu_65c02/build/sweep_6502_golden_results.txt',
+    'mos_golden_summary':    'module_tests/cpu_65c02/build/sweep_6502_golden.txt',
+    'mos_analysis_report':   'module_tests/cpu_65c02/build/mos_analysis_report.txt',
 }
 
 
@@ -108,15 +117,15 @@ def suite_info():
     return info
 
 
-def sampled_test_ids():
+def sampled_test_ids(suite_dir, empty_ops=()):
     """Replicate sst_driver.py selection exactly; return source-array indices."""
     ids = {}
     for op in range(256):
         hexop = '%02x' % op
-        if hexop in EMPTY_OPS:
+        if hexop in empty_ops:
             ids[hexop] = []
             continue
-        p = os.path.join(SUITE_DIR, hexop + '.json')
+        p = os.path.join(suite_dir, hexop + '.json')
         with open(p) as f:
             tests = json.load(f)
         rng = random.Random(SEED * 1000 + op)
@@ -152,11 +161,13 @@ def main():
                                'cb/db JSONs are empty -> 12700 total'),
             'empty_ops': list(EMPTY_OPS),
             'total_tests': TOTAL_TESTS,
+            'mos_total_tests': 256 * SAMPLE,
             'capture_window_cycles': 16,
             'status_mask_pb': '0x6F',
             'final_offset': {'new_core': 0, 'golden': 1},
         },
-        'sampled_test_ids': sampled_test_ids(),
+        'sampled_test_ids': sampled_test_ids(WDC_DIR, EMPTY_OPS),
+        'sampled_test_ids_mos': sampled_test_ids(MOS_DIR),
         'files': {
             'rtl': {k: {r: sha256_of(r) for r in v} for k, v in RTL_FILES.items()},
             'tools_and_tbs': {r: sha256_of(r) for r in TOOL_FILES},
@@ -182,6 +193,23 @@ def main():
                                'files.rtl.golden', 'files.binaries.golden_sst',
                                'files.tools_and_tbs[module_tests/cpu_65c02/sst_driver.py]',
                                'files.results.golden_sweep_raw'],
+            },
+            'mos_new_sweep': {
+                'what': ('MOS 6502 SST sweep, new core (step 6; 64 opcode files '
+                         'are broken references — see FINAL_VERDICT.md §2.4)'),
+                'pass_count': summary_pass_count(RESULT_FILES['mos_new_sweep_summary']),
+                'depends_on': ['suite.commit', 'sweep.*', 'sampled_test_ids_mos',
+                               'files.rtl.new_core', 'files.binaries.new_core_sst',
+                               'files.tools_and_tbs[module_tests/cpu_65c02/sst_driver.py]',
+                               'files.results.mos_new_sweep_raw'],
+            },
+            'mos_golden_sweep': {
+                'what': 'MOS 6502 SST sweep, golden R65Cx2 (step 6)',
+                'pass_count': summary_pass_count(RESULT_FILES['mos_golden_summary']),
+                'depends_on': ['suite.commit', 'sweep.*', 'sampled_test_ids_mos',
+                               'files.rtl.golden', 'files.binaries.golden_sst',
+                               'files.tools_and_tbs[module_tests/cpu_65c02/sst_driver.py]',
+                               'files.results.mos_golden_sweep_raw'],
             },
         },
     }

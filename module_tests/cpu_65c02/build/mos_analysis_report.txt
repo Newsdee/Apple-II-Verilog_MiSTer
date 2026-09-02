@@ -1,0 +1,388 @@
+CAVEAT: the functional/timing-only split below is misleading —
+when a core takes more or fewer cycles than the suite expects, the
+snapshot at row[ncyc] is mid-instruction and "final" mismatches are
+artifacts. Trust the per-opcode tables and FINAL_VERDICT.md §2.
+MOS (6502) suite sweep analysis — sample=50 seed=1, 256 ops
+new core : 6706/12800 pass
+  failures: 4557 functional (final state wrong) / 1537 timing-only (bus trace, final OK)
+golden   : 7869/12800 pass
+  failures: 4753 functional / 178 timing-only
+
+per-opcode pass counts (of 50):  op   wdc_new mos_new mos_gold | delta mos-wdc(new)
+  00    50      28      28      -22
+  01    50      50      50      +0
+  02    50       0       0      -50
+  03    50       0       0      -50
+  04    50      50      50      +0
+  05    50      50      50      +0
+  06    50       0      50      -50
+  07    50       0       0      -50
+  08    50      50      50      +0
+  09    50      50      50      +0
+  0a    50      50      50      +0
+  0b    50       0       0      -50
+  0c    50      50      50      +0
+  0d    50      50      50      +0
+  0e    50       0      50      -50
+  0f     0       0       0      +0
+  10    50      50      50      +0
+  11    22      50      50      +28
+  12    50       0       0      -50
+  13    50       0       0      -50
+  14    50       0       0      -50
+  15    50      50      50      +0
+  16    50       0      50      -50
+  17    50       0       0      -50
+  18    50      50      50      +0
+  19    30      50      50      +20
+  1a    50       0       0      -50
+  1b    50       0       0      -50
+  1c    50       0       0      -50
+  1d    50      25      50      -25
+  1e    50       0      49      -50
+  1f     0       0       0      +0
+  20    50      50      50      +0
+  21    50      50      50      +0
+  22    50       0       0      -50
+  23    50       0       0      -50
+  24    50      50      50      +0
+  25    50      50      50      +0
+  26    50       0      50      -50
+  27    50       0       0      -50
+  28    50      50      50      +0
+  29    50      50      50      +0
+  2a    50      50      50      +0
+  2b    50       0       0      -50
+  2c    50      50      50      +0
+  2d    50      50      50      +0
+  2e    50       0      50      -50
+  2f     0       0       0      +0
+  30    50      50      50      +0
+  31    23      50      50      +27
+  32    50       0       0      -50
+  33    50       0       0      -50
+  34    50      11      11      -39
+  35    50      50      50      +0
+  36    50       0      50      -50
+  37    50       0       0      -50
+  38    50      50      50      +0
+  39    29      50      50      +21
+  3a    50       0       0      -50
+  3b    50       0       0      -50
+  3c    50       5      10      -45
+  3d    50      29      50      -21
+  3e    50       0      50      -50
+  3f     0       0       0      +0
+  40    50      50      49      +0
+  41    50      50      50      +0
+  42    50       0       0      -50
+  43    50       0       0      -50
+  44    50      50       0      +0
+  45    50      50      50      +0
+  46    50       0      50      -50
+  47    50       0       0      -50
+  48    50      50      50      +0
+  49    50      50      50      +0
+  4a    50      50      50      +0
+  4b    50       0       0      -50
+  4c    50      50      50      +0
+  4d    50      50      50      +0
+  4e    50       0      50      -50
+  4f     0       0       0      +0
+  50    50      50      50      +0
+  51    20      50      50      +30
+  52    50       0       0      -50
+  53    50       0       0      -50
+  54    50      50       0      +0
+  55    50      50      50      +0
+  56    50       0      50      -50
+  57    50       0       0      -50
+  58    50      50      50      +0
+  59    33      50      50      +17
+  5a    50      50       0      +0
+  5b    50       0       0      -50
+  5c     0       0       0      +0
+  5d    50      26      50      -24
+  5e    50       0      50      -50
+  5f     0       0       0      +0
+  60    50      50      50      +0
+  61    25      43      50      +18
+  62    50       0       0      -50
+  63    50       0       0      -50
+  64    50       0       0      -50
+  65    26      42      50      +16
+  66    50       0      50      -50
+  67    50       0       0      -50
+  68    50      50      50      +0
+  69    25      46      50      +21
+  6a    50      50      50      +0
+  6b    50       0       0      -50
+  6c     0       0      50      +0
+  6d    24      39      50      +15
+  6e    50       0      50      -50
+  6f     0       0       0      +0
+  70    50      50      50      +0
+  71    15      41      50      +26
+  72    23       0       0      -23
+  73    50       0       0      -50
+  74    50       0       0      -50
+  75    27      41      50      +14
+  76    50       0      50      -50
+  77    50       0       0      -50
+  78    50      50      50      +0
+  79    15      43      48      +28
+  7a    50      50       0      +0
+  7b    50       0       0      -50
+  7c     0       0      20      +0
+  7d    23      28      50      +5
+  7e    50       0      50      -50
+  7f     0       0       0      +0
+  80    50      50      50      +0
+  81    50      50      50      +0
+  82    50      50      50      +0
+  83    50       0       0      -50
+  84    50      50      50      +0
+  85    50      50      50      +0
+  86    50      50      50      +0
+  87    50       0       0      -50
+  88    50      50      50      +0
+  89    50      22      22      -28
+  8a    50      50      50      +0
+  8b    50       0       0      -50
+  8c    50      50      50      +0
+  8d    50      50      50      +0
+  8e    50      50      50      +0
+  8f     0       0       0      +0
+  90    50      50      50      +0
+  91     0      50      50      +50
+  92    50       0       0      -50
+  93    50       0       0      -50
+  94    50      50      50      +0
+  95    50      50      50      +0
+  96    50      50      50      +0
+  97    50       0       0      -50
+  98    50      50      50      +0
+  99     0      50      50      +50
+  9a    50      50      50      +0
+  9b    50       0       0      -50
+  9c    50       0       0      -50
+  9d    50       0      50      -50
+  9e    50       0       0      -50
+  9f     0       0       0      +0
+  a0    50      50      50      +0
+  a1    50      50      50      +0
+  a2    50      50      50      +0
+  a3    50       0       0      -50
+  a4    50      50      50      +0
+  a5    50      50      50      +0
+  a6    50      50      50      +0
+  a7    50       0       0      -50
+  a8    50      50      50      +0
+  a9    50      50      50      +0
+  aa    50      50      50      +0
+  ab    50       0       0      -50
+  ac    50      50      50      +0
+  ad    50      50      50      +0
+  ae    50      50      50      +0
+  af     0       0       0      +0
+  b0    50      50      50      +0
+  b1    25      50      50      +25
+  b2    50       0       0      -50
+  b3    50       0       0      -50
+  b4    50      50      50      +0
+  b5    50      50      50      +0
+  b6    50      50      50      +0
+  b7    50       0       0      -50
+  b8    50      50      50      +0
+  b9    26      50      50      +24
+  ba    50      50      50      +0
+  bb    50       0       0      -50
+  bc    50      27      50      -23
+  bd    50      28      50      -22
+  be    21      50      50      +29
+  bf     0       0       0      +0
+  c0    50      50      50      +0
+  c1    50      50      50      +0
+  c2    50      50      50      +0
+  c3    50       0       0      -50
+  c4    50      50      50      +0
+  c5    50      50      50      +0
+  c6    50       0      50      -50
+  c7    50       0       0      -50
+  c8    50      50      50      +0
+  c9    50      50      50      +0
+  ca    50      50      50      +0
+  cb     0       0       0      +0
+  cc    50      50      50      +0
+  cd    50      50      50      +0
+  ce    50       0      50      -50
+  cf     0       0       0      +0
+  d0    50      50      50      +0
+  d1    25      50      50      +25
+  d2    50       0       0      -50
+  d3    50       0       0      -50
+  d4    50      50       0      +0
+  d5    50      50      50      +0
+  d6    50       0      50      -50
+  d7    50       0       0      -50
+  d8    50      50      50      +0
+  d9    26      50      50      +24
+  da    50      50       0      +0
+  db     0       0       0      +0
+  dc     0       0       0      +0
+  dd    50      27      50      -23
+  de    50       0      50      -50
+  df     0       0       0      +0
+  e0    50      50      50      +0
+  e1    24      48      48      +24
+  e2    50      50      50      +0
+  e3    50       0       0      -50
+  e4    50      50      50      +0
+  e5    27      47      47      +20
+  e6    50       0      50      -50
+  e7    50       0       0      -50
+  e8    50      50      50      +0
+  e9    25      47      47      +22
+  ea    50      50      50      +0
+  eb    50       0       0      -50
+  ec    50      50      50      +0
+  ed    26      47      47      +21
+  ee    50       0      50      -50
+  ef     0       0       0      +0
+  f0    50      50      50      +0
+  f1    16      48      48      +32
+  f2    21       0       0      -21
+  f3    50       0       0      -50
+  f4    50      50       0      +0
+  f5    30      50      50      +20
+  f6    50       0      50      -50
+  f7    50       0       0      -50
+  f8    50      50      50      +0
+  f9    15      49      49      +34
+  fa    50      50       0      +0
+  fb    50       0       0      -50
+  fc     0       0       0      +0
+  fd    31      19      46      -12
+  fe    50       0      50      -50
+  ff     0       0       0      +0
+
+new core BETTER on MOS than WDC (28 ops): 11 19 31 39 51 59 61 65 69 6d 71 75 79 7d 91 99 b1 b9 be d1 d9 e1 e5 e9 ed f1 f5 f9
+
+new core WORSE on MOS than WDC (102 ops): 00 02 03 06 07 0b 0e 12 13 14 16 17 1a 1b 1c 1d 1e 22 23 26 27 2b 2e 32 33 34 36 37 3a 3b 3c 3d 3e 42 43 46 47 4b 4e 52 53 56 57 5b 5d 5e 62 63 64 66 67 6b 6e 72 73 74 76 77 7b 7e 83 87 89 8b 92 93 97 9b 9c 9d 9e a3 a7 ab b2 b3 b7 bb bc bd c3 c6 c7 ce d2 d3 d6 d7 dd de e3 e6 e7 eb ee f2 f3 f6 f7 fb fd fe
+
+new-core FUNCTIONAL failures on MOS (final A/P/S/PC/RAM wrong):
+  00: 22/50 functional (plus 0 timing-only, 28 pass)
+  02: 50/50 functional (plus 0 timing-only, 0 pass)
+  03: 50/50 functional (plus 0 timing-only, 0 pass)
+  07: 50/50 functional (plus 0 timing-only, 0 pass)
+  0b: 50/50 functional (plus 0 timing-only, 0 pass)
+  0f: 50/50 functional (plus 0 timing-only, 0 pass)
+  12: 50/50 functional (plus 0 timing-only, 0 pass)
+  13: 50/50 functional (plus 0 timing-only, 0 pass)
+  14: 25/50 functional (plus 25 timing-only, 0 pass)
+  17: 50/50 functional (plus 0 timing-only, 0 pass)
+  1a: 50/50 functional (plus 0 timing-only, 0 pass)
+  1b: 50/50 functional (plus 0 timing-only, 0 pass)
+  1c: 20/50 functional (plus 30 timing-only, 0 pass)
+  1e: 27/50 functional (plus 23 timing-only, 0 pass)
+  1f: 50/50 functional (plus 0 timing-only, 0 pass)
+  22: 50/50 functional (plus 0 timing-only, 0 pass)
+  23: 50/50 functional (plus 0 timing-only, 0 pass)
+  27: 50/50 functional (plus 0 timing-only, 0 pass)
+  2b: 50/50 functional (plus 0 timing-only, 0 pass)
+  2f: 50/50 functional (plus 0 timing-only, 0 pass)
+  32: 50/50 functional (plus 0 timing-only, 0 pass)
+  33: 50/50 functional (plus 0 timing-only, 0 pass)
+  34: 39/50 functional (plus 0 timing-only, 11 pass)
+  37: 50/50 functional (plus 0 timing-only, 0 pass)
+  3a: 50/50 functional (plus 0 timing-only, 0 pass)
+  3b: 50/50 functional (plus 0 timing-only, 0 pass)
+  3c: 40/50 functional (plus 5 timing-only, 5 pass)
+  3e: 21/50 functional (plus 29 timing-only, 0 pass)
+  3f: 50/50 functional (plus 0 timing-only, 0 pass)
+  42: 50/50 functional (plus 0 timing-only, 0 pass)
+  43: 50/50 functional (plus 0 timing-only, 0 pass)
+  47: 50/50 functional (plus 0 timing-only, 0 pass)
+  4b: 50/50 functional (plus 0 timing-only, 0 pass)
+  4f: 50/50 functional (plus 0 timing-only, 0 pass)
+  52: 50/50 functional (plus 0 timing-only, 0 pass)
+  53: 50/50 functional (plus 0 timing-only, 0 pass)
+  57: 50/50 functional (plus 0 timing-only, 0 pass)
+  5b: 50/50 functional (plus 0 timing-only, 0 pass)
+  5e: 28/50 functional (plus 22 timing-only, 0 pass)
+  5f: 50/50 functional (plus 0 timing-only, 0 pass)
+  61: 7/50 functional (plus 0 timing-only, 43 pass)
+  62: 50/50 functional (plus 0 timing-only, 0 pass)
+  63: 50/50 functional (plus 0 timing-only, 0 pass)
+  64: 50/50 functional (plus 0 timing-only, 0 pass)
+  65: 8/50 functional (plus 0 timing-only, 42 pass)
+  67: 50/50 functional (plus 0 timing-only, 0 pass)
+  69: 4/50 functional (plus 0 timing-only, 46 pass)
+  6b: 50/50 functional (plus 0 timing-only, 0 pass)
+  6c: 50/50 functional (plus 0 timing-only, 0 pass)
+  6d: 11/50 functional (plus 0 timing-only, 39 pass)
+  6f: 50/50 functional (plus 0 timing-only, 0 pass)
+  71: 9/50 functional (plus 0 timing-only, 41 pass)
+  72: 50/50 functional (plus 0 timing-only, 0 pass)
+  73: 50/50 functional (plus 0 timing-only, 0 pass)
+  74: 50/50 functional (plus 0 timing-only, 0 pass)
+  75: 9/50 functional (plus 0 timing-only, 41 pass)
+  77: 50/50 functional (plus 0 timing-only, 0 pass)
+  79: 7/50 functional (plus 0 timing-only, 43 pass)
+  7b: 50/50 functional (plus 0 timing-only, 0 pass)
+  7d: 6/50 functional (plus 16 timing-only, 28 pass)
+  7e: 29/50 functional (plus 21 timing-only, 0 pass)
+  7f: 50/50 functional (plus 0 timing-only, 0 pass)
+  83: 50/50 functional (plus 0 timing-only, 0 pass)
+  87: 50/50 functional (plus 0 timing-only, 0 pass)
+  89: 28/50 functional (plus 0 timing-only, 22 pass)
+  8b: 50/50 functional (plus 0 timing-only, 0 pass)
+  8f: 50/50 functional (plus 0 timing-only, 0 pass)
+  92: 50/50 functional (plus 0 timing-only, 0 pass)
+  93: 50/50 functional (plus 0 timing-only, 0 pass)
+  97: 50/50 functional (plus 0 timing-only, 0 pass)
+  9b: 50/50 functional (plus 0 timing-only, 0 pass)
+  9c: 50/50 functional (plus 0 timing-only, 0 pass)
+  9e: 50/50 functional (plus 0 timing-only, 0 pass)
+  9f: 50/50 functional (plus 0 timing-only, 0 pass)
+  a3: 50/50 functional (plus 0 timing-only, 0 pass)
+  a7: 50/50 functional (plus 0 timing-only, 0 pass)
+  ab: 50/50 functional (plus 0 timing-only, 0 pass)
+  af: 50/50 functional (plus 0 timing-only, 0 pass)
+  b2: 50/50 functional (plus 0 timing-only, 0 pass)
+  b3: 50/50 functional (plus 0 timing-only, 0 pass)
+  b7: 50/50 functional (plus 0 timing-only, 0 pass)
+  bb: 50/50 functional (plus 0 timing-only, 0 pass)
+  bf: 50/50 functional (plus 0 timing-only, 0 pass)
+  c3: 50/50 functional (plus 0 timing-only, 0 pass)
+  c7: 50/50 functional (plus 0 timing-only, 0 pass)
+  cb: 50/50 functional (plus 0 timing-only, 0 pass)
+  cf: 50/50 functional (plus 0 timing-only, 0 pass)
+  d2: 50/50 functional (plus 0 timing-only, 0 pass)
+  d3: 50/50 functional (plus 0 timing-only, 0 pass)
+  d7: 50/50 functional (plus 0 timing-only, 0 pass)
+  db: 50/50 functional (plus 0 timing-only, 0 pass)
+  dc: 24/50 functional (plus 26 timing-only, 0 pass)
+  df: 50/50 functional (plus 0 timing-only, 0 pass)
+  e1: 2/50 functional (plus 0 timing-only, 48 pass)
+  e3: 50/50 functional (plus 0 timing-only, 0 pass)
+  e5: 3/50 functional (plus 0 timing-only, 47 pass)
+  e7: 50/50 functional (plus 0 timing-only, 0 pass)
+  e9: 3/50 functional (plus 0 timing-only, 47 pass)
+  eb: 50/50 functional (plus 0 timing-only, 0 pass)
+  ed: 3/50 functional (plus 0 timing-only, 47 pass)
+  ef: 50/50 functional (plus 0 timing-only, 0 pass)
+  f1: 2/50 functional (plus 0 timing-only, 48 pass)
+  f2: 50/50 functional (plus 0 timing-only, 0 pass)
+  f3: 50/50 functional (plus 0 timing-only, 0 pass)
+  f7: 50/50 functional (plus 0 timing-only, 0 pass)
+  f9: 1/50 functional (plus 0 timing-only, 49 pass)
+  fb: 50/50 functional (plus 0 timing-only, 0 pass)
+  fc: 25/50 functional (plus 25 timing-only, 0 pass)
+  fd: 4/50 functional (plus 27 timing-only, 19 pass)
+  ff: 50/50 functional (plus 0 timing-only, 0 pass)
+
+golden passes / new core fails (MOS):
+  06 0e 16 1d 1e 26 2e 36 3c 3d 3e 46 4e 56 5d 5e 61 65 66 69 6c 6d 6e 71 75 76 79 7c 7d 7e 9d bc bd c6 ce d6 dd de e6 ee f6 fd fe
+new core passes / golden fails (MOS):
+  40 44 54 5a 7a d4 da f4 fa
