@@ -1,0 +1,4 @@
+# smoke3: v5.1 (sp0 == sp)
+1 bd 00 00 00 30 2000 4000 bd 2000=ea 2001=ea 2002=ea 2003=ea 2004=ea 2005=ea 2006=ea 2007=ea 2008=ea 2009=ea 200a=ea 200b=ea 200c=ea 200d=ea 200e=ea 200f=ea fffc=00 fffd=40
+2 bd 00 00 00 30 2000 4000 bd 2000=a9 2001=7f 2002=ea 2003=ea 2004=ea 2005=ea 2006=ea 2007=ea 2008=ea 2009=ea 200a=ea 200b=ea 200c=ea 200d=ea 200e=ea 200f=ea fffc=00 fffd=40
+3 bd 55 42 00 30 2000 4000 bd 2000=85 2001=40 2002=ea 2003=ea 2004=ea 2005=ea 2006=ea 2007=ea 2008=ea 2009=ea 200a=ea 200b=ea 200c=ea 200d=ea 200e=ea 200f=ea fffc=00 fffd=40

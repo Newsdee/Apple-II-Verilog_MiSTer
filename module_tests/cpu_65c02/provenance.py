@@ -43,6 +43,7 @@ TOTAL_TESTS = 254 * SAMPLE        # 12700 (WDC); MOS has all 256 files -> 12800
 RTL_FILES = {
     'new_core':     ['rtl/new_cpu/cpu_65c02.sv', 'rtl/new_cpu/cpu_alu.sv'],
     'new_core_v2':  ['rtl/new_cpu_v2/cpu_65c02.sv', 'rtl/new_cpu_v2/cpu_alu.sv'],
+    'new_6502_core': ['rtl/new_6502/cpu_65c02.sv', 'rtl/new_6502/cpu_alu.sv'],
     'golden':       ['rtl/R65Cx2.sv'],
     't65':          ['module_tests/t65/t65_verilog_tb.sv'],
 }
@@ -69,11 +70,13 @@ TOOL_FILES = [
     'module_tests/cpu_65c02/build/analyze_bcd_xf.py',
     'module_tests/cpu_65c02/build/regen_all_summaries.py',
     'module_tests/cpu_65c02/build/v2nmos_report.py',
+    'module_tests/cpu_65c02/build/new6502_report.py',
 ]
 BINARY_FILES = {
     'new_core_sst':  'module_tests/cpu_65c02/evidence/Vcpu65_sst_tb.exe',
     'new_core_v2_sst': 'module_tests/cpu_65c02/evidence/Vcpu65_sst_tb_v2_wdc.exe',
     'new_core_v2_sst_nmos': 'module_tests/cpu_65c02/evidence/Vcpu65_sst_tb_v2_nmos.exe',
+    'new_6502_sst': 'module_tests/cpu_65c02/evidence/Vcpu65_sst_tb_6502.exe',
     'golden_sst':    'module_tests/cpu_65c02/evidence/Vr65cx2_sst_tb.exe',
     'pair_new_core': 'module_tests/cpu_65c02/evidence/Vcpu65_r65_tb.exe',
 }
@@ -95,6 +98,8 @@ RESULT_FILES = {
     'v2_wdc_sweep_raw':      'module_tests/cpu_65c02/evidence/sweep_wdc_v2_results.txt',
     'v2_mos_sweep_raw':      'module_tests/cpu_65c02/evidence/sweep_6502_v2_results.txt',
     'v2_mos_nmos_sweep_raw': 'module_tests/cpu_65c02/evidence/sweep_6502_v2nmos_results.txt',
+    'new6502_mos_sweep_raw': 'module_tests/cpu_65c02/evidence/sweep_6502_new6502_results.txt',
+    'new6502_report':        'module_tests/cpu_65c02/build/new6502_report.txt',
     'v2_rockwell_sweep_raw': 'module_tests/cpu_65c02/evidence/sweep_rockwell_v2_results.txt',
     'v2_synertek_sweep_raw': 'module_tests/cpu_65c02/evidence/sweep_synertek_v2_results.txt',
     'rockwell_v1_sweep_raw': 'module_tests/cpu_65c02/evidence/sweep_rockwell_v1_results.txt',
@@ -337,6 +342,17 @@ def main():
                  'files.binaries.new_core_v2_sst_nmos',
                  'files.tools_and_tbs[module_tests/cpu_65c02/sst_driver.py]',
                  'files.results.v2_mos_nmos_sweep_raw'], prev_retained),
+            'new6502_mos_sweep': _retained(
+                'new6502_mos_sweep',
+                ('MOS 6502 SST sweep, rtl/new_6502 (netlist-derived '
+                 'NMOS-specialized 65C02 variant), WDC_MODE=0'),
+                '6502', 'new6502_mos_sweep_raw', 0,
+                ['suite.commit', 'sweep.*', 'sampled_test_ids_mos',
+                 'files.rtl.new_6502_core',
+                 'files.binaries.new_6502_sst',
+                 'files.tools_and_tbs[module_tests/cpu_65c02/sst_driver.py]',
+                 'files.results.new6502_mos_sweep_raw',
+                 'files.results.new6502_report'], prev_retained),
             'v2_rockwell_sweep': _retained(
                 'v2_rockwell_sweep',
                 'Rockwell 65C02 SST sweep, v2 core',
@@ -368,7 +384,8 @@ def main():
     missing = [r for r in all_files if sha256_of(r) is None]
     print('wrote', os.path.relpath(out, REPO))
     print('suite commit:', doc['suite']['commit'], 'clean:', doc['suite']['tree_clean'])
-    for k in ('new_core_sweep', 'golden_sweep', 'v2_wdc_sweep', 'v2_mos_nmos_sweep'):
+    for k in ('new_core_sweep', 'golden_sweep', 'v2_wdc_sweep',
+              'v2_mos_nmos_sweep', 'new6502_mos_sweep'):
         print(' %s: %s' % (k, doc['retained_results'][k]['pass_count']))
     if missing:
         print('MISSING files:')

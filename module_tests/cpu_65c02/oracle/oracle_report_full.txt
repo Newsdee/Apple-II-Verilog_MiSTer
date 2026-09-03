@@ -1,0 +1,129 @@
+perfect6502 netlist oracle report (tag=full, 12796 tests)
+skipped specs: {'vector-area collision with initial ram': 4}
+oracle R lines: 12796, U/F: 0
+suite pass (final_offset=-1, netlist commit convention): 822/12796
+suite pass P-exempt (final_offset=-1): 10181/12796 (netlist-valid; P readout is an A alias in this netlist)
+p-limited (failed only on the final-P line): 9657
+late-commit rescues (register failures dropped, see late_commit_rescue): 2846
+per-op full pass/fail (offset -1): 00:1/50 01:0/50 02:0/50 03:3/50 04:1/50 05:4/50 06:5/50 07:8/50 08:1/50 09:1/50 0a:9/50 0b:0/50 0c:1/50 0d:3/50 0e:4/50 0f:6/50 10:3/50 11:2/50 12:0/50 13:3/50 14:2/50 15:3/50 16:3/50 17:8/50 18:3/50 19:3/50 1a:2/50 1b:12/50 1c:0/50 1d:6/50 1e:6/50 1f:4/50 20:0/50 21:7/50 22:0/50 23:1/50 24:5/50 25:2/50 26:3/50 27:2/50 28:50/50 29:6/50 2a:1/50 2b:0/50 2c:6/50 2d:3/50 2e:2/50 2f:4/50 30:1/50 31:4/50 32:0/50 33:8/50 34:4/50 35:8/50 36:3/50 37:3/49 38:4/50 39:2/50 3a:0/50 3b:0/50 3c:3/50 3d:1/50 3e:3/50 3f:3/50 40:50/50 41:4/50 42:0/50 43:8/50 44:1/50 45:4/50 46:6/50 47:6/50 48:3/50 49:5/50 4a:6/50 4b:0/50 4c:1/50 4d:1/50 4e:3/50 4f:6/50 50:4/50 51:2/50 52:0/50 53:5/50 54:4/50 55:3/50 56:6/50 57:6/50 58:2/50 59:5/50 5a:3/50 5b:7/50 5c:5/50 5d:5/50 5e:6/50 5f:5/50 60:1/50 61:4/50 62:0/50 63:3/50 64:0/50 65:3/50 66:4/50 67:2/50 68:4/50 69:2/50 6a:2/50 6b:0/50 6c:2/50 6d:2/49 6e:3/50 6f:1/50 70:1/50 71:1/50 72:0/50 73:1/50 74:2/50 75:3/50 76:1/50 77:2/50 78:1/50 79:6/50 7a:3/50 7b:2/50 7c:2/50 7d:2/50 7e:6/50 7f:2/50 80:4/50 81:2/50 82:1/50 83:0/50 84:3/50 85:3/50 86:2/49 87:0/50 88:5/50 89:1/50 8a:5/50 8b:6/50 8c:2/50 8d:1/50 8e:1/50 8f:2/50 90:1/50 91:3/50 92:0/50 93:2/50 94:3/50 95:1/50 96:1/50 97:0/50 98:2/50 99:3/50 9a:1/50 9b:1/50 9c:1/50 9d:2/50 9e:2/50 9f:2/50 a0:4/50 a1:2/50 a2:1/50 a3:3/50 a4:4/50 a5:6/50 a6:3/50 a7:2/50 a8:1/50 a9:5/50 aa:3/50 ab:0/50 ac:2/50 ad:3/50 ae:3/50 af:3/50 b0:1/50 b1:2/50 b2:0/50 b3:2/50 b4:4/50 b5:7/50 b6:4/50 b7:2/50 b8:2/50 b9:6/50 ba:2/50 bb:6/50 bc:3/50 bd:3/50 be:2/50 bf:6/50 c0:4/50 c1:0/50 c2:0/50 c3:5/50 c4:3/50 c5:5/50 c6:4/50 c7:4/50 c8:2/50 c9:2/50 ca:6/50 cb:9/50 cc:3/50 cd:3/50 ce:2/50 cf:3/50 d0:0/50 d1:5/50 d2:0/50 d3:4/50 d4:4/50 d5:4/50 d6:3/50 d7:1/50 d8:4/50 d9:2/50 da:0/50 db:6/50 dc:3/50 dd:2/50 de:3/50 df:0/50 e0:2/50 e1:0/50 e2:1/50 e3:3/50 e4:4/50 e5:3/50 e6:6/50 e7:4/50 e8:5/50 e9:4/50 ea:1/50 eb:5/50 ec:5/50 ed:3/50 ee:1/50 ef:3/50 f0:0/50 f1:0/49 f2:0/50 f3:0/50 f4:2/50 f5:0/50 f6:2/50 f7:3/50 f8:2/50 f9:1/50 fa:5/50 fb:2/50 fc:4/50 fd:3/50 fe:2/50 ff:4/50
+per-op P-exempt pass/fail: 00:1/50 01:50/50 02:0/50 03:50/50 04:50/50 05:50/50 06:50/50 07:50/50 08:1/50 09:50/50 0a:50/50 0b:4/50 0c:50/50 0d:50/50 0e:50/50 0f:50/50 10:42/50 11:50/50 12:0/50 13:50/50 14:50/50 15:50/50 16:50/50 17:50/50 18:50/50 19:50/50 1a:50/50 1b:50/50 1c:50/50 1d:50/50 1e:50/50 1f:50/50 20:50/50 21:50/50 22:0/50 23:29/50 24:50/50 25:50/50 26:21/50 27:22/50 28:50/50 29:50/50 2a:25/50 2b:4/50 2c:50/50 2d:50/50 2e:24/50 2f:26/50 30:39/50 31:50/50 32:0/50 33:27/50 34:50/50 35:50/50 36:25/50 37:27/49 38:50/50 39:50/50 3a:50/50 3b:26/50 3c:50/50 3d:50/50 3e:23/50 3f:21/50 40:50/50 41:50/50 42:0/50 43:50/50 44:50/50 45:50/50 46:50/50 47:50/50 48:50/50 49:50/50 4a:50/50 4b:4/50 4c:50/50 4d:50/50 4e:50/50 4f:50/50 50:50/50 51:50/50 52:0/50 53:50/50 54:50/50 55:50/50 56:50/50 57:50/50 58:50/50 59:50/50 5a:50/50 5b:50/50 5c:50/50 5d:50/50 5e:50/50 5f:50/50 60:50/50 61:12/50 62:0/50 63:15/50 64:50/50 65:15/50 66:22/50 67:14/50 68:50/50 69:8/50 6a:17/50 6b:0/50 6c:50/50 6d:10/49 6e:22/50 6f:8/50 70:21/50 71:8/50 72:0/50 73:10/50 74:50/50 75:13/50 76:20/50 77:12/50 78:50/50 79:16/50 7a:50/50 7b:14/50 7c:50/50 7d:17/50 7e:25/50 7f:11/50 80:50/50 81:50/50 82:50/50 83:50/50 84:50/50 85:50/50 86:49/49 87:50/50 88:50/50 89:50/50 8a:50/50 8b:25/50 8c:50/50 8d:50/50 8e:50/50 8f:50/50 90:50/50 91:50/50 92:0/50 93:50/50 94:50/50 95:50/50 96:50/50 97:50/50 98:50/50 99:50/50 9a:50/50 9b:50/50 9c:50/50 9d:50/50 9e:50/50 9f:50/50 a0:50/50 a1:50/50 a2:50/50 a3:50/50 a4:50/50 a5:50/50 a6:50/50 a7:50/50 a8:50/50 a9:50/50 aa:50/50 ab:11/50 ac:50/50 ad:50/50 ae:50/50 af:50/50 b0:22/50 b1:50/50 b2:0/50 b3:50/50 b4:50/50 b5:50/50 b6:50/50 b7:50/50 b8:50/50 b9:50/50 ba:50/50 bb:50/50 bc:50/50 bd:50/50 be:50/50 bf:50/50 c0:50/50 c1:50/50 c2:50/50 c3:50/50 c4:50/50 c5:50/50 c6:50/50 c7:50/50 c8:50/50 c9:50/50 ca:50/50 cb:50/50 cc:50/50 cd:50/50 ce:50/50 cf:50/50 d0:50/50 d1:50/50 d2:0/50 d3:50/50 d4:50/50 d5:50/50 d6:50/50 d7:50/50 d8:50/50 d9:50/50 da:50/50 db:50/50 dc:50/50 dd:50/50 de:50/50 df:50/50 e0:50/50 e1:13/50 e2:50/50 e3:13/50 e4:50/50 e5:13/50 e6:50/50 e7:16/50 e8:50/50 e9:20/50 ea:50/50 eb:20/50 ec:50/50 ed:15/50 ee:50/50 ef:12/50 f0:21/50 f1:12/49 f2:0/50 f3:17/50 f4:50/50 f5:17/50 f6:50/50 f7:14/50 f8:50/50 f9:17/50 fa:50/50 fb:16/50 fc:50/50 fd:16/50 fe:50/50 ff:21/50
+per-op late-commit rescues: 01:47 03:43 05:47 07:46 09:47 0a:50 0d:47 0f:42 11:43 13:39 15:45 17:45 19:44 1b:41 1d:45 1f:47 21:48 23:38 25:45 27:38 29:45 2a:25 2d:48 2f:28 31:45 33:33 35:47 37:36 39:44 3b:37 3d:45 3f:29 41:50 43:50 45:50 47:50 49:50 4a:50 4b:4 4d:50 4f:49 51:50 53:49 55:50 57:50 59:50 5b:49 5d:50 5f:50 61:12 63:15 65:15 67:14 69:8 6a:17 6d:10 6f:8 71:8 73:10 75:13 77:12 79:15 7b:14 7d:16 7f:11 88:50 c8:50 ca:50 cb:50 e1:12 e3:13 e5:13 e7:15 e8:50 e9:20 eb:20 ed:15 ef:11 f1:12 f3:17 f5:17 f7:14 f9:17 fb:15 fd:16 ff:21
+
+first failing details (offset -1, post-rescue):
+  idx 0 op 00 off-1: cyc4: data B4 != expected 7D
+  idx 1 op 00 off-1: cyc4: data B4 != expected B0
+  idx 2 op 00 off-1: cyc4: data 34 != expected BF
+  idx 3 op 00 off-1: cyc4: data 34 != expected 35
+  idx 4 op 00 off-1: cyc4: data 34 != expected F5
+  idx 5 op 00 off-1: cyc4: data 34 != expected BF
+  idx 6 op 00 off-1: cyc4: data 34 != expected 39
+  idx 7 op 00 off-1: cyc4: data B4 != expected B2
+  idx 8 op 00 off-1: cyc4: data B4 != expected F0
+  idx 9 op 00 off-1: cyc4: data B4 != expected 75
+  idx 10 op 00 off-1: cyc4: data 34 != expected 74
+  idx 11 op 00 off-1: cyc4: data B4 != expected 37
+
+$5C next-fetch start row (first READ at final PC, 1-based row): {'row 6': 23, 'row 5': 27}
+
+op 80 behaviour (16-cycle window, per test):
+  finalPC=021E nxtRow=3 nop x1
+  finalPC=0E25 nxtRow=3 nop x1
+  finalPC=1F14 nxtRow=3 nop x1
+  finalPC=24B2 nxtRow=3 nop x1
+  finalPC=26BA nxtRow=3 nop x1
+  finalPC=2A6E nxtRow=3 nop x1
+  finalPC=2E59 nxtRow=3 nop x1
+  finalPC=36A6 nxtRow=3 nop x1
+  finalPC=3B2D nxtRow=3 nop x1
+  finalPC=3B37 nxtRow=3 nop x1
+  finalPC=4555 nxtRow=3 nop x1
+  finalPC=5371 nxtRow=3 nop x1
+  finalPC=5976 nxtRow=3 nop x1
+  finalPC=5E02 nxtRow=3 nop x1
+  finalPC=60D4 nxtRow=3 nop x1
+  finalPC=6570 nxtRow=3 nop x1
+  finalPC=65F7 nxtRow=3 nop x1
+  finalPC=6BB5 nxtRow=3 nop x1
+  finalPC=6FBD nxtRow=3 nop x1
+  finalPC=70A3 nxtRow=3 nop x1
+  finalPC=75BB nxtRow=3 nop x1
+  finalPC=7B98 nxtRow=3 nop x1
+  finalPC=7D1B nxtRow=3 nop x1
+  finalPC=7E1B nxtRow=3 nop x1
+  finalPC=7F82 nxtRow=3 nop x1
+  finalPC=874A nxtRow=3 nop x1
+  finalPC=9265 nxtRow=3 nop x1
+  finalPC=95C0 nxtRow=3 nop x1
+  finalPC=98BC nxtRow=3 nop x1
+  finalPC=9DE9 nxtRow=3 nop x1
+  finalPC=A7A0 nxtRow=3 nop x1
+  finalPC=AAE6 nxtRow=3 nop x1
+  finalPC=AC41 nxtRow=3 nop x1
+  finalPC=BB4C nxtRow=3 nop x1
+  finalPC=BD36 nxtRow=3 nop x1
+  finalPC=C25D nxtRow=3 nop x1
+  finalPC=C60A nxtRow=3 nop x1
+  finalPC=C809 nxtRow=3 nop x1
+  finalPC=CAD2 nxtRow=3 nop x1
+  finalPC=CD27 nxtRow=3 nop x1
+  finalPC=CE8A nxtRow=3 nop x1
+  finalPC=CF44 nxtRow=3 nop x1
+  finalPC=D9D1 nxtRow=3 nop x1
+  finalPC=E444 nxtRow=3 nop x1
+  finalPC=E463 nxtRow=3 nop x1
+  finalPC=E6C0 nxtRow=3 nop x1
+  finalPC=EB2D nxtRow=3 nop x1
+  finalPC=ED9E nxtRow=3 nop x1
+  finalPC=F0DE nxtRow=3 nop x1
+  finalPC=F227 nxtRow=3 nop x1
+op 7c behaviour (16-cycle window, per test):
+  finalPC=0FB2 nxtRow=6 other x1
+  finalPC=13B8 nxtRow=6 other x1
+  finalPC=1852 nxtRow=5 other x1
+  finalPC=1AB2 nxtRow=5 other x1
+  finalPC=2110 nxtRow=6 other x1
+  finalPC=3489 nxtRow=6 other x1
+  finalPC=3DA7 nxtRow=6 other x1
+  finalPC=3E31 nxtRow=5 other x1
+  finalPC=467B nxtRow=6 other x1
+  finalPC=505F nxtRow=6 other x1
+  finalPC=5539 nxtRow=6 other x1
+  finalPC=58DA nxtRow=5 other x1
+  finalPC=5FDA nxtRow=6 other x1
+  finalPC=60B6 nxtRow=6 other x1
+  finalPC=6C0E nxtRow=5 other x1
+  finalPC=6FDF nxtRow=6 other x1
+  finalPC=7424 nxtRow=6 other x1
+  finalPC=7484 nxtRow=6 other x1
+  finalPC=7EEF nxtRow=5 other x1
+  finalPC=811F nxtRow=6 other x1
+  finalPC=8214 nxtRow=5 other x1
+  finalPC=8C43 nxtRow=6 other x1
+  finalPC=8E37 nxtRow=5 other x1
+  finalPC=8E7D nxtRow=6 other x1
+  finalPC=8F0D nxtRow=5 other x1
+  finalPC=9090 nxtRow=6 other x1
+  finalPC=96D4 nxtRow=5 other x1
+  finalPC=9A75 nxtRow=6 other x1
+  finalPC=9BDF nxtRow=5 other x1
+  finalPC=A0FB nxtRow=5 other x1
+  finalPC=ABC8 nxtRow=5 other x1
+  finalPC=B08A nxtRow=6 other x1
+  finalPC=B5C8 nxtRow=6 other x1
+  finalPC=B9A2 nxtRow=6 other x1
+  finalPC=C03D nxtRow=5 other x1
+  finalPC=C051 nxtRow=6 other x1
+  finalPC=C0A0 nxtRow=5 other x1
+  finalPC=C31F nxtRow=5 other x1
+  finalPC=C88D nxtRow=5 other x1
+  finalPC=CECF nxtRow=6 other x1
+  finalPC=D068 nxtRow=5 other x1
+  finalPC=D5B3 nxtRow=6 other x1
+  finalPC=D9EF nxtRow=6 other x1
+  finalPC=DD17 nxtRow=6 other x1
+  finalPC=DF30 nxtRow=6 other x1
+  finalPC=F063 nxtRow=5 other x1
+  finalPC=F3F2 nxtRow=6 other x1
+  finalPC=F92C nxtRow=6 other x1
+  finalPC=F985 nxtRow=5 other x1
+  finalPC=FFCC nxtRow=6 other x1

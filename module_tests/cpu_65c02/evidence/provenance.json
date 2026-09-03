@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-09-02T20:54:01+00:00",
+ "generated_at": "2026-09-03T02:53:38+00:00",
  "python": "3.14.3",
  "suite": {
   "path": "E:\\MiSTer\\Apple-II_FPGAdev\\65x02",
@@ -53189,6 +53189,10 @@
     "rtl/new_cpu_v2/cpu_65c02.sv": "4ccd067ac5c03827391a4905ed77767054c755acb289ee0c8beb0f6cc02eb1ae",
     "rtl/new_cpu_v2/cpu_alu.sv": "b83116dc82ddb1ff729c56830b35cf93ac110c7805ae22baf16e2d39f61af249"
    },
+   "new_6502_core": {
+    "rtl/new_6502/cpu_65c02.sv": "b97dcbdc8ff484951e42dbb62643937151efd8ea2392f9b670c36dfabd99f517",
+    "rtl/new_6502/cpu_alu.sv": "5232afd91d68079dc10afa84850bc24e7ab134da168028b7cfd9078777460f9d"
+   },
    "golden": {
     "rtl/R65Cx2.sv": "145d377a3ec96979cefe40215817901ff981f50bbca6cd80d0495a710394492f"
    },
@@ -53197,12 +53201,12 @@
    }
   },
   "tools_and_tbs": {
-   "module_tests/cpu_65c02/sst_driver.py": "9561d76b2b20dc8bc6d99d160a576ecfade0297c5b2fd6c97cb02f621f73e050",
+   "module_tests/cpu_65c02/sst_driver.py": "cc35db5d8c4edc0ccc4eb73afbdc855a36f95c74f3f2a55e2953e8048b437945",
    "module_tests/cpu_65c02/semantic_compare.py": "9cfdef00e8ab8518d6ad4ff09765f3ac875135504086b3b58cf2d21a896efeb3",
    "module_tests/cpu_65c02/semantic_whitelist.txt": "07f362475ebf792d615ee41410d5125c4d7992f24785c5cffc06a0bf8c4a07f3",
    "module_tests/cpu_65c02/p3_cases.py": "238330ff4dd5dac82908e63672ff92f7c28ff2cc0900e6423ca187628d9399a7",
    "module_tests/cpu_65c02/rebuild_summary.py": "60c5973c0cd54295e5857ca59b02989a44be3bf78fddc2549f5e0566699af78e",
-   "module_tests/cpu_65c02/provenance.py": "a1eb61e882a4988e4e273c3ce32e4bc61cebfc6646e50f766cc3ef7acb91dd7e",
+   "module_tests/cpu_65c02/provenance.py": "4eee73ba0fe99bd7a47c3df1fe7da0eaebe62b1f3abbe96e68549611b542a858",
    "module_tests/cpu_65c02/cpu65_sst_tb.sv": "e0738c2adfdab3622d162228a06a9756f1ed53f12230d8acec2e5c38176689da",
    "module_tests/cpu_65c02/r65cx2_sst_tb.sv": "77bdc6547f7cbe92a5266f539db73cf927ad0b206ec3bd548f22084d7ae3a593",
    "module_tests/cpu_65c02/cpu65_r65_tb.sv": "6d0fc3b04f326ac14857b7b1038d17e51c247b49482eaf3613a88c0b7ea3e2b6",
@@ -53213,17 +53217,19 @@
    "module_tests/cpu_65c02/build/bcd_classify.py": "fd2c19453747f353004709e292a561d8d25476761b2314d573f26872765e256a",
    "module_tests/cpu_65c02/build/bcd_bus_check.py": "ffdae6ebe67447e1ba945670f57688549ef07ef3d0662f7fda805bdaaf9e9625",
    "module_tests/cpu_65c02/build/v2_reconcile.py": "40581b54bd1132cf95747adda820ac23dd32957dd541743d1efbf5503a3feebd",
-   "module_tests/cpu_65c02/build/v2_compare.py": "b0392e0bfca89fb9305be9bc285403632dadfdafc6bbf181de91bde267a869e0",
+   "module_tests/cpu_65c02/build/v2_compare.py": "65fd565796307a44617c4efdfc620f23c88807bacc9a5394471acaaeadde1b43",
    "module_tests/cpu_65c02/build/mos_bothfail_decomp.py": "6b85c887f96a67bc709161559ce32e56abdbc9e92841056faf09f1125de98107",
    "module_tests/cpu_65c02/build/analyze_7c_nmos.py": "3558a56ec86a70df18d2e4023e51464ad98600780ba8a4d1a2b24a5a85e4b135",
    "module_tests/cpu_65c02/build/analyze_bcd_xf.py": "a6443fa9f5cfb4127704ff9d8176cb94c03c77ce83b8855bff9b15f1174789f7",
-   "module_tests/cpu_65c02/build/regen_all_summaries.py": "6dd54697f855fc1559f1219d4c9bd60de685dc7b48595381d6aaf94cae55fc20",
-   "module_tests/cpu_65c02/build/v2nmos_report.py": "de29c3212de99e55ee774e16000f1fbed0ea60de6297cda440542bf3fa9f7bef"
+   "module_tests/cpu_65c02/build/regen_all_summaries.py": "60e238c7dc772284e1e792ddfcc152e2de125cc33d83c1173e6aa26dbdea7a8a",
+   "module_tests/cpu_65c02/build/v2nmos_report.py": "de29c3212de99e55ee774e16000f1fbed0ea60de6297cda440542bf3fa9f7bef",
+   "module_tests/cpu_65c02/build/new6502_report.py": "aa43faba865ce381bc81ba16c9cce95a38b5ced669ed33ca0eb9f2d91669f4b8"
   },
   "binaries": {
    "new_core_sst": "604cf1617c6cb2adf52bdc11de0679c0561341a5b1aa6361f9f4d631f39cd32d",
    "new_core_v2_sst": "87c5d18e5633ea1cb68e727617bd622a8e415750803412dba5a8b2f530b1024d",
    "new_core_v2_sst_nmos": "8a0572baee0a3405fa11f4291f18e02a2ad545289104b0cbfce73ef708ae6487",
+   "new_6502_sst": "f046de7159c50b5156abd3d3d98e30b53bd74e8938cfe05d4b5129555a99e137",
    "golden_sst": "f4266ab5bb8ec47a5f0b2c7559edb4cafc4193cc7835c2bbdf92508f4a765a11",
    "pair_new_core": "eb0325405893e608212bcb1fcd5c38890c94a92102fae8db773b639557a8a9bf"
   },
@@ -53296,6 +53302,14 @@
     "sha256": "178aa386c4147c3025c2c3220f90c84bc9665ca6c8d18a5cf3f0f4668b276bbb",
     "lines": 12800
    },
+   "new6502_mos_sweep_raw": {
+    "sha256": "42213e2a5d3ee3b99180b553758f0f53a2ad3c787ff7523ab9a943a1d4ec7298",
+    "lines": 12800
+   },
+   "new6502_report": {
+    "sha256": "c064e4f675eab83cdd8b4607732bdc5591fd3782269e892e8565223e438c5152",
+    "lines": 92
+   },
    "v2_rockwell_sweep_raw": {
     "sha256": "c1686c83026d6522c7bb3c6bd7ee4159a7b15e67f4022fb776b0cc69ab437303",
     "lines": 12800
@@ -53333,8 +53347,8 @@
     "lines": 192
    },
    "analyze_7c_report": {
-    "sha256": "9123b1a86929de7c1b51b08edffc27e9dd885a98cc2b1423f6fbc611827b159a",
-    "lines": 101
+    "sha256": "21ac9d1eb561a9894a11776aa7ff71773fc7b149e891390d453e34829974c4b3",
+    "lines": 61
    },
    "v2_mos_newonly_list": {
     "sha256": "f8a687d997240a1c0da890c66342b9eb6cac4f11a2a806f229c779f18a9ef1a5",
@@ -53350,7 +53364,7 @@
     "suite": "wdc65c02",
     "raw_sha256": "9094a90b92ae4cd08828cbfd6bc770d2b7a09a6188a3a0efcc50b6518e886d14",
     "checker_sha256": [
-     "9561d76b2b20dc8bc6d99d160a576ecfade0297c5b2fd6c97cb02f621f73e050",
+     "cc35db5d8c4edc0ccc4eb73afbdc855a36f95c74f3f2a55e2953e8048b437945",
      "60c5973c0cd54295e5857ca59b02989a44be3bf78fddc2549f5e0566699af78e"
     ],
     "final_offset": 0,
@@ -53374,7 +53388,7 @@
     "suite": "wdc65c02",
     "raw_sha256": "9f51483992e709adf68bedbe3d0a34accfbb345c6698719bff0ef0ee8c95d52b",
     "checker_sha256": [
-     "9561d76b2b20dc8bc6d99d160a576ecfade0297c5b2fd6c97cb02f621f73e050",
+     "cc35db5d8c4edc0ccc4eb73afbdc855a36f95c74f3f2a55e2953e8048b437945",
      "60c5973c0cd54295e5857ca59b02989a44be3bf78fddc2549f5e0566699af78e"
     ],
     "final_offset": 1,
@@ -53398,7 +53412,7 @@
     "suite": "6502",
     "raw_sha256": "e8d7d6de330f4e5c620fb02e4ae7803bd6bf5f0cabd33928cf8b78bd9362ebcd",
     "checker_sha256": [
-     "9561d76b2b20dc8bc6d99d160a576ecfade0297c5b2fd6c97cb02f621f73e050",
+     "cc35db5d8c4edc0ccc4eb73afbdc855a36f95c74f3f2a55e2953e8048b437945",
      "60c5973c0cd54295e5857ca59b02989a44be3bf78fddc2549f5e0566699af78e"
     ],
     "final_offset": 0,
@@ -53422,7 +53436,7 @@
     "suite": "6502",
     "raw_sha256": "54fa9d8e5e119ed49f1e86375414a78ccc764fedc88a1ae26933a0c103405cc5",
     "checker_sha256": [
-     "9561d76b2b20dc8bc6d99d160a576ecfade0297c5b2fd6c97cb02f621f73e050",
+     "cc35db5d8c4edc0ccc4eb73afbdc855a36f95c74f3f2a55e2953e8048b437945",
      "60c5973c0cd54295e5857ca59b02989a44be3bf78fddc2549f5e0566699af78e"
     ],
     "final_offset": 1,
@@ -53446,7 +53460,7 @@
     "suite": "wdc65c02",
     "raw_sha256": "22ff516a304394c9d871ffac2026745f93afd3b6d98367fa326b00ebd4b82223",
     "checker_sha256": [
-     "9561d76b2b20dc8bc6d99d160a576ecfade0297c5b2fd6c97cb02f621f73e050",
+     "cc35db5d8c4edc0ccc4eb73afbdc855a36f95c74f3f2a55e2953e8048b437945",
      "60c5973c0cd54295e5857ca59b02989a44be3bf78fddc2549f5e0566699af78e"
     ],
     "final_offset": 0,
@@ -53470,7 +53484,7 @@
     "suite": "6502",
     "raw_sha256": "2d61642bca863ebb70774a1f274c29c37d3c4e1cbdfde5db4adbdcfb6f0132c7",
     "checker_sha256": [
-     "9561d76b2b20dc8bc6d99d160a576ecfade0297c5b2fd6c97cb02f621f73e050",
+     "cc35db5d8c4edc0ccc4eb73afbdc855a36f95c74f3f2a55e2953e8048b437945",
      "60c5973c0cd54295e5857ca59b02989a44be3bf78fddc2549f5e0566699af78e"
     ],
     "final_offset": 0,
@@ -53494,7 +53508,7 @@
     "suite": "6502",
     "raw_sha256": "178aa386c4147c3025c2c3220f90c84bc9665ca6c8d18a5cf3f0f4668b276bbb",
     "checker_sha256": [
-     "9561d76b2b20dc8bc6d99d160a576ecfade0297c5b2fd6c97cb02f621f73e050",
+     "cc35db5d8c4edc0ccc4eb73afbdc855a36f95c74f3f2a55e2953e8048b437945",
      "60c5973c0cd54295e5857ca59b02989a44be3bf78fddc2549f5e0566699af78e"
     ],
     "final_offset": 0,
@@ -53511,6 +53525,31 @@
     "files.results.v2_mos_nmos_sweep_raw"
    ]
   },
+  "new6502_mos_sweep": {
+   "what": "MOS 6502 SST sweep, rtl/new_6502 (netlist-derived NMOS-specialized 65C02 variant), WDC_MODE=0",
+   "pass_count": "7973/12800",
+   "pass_count_inputs": {
+    "suite": "6502",
+    "raw_sha256": "42213e2a5d3ee3b99180b553758f0f53a2ad3c787ff7523ab9a943a1d4ec7298",
+    "checker_sha256": [
+     "cc35db5d8c4edc0ccc4eb73afbdc855a36f95c74f3f2a55e2953e8048b437945",
+     "60c5973c0cd54295e5857ca59b02989a44be3bf78fddc2549f5e0566699af78e"
+    ],
+    "final_offset": 0,
+    "seed": 1,
+    "samples_per_op": 50
+   },
+   "depends_on": [
+    "suite.commit",
+    "sweep.*",
+    "sampled_test_ids_mos",
+    "files.rtl.new_6502_core",
+    "files.binaries.new_6502_sst",
+    "files.tools_and_tbs[module_tests/cpu_65c02/sst_driver.py]",
+    "files.results.new6502_mos_sweep_raw",
+    "files.results.new6502_report"
+   ]
+  },
   "v2_rockwell_sweep": {
    "what": "Rockwell 65C02 SST sweep, v2 core",
    "pass_count": "12155/12800",
@@ -53518,7 +53557,7 @@
     "suite": "rockwell65c02",
     "raw_sha256": "c1686c83026d6522c7bb3c6bd7ee4159a7b15e67f4022fb776b0cc69ab437303",
     "checker_sha256": [
-     "9561d76b2b20dc8bc6d99d160a576ecfade0297c5b2fd6c97cb02f621f73e050",
+     "cc35db5d8c4edc0ccc4eb73afbdc855a36f95c74f3f2a55e2953e8048b437945",
      "60c5973c0cd54295e5857ca59b02989a44be3bf78fddc2549f5e0566699af78e"
     ],
     "final_offset": 0,
@@ -53542,7 +53581,7 @@
     "suite": "synertek65c02",
     "raw_sha256": "85be22b48a7e3c96d8a6b23f362d28f08cd4a6789daddaa7e7d20c648112af6a",
     "checker_sha256": [
-     "9561d76b2b20dc8bc6d99d160a576ecfade0297c5b2fd6c97cb02f621f73e050",
+     "cc35db5d8c4edc0ccc4eb73afbdc855a36f95c74f3f2a55e2953e8048b437945",
      "60c5973c0cd54295e5857ca59b02989a44be3bf78fddc2549f5e0566699af78e"
     ],
     "final_offset": 0,

@@ -26,10 +26,32 @@ doesn't have (BCD extra cycle, page-cross dummies).
 
 **UPDATE (same day): the user asked whether v2's `WDC_MODE` parameter should
 be used to replicate the MOS 6502 — it should, and it works.** Built with
-`WDC_MODE=0` (NMOS behavior), v2 scores **8273/12800 on the 6502 suite: +1990
+`WDC_MODE=0` (NMOS-flavored bus behavior), v2 scores **8273/12800 on the 6502 suite: +1990
 fixed vs WDC_MODE=1, ZERO regressions, and it beats the T65 golden (7869)
-by +404.** Its only remaining new-only-fails are 20 tests of op 7c (SBC
-abs,X) — a lineage trait v1 shares. See §3b and §8.
+by +404.** (Historical figures — they predate the instruction-complete
+check now in `sst_driver.compare()`; like-for-like current totals are in
+the new6502 UPDATE below.) Its only remaining new-only-fails are 20 tests
+of op 7c — the suite's 6502-subset model for that opcode (JMP (abs,X) on
+W65C02; NMOS-silicon behavior of $7C is a known open question, see §3b
+caveat) — a lineage trait v1 shares. See §3b and §8.
+
+**Caveat on the “v2nmos = NMOS 6502” label (2026-09-03, from independent
+review):** `WDC_MODE=0` does NOT make v2 an NMOS 6502 model. It switches
+only a limited set of bus/flag behaviors (RMW write-back order, indexed
+page-cross dummy addresses, BCD D=1 extra cycle, BRK, D-clear on IRQ, ~10
+gated sites in `cpu_65c02.sv`); the opcode decode remains the 65C02-style
+decode (65C02-only instructions still execute). The 6502-suite score
+therefore demonstrates compatibility with the documented MOS subset, not
+MOS correctness. Treat the “v2nmos” column as “v2 with WDC bus behavior
+off” — a useful NMOS-leaning reference, not an oracle.
+
+**UPDATE (2026-09-03, ~09:30 CST): a third, netlist-derived NMOS-specialized
+core arrived as `rtl/new_6502/`.** Compared on the MOS 6502 suite against the
+NMOS results only (per user): **tied with v2nmos (7973/12800, fixed=0 /
+regressed=0), strictly dominates v2 WDC=1 (+1990) and v1 (+1567), zero
+new-only-fails vs golden; its 91 raw-trace diffs vs v2nmos are all
+netlist-specific behavior the suite cannot see ($5C LLX decode, released-bus
+settle addresses).** See §3c.
 
 ## 2. The cores
 
@@ -122,9 +144,18 @@ analysis `build/v2nmos_report.txt`.
 | pass / 12800 | 6706 (52.4%) | 6283 (49.1%) | **8273 (64.6%)** | 7869 (61.5%) |
 
 - vs golden (offset 1): both-pass 7849, both-fail 4507, v2nmos-wins 424,
-  **new-only-fail = 20 — all op 7c (SBC abs,X), cyc3 addr/data mismatch**
+  **new-only-fail = 20 — all op 7c (the suite models this opcode for the
+  6502 subset; v2/v1 disagree on its cyc3 address/data)**
   (e.g. `7c [7c 3068]: cyc3: addr 8212 != expected 685E`). v1 had the same
   7c:20 — lineage trait, not a v2 regression.
+  **$7C note (independent review):** $7C is JMP (abs,X) on the W65C02;
+  it is not “SBC abs,X” as an ISA fact. What the suite expects here is the
+  6502-subset model of the suite; verified from the retained results, ALL
+  FIVE cores (new6502, v2nmos, v2 WDC1, v1, R65Cx2) fail 50/50 of the $7C
+  tests against it — the suite’s $7C model matches no core. The real
+  NMOS-silicon behavior of $7C (indexed-NOP vs SBC-abs,X modeling) is an
+  open question for the perfect6502 NMOS-oracle run (2026-09-03, expert
+  question 11 of `build/new6502_diff_documentation.md`).
 - WDC=0 vs WDC=1 on the same RTL: **fixed 1990, regressed 0**. Fixed classes:
   RMW double-write family (26 ops × 50 — the `!WDC_MODE` write-back of the
   unmodified value before the modified one, lines ~1009/1043 of
@@ -156,6 +187,91 @@ v2's 1987 = v1's 1564 re-cut:
   golden but the suite's expected final PC differs by ±1 (suite final-state
   field inconsistent with its own trace — same broken-reference class as
   FINAL_VERDICT §2; v1 showed the same set plus cyc4/cyc5/cyc6 on top).
+
+### 3c. `rtl/new_6502` (netlist-derived NMOS-specialized core) — DONE 2026-09-03
+
+User-provided core (first copy was a byte-identical duplicate of v2 —
+re-supplied). `cpu_65c02.sv` 58,215 B, `cpu_alu.sv` 4,779 B (md5
+`ce55e5ec…` / `96caadf9…` — pinned in `evidence/provenance.json`). README:
+"netlist derived, fixed some pin definitions, IRQ timing speculative based
+on 6502". Same module name and `WDC_MODE` param as v2 plus new pins
+(`so_n`, `be`, `ml_n`, `phi1o/phi2o`, split `din`/`dout` + output enables).
+`cpu65_sst_tb_v2.sv` compiles unchanged: the two new inputs stay unconnected
+(= 0 — no SOB edge, BE only gates unused output-enables) and the new outputs
+are unused, so the only on-bus difference vs v2nmos is core behavior.
+
+Built with the pinned command (v2nmos Mdir recipe with the sources swapped,
+Verilator 5.050, `-GWDC_MODE=0`): `build/sst_verilog_6502/`. Integrity check:
+op 00 raw traces are **byte-identical** to v2nmos, so every diff below is
+core-level, not harness plumbing.
+
+| 6502 suite, current checker (12800) | v1 | v2 WDC=1 | v2 WDC=0 | **new6502** | golden |
+|---|---|---|---|---|---|
+| pass | 6406 | 5983 | 7973 | **7973** | 7749 |
+
+(all five columns computed with the current `sst_driver.compare()` incl.
+instruction-complete check — the 8273/7869 figures in §1/§3b predate that
+check; within one column set the comparison is like-for-like.)
+
+- vs v2nmos (the other NMOS result): **fixed=0, regressed=0** — identical
+  verdict on all 12800 tests. vs v2 WDC=1: +1990/0; vs v1: +1567/0. vs
+  golden: only-pass 224, **only-fail = 0** (never loses to the reference).
+- **91/12800 raw bus traces differ vs v2nmos — one systematic class**
+  (`build/new6502_report.txt`, regenerated from raw results):
+  - **50× $5C, in-window**: new core does the documented NMOS LLX decode
+    (FFbb + FFFF reads); v2nmos does WDC-style extra cycles at PC. Both fail
+    the MOS suite's own $5C model (pinned both-fail class) — the suite agrees
+    with neither.
+  - **9× illegal ops, in-window (23 3b 63 73 7b 9b c3 db f3)**: the
+    netlist's settle/extra-cycle address model differs from v2's
+    hand-modelled one. All 59 in-window diff lines sit in the both-fail
+    class — both cores disagree with the suite's model on those cycles.
+  - **32× trailing-only (legal ops)**: differences only at cyc ≥ ncyc — the
+    suite models no post-instruction cycles, so all three cores PASS these
+    tests. Both cores take the **same cycle count** and re-sync right after
+    the settle window; during it the new core drives FFxx/FFFF (netlist
+    released-bus model) where v2nmos drives PC/EE values. (Interpretation,
+    not a suite-verifiable claim — the released NMOS bus floats; FFFF is the
+    pull-up-high resolution.)
+- **Completion timing (added 2026-09-03, reviewer-driven)**: `sst_driver.py`
+  gained `completion_classify()` (first (READ finalPC, READ finalPC+1) row
+  pair = next-opcode fetch start; exact / early-N / late-N / no-fetch vs the
+  suite row) and `build/new6502_report.py` reports it. For $5C: R65Cx2 starts
+  the next fetch at row 4 on 50/50 (exact on the 27 4-cycle tests, 1 row
+  early on the 23 5-cycle tests); v2nmos and new6502 both start it at row 8
+  on 50/50 — their rows 4-7 are PC-hold / phantom reads, not a fetch. For the
+  nine illegal ops the two NMOS cores have identical timing classes (mostly
+  early or no-fetch — their final PC = PC+4 differs from the suite’s, so the
+  expected pair never forms); golden diverges. Per-cycle register snapshots
+  of new6502 and v2nmos are byte-identical on all 12800 tests — the 91-line
+  difference is purely bus activity. No change to `compare()` pass/fail
+  semantics; the classifier is reporting/analysis only.
+- **$80 silent branch (2026-09-03 — the concrete “finish early/late and
+  occasionally appear correct” case)**: all 50 op-$80 tests PASS for all five
+  cores, yet every core decodes $80 as a 2-byte relative branch (WDC BRA,
+  target = PC+2+signed(offset)) and continues execution at the branch
+  target. The suite models $80 as a 2-byte NOP and never sees the branch:
+  row ncyc is a coincidental READ of PC+2 (the expected next-fetch address)
+  and the register snapshot at row ncyc is still pre-branch. If NMOS silicon
+  treats $80 as a NOP, new6502 — despite being NMOS-specialized — still
+  carries the 65C02 decode for this opcode. Expert question 11 in the doc
+  below (same class of question for $7C, where all five cores fail 50/50
+  against the suite’s 6502-subset model).
+- **Expert-review document**: `build/new6502_diff_documentation.md` (generated
+  by `build/new6502_diff_doc.py` from the retained raw traces only) —
+  self-contained: per-cycle four-opinion bus traces with exact starting state
+  for every one of the 91 diff lines, mechanical verification output, 11
+  expert questions, and a reference ladder with perfect6502 (the
+  transistor-level NMOS netlist simulation) as the best non-hardware oracle.
+- **Verdict: tied on the suite (whose $5C / illegal-op / settle models
+  cannot discriminate the two NMOS behaviours), and strictly closer to the
+  netlist exactly where the suite is blind. Zero regressions against any
+  reference. As an NMOS 6502 model, new6502 ≥ v2nmos on every axis
+  measured.** Rockwell/Synertek (65C02 vendor) suites were NOT run —
+  WDC-mode territory, out of scope per the user's "NMOS results only".
+- FPGA framing unchanged: the Apple II CPU is an ST2204 (65C02) — the MiSTer
+  core keeps `WDC_MODE=1`. new6502 targets NMOS-6502 contexts (e.g. Atari
+  7800), per its README.
 
 ## 4. Harness state (how the v2 binary was built)
 
@@ -242,6 +358,14 @@ against headers before reporting anything).
   binary predates the edit but remains valid.
 - `build/bcd_classify_wdc.py` — last tool written before the crash (WDC BCD
   D-flag failure classifier; output: all 337 = extra-cycle address mismatch)
+- `build/sst_verilog_6502/` — new_6502 SST binary (WDC_MODE=0); pinned copy
+  `evidence/Vcpu65_sst_tb_6502.exe`
+- `evidence/sweep_6502_new6502_results.txt` (12800 R-lines) +
+  `build/new6502_report.py` → `build/new6502_report.txt` — the §3c sweep and
+  its trace-diff analysis
+- `evidence/provenance.json` now carries the new_6502 entries
+  (`files.rtl.new_6502_core`, `files.binaries.new_6502_sst`,
+  `retained_results.new6502_mos_sweep` = 7973/12800)
 - prior campaign: `FINAL_VERDICT.md`, `sst_progress.md`, `provenance.json`
   (committed as `74546ce`)
 
@@ -254,9 +378,12 @@ against headers before reporting anything).
 2. ~~WDC_MODE=0 untested~~ **DONE (2026-09-03)**: 8273/12800, +1990 fixed /
    0 regressed vs WDC=1, beats golden by 404; only residual = 20× op 7c
    (lineage trait). See §3b. Remaining question if it matters: why does 7c
-   SBC abs,X cyc3 disagree with the MOS suite (and note 6c/7c are flagged as
+   (suite model for the 6502 subset) cyc3 disagree with the MOS suite (and
+   note 6c/7c are flagged as
    unreliable refs in FINAL_VERDICT — check whether those 20 are the same
-   broken-reference class before treating them as a real bug).
+   broken-reference class before treating them as a real bug). $7C is
+   JMP (abs,X) on W65C02; NMOS-silicon behavior pending the perfect6502
+   oracle run.
 3. **BCD extra-cycle dummy read** (§5.3): decide document-vs-chase. Current
    recommendation: document (three different vendor constants ⇒ artifact).
 4. **Staging/commit**: v2 campaign files are all untracked in
@@ -267,6 +394,15 @@ against headers before reporting anything).
    smoke with v2, Apple-II.sv wiring. If the user wants v2 in the FPGA core,
    that's a fresh work item (component binding in `rtl/apple2_top.vhd`,
    files.qip registration, WDC_MODE choice, Quartus map).
+6. ~~new_6502 comparison~~ **DONE (2026-09-03)** — see §3c: tied with v2nmos
+   on the 6502 suite, zero regressions anywhere; the 91 raw-trace diffs are
+   netlist-specific (suite-blind) behaviour. Not done for new_6502: Rockwell/
+   Synertek vendor suites (WDC-mode territory — out of scope per user), and
+   any WDC_MODE=1 build (the core ships the param; only the NMOS mode was
+   requested). **Next step (2026-09-03, after independent review):** run the
+   perfect6502 NMOS-oracle on the 11 expert questions in
+   `build/new6502_diff_documentation.md` (or silicon capture); also decide
+   what to do about the $80 silent-branch case (expert question 11).
 
 ## 9. Reproduce
 
@@ -280,3 +416,11 @@ C:\msys64\ucrt64\bin\python module_tests\cpu_65c02\build\v2_compare.py
 Sweep driver (per core × suite, ~39 s each): see `sst_progress.md` "Step 6"
 for the exact `sst_driver.py` invocations; v2 uses `--bin
 module_tests/cpu_65c02/build/sst_verilog_v2/Vcpu65_sst_tb_v2.exe`.
+new_6502 (§3c) uses `--bin
+module_tests/cpu_65c02/build/sst_verilog_6502/Vcpu65_sst_tb_v2.exe`; its
+report regenerates with no simulation:
+
+```bat
+C:\msys64\ucrt64\bin\python module_tests\cpu_65c02\build\new6502_report.py
+C:\msys64\ucrt64\bin\python module_tests\cpu_65c02\provenance.py
+```

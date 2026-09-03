@@ -9,6 +9,19 @@ cpu65_sst_tb.sv, runs the Verilator binary, and compares:
   * instruction completion (next opcode fetch at the expected final PC),
   * final register state (P compared with bits 7/4 masked).
 
+Completion timing (review 2026-09-03): the SST procedure says "run until
+the instruction completes"; this driver instead compares a fixed cycle
+window, so a core that finishes early or late can pass the per-cycle
+checks. completion_classify() makes the completion point explicit from the
+bus trace: the next-opcode fetch is the first pair of consecutive rows
+(r, r+1) where row r is a READ of the expected final PC and row r+1 is a
+READ of the next program location (final PC + 1). The pair — rather than a
+single read — distinguishes a fetch from (a) a data read that happens to
+land on the final PC and (b) a core that holds the PC value on the address
+bus during settle cycles. It classifies the fetch start as 'exact' (row
+ncyc, the suite's own convention), 'early-<n>', 'late-<n>', or
+'no-fetch' (no pair inside the capture window).
+
 Usage:
   python sst_driver.py --suite wdc65c02 --ops a9,f0 --sample 100 --seed 1 \
       --bin module_tests/cpu_65c02/build/sst_verilog/Vcpu65_sst_tb.exe \
@@ -140,6 +153,30 @@ def compare(test, groups, final_offset=0):
         if ram.get(addr) != val:
             fails.append(f'final ram[{addr:04X}] = {ram.get(addr)} != {val}')
     return fails
+
+def completion_classify(test, groups):
+    """Classify the next-opcode-fetch start row against the suite's
+    expected instruction length (see module docstring).
+
+    Returns 'exact', 'early-<n>', 'late-<n>' or 'no-fetch'. Heuristic
+caveat: an operand read that happens to form the (finalPC, finalPC+1)
+    read pair before the real fetch will be reported as early; the first
+    such pair is the earliest plausible fetch start.
+    """
+    ncyc = len(test['cycles'])
+    fpc = test['final']['pc'] & 0xFFFF
+    W_ = len(groups)
+    if ncyc >= W_ - 1:
+        return 'no-fetch'
+    for r in range(W_ - 1):
+        b0, b1 = groups[r][0], groups[r + 1][0]
+        if b0[4] == 'R' and int(b0[0:4], 16) == fpc \
+                and b1[4] == 'R' and int(b1[0:4], 16) == (fpc + 1) & 0xFFFF:
+            d = r - ncyc
+            if d == 0:
+                return 'exact'
+            return ('early-%d' % -d) if d < 0 else ('late-%d' % d)
+    return 'no-fetch'
 
 def main():
     ap = argparse.ArgumentParser()

@@ -72,6 +72,11 @@
       "compareOnly": true
     },
     {
+      "name": "virtual_keyboard_controller",
+      "runner": "virtual_keyboard_controller/run_equivalence.ps1",
+      "compareOnly": false
+    },
+    {
       "name": "virtual_keyboard_overlay",
       "runner": "virtual_keyboard_overlay/run_equivalence.ps1",
       "compareOnly": false

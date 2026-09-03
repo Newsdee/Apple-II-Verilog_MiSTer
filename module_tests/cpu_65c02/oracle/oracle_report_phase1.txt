@@ -1,0 +1,129 @@
+perfect6502 netlist oracle report (tag=phase1, 600 tests)
+skipped specs: none
+oracle R lines: 600, U/F: 0
+suite pass (final_offset=-1, netlist commit convention): 30/600
+suite pass P-exempt (final_offset=-1): 411/600 (netlist-valid; P readout is an A alias in this netlist)
+p-limited (failed only on the final-P line): 388
+late-commit rescues (register failures dropped, see late_commit_rescue): 131
+per-op full pass/fail (offset -1): 23:1/50 3b:0/50 5c:5/50 63:3/50 73:1/50 7b:2/50 7c:2/50 80:4/50 9b:1/50 c3:5/50 db:6/50 f3:0/50
+per-op P-exempt pass/fail: 23:29/50 3b:26/50 5c:50/50 63:15/50 73:10/50 7b:14/50 7c:50/50 80:50/50 9b:50/50 c3:50/50 db:50/50 f3:17/50
+per-op late-commit rescues: 23:38 3b:37 63:15 73:10 7b:14 f3:17
+
+first failing details (offset -1, post-rescue):
+  idx 0 op 23 off-1: final p 34 != 26 (masked)
+  idx 1 op 23 off-1: final p 35 != 65 (masked)
+  idx 2 op 23 off-1: final p 34 != 28 (masked)
+  idx 3 op 23 off-1: final p B4 != A0 (masked)
+  idx 4 op 23 off-1: final p B5 != 21 (masked)
+  idx 5 op 23 off-1: cyc7: data 8C != expected 8D
+  idx 6 op 23 off-1: final p 35 != 63 (masked)
+  idx 7 op 23 off-1: final p 34 != 68 (masked)
+  idx 8 op 23 off-1: cyc7: data 38 != expected 39
+  idx 9 op 23 off-1: final p 34 != 68 (masked)
+  idx 10 op 23 off-1: cyc7: data 0E != expected 0F
+  idx 11 op 23 off-1: final p B4 != A8 (masked)
+
+$5C next-fetch start row (first READ at final PC, 1-based row): {'row 6': 23, 'row 5': 27}
+
+op 80 behaviour (16-cycle window, per test):
+  finalPC=021E nxtRow=3 nop x1
+  finalPC=0E25 nxtRow=3 nop x1
+  finalPC=1F14 nxtRow=3 nop x1
+  finalPC=24B2 nxtRow=3 nop x1
+  finalPC=26BA nxtRow=3 nop x1
+  finalPC=2A6E nxtRow=3 nop x1
+  finalPC=2E59 nxtRow=3 nop x1
+  finalPC=36A6 nxtRow=3 nop x1
+  finalPC=3B2D nxtRow=3 nop x1
+  finalPC=3B37 nxtRow=3 nop x1
+  finalPC=4555 nxtRow=3 nop x1
+  finalPC=5371 nxtRow=3 nop x1
+  finalPC=5976 nxtRow=3 nop x1
+  finalPC=5E02 nxtRow=3 nop x1
+  finalPC=60D4 nxtRow=3 nop x1
+  finalPC=6570 nxtRow=3 nop x1
+  finalPC=65F7 nxtRow=3 nop x1
+  finalPC=6BB5 nxtRow=3 nop x1
+  finalPC=6FBD nxtRow=3 nop x1
+  finalPC=70A3 nxtRow=3 nop x1
+  finalPC=75BB nxtRow=3 nop x1
+  finalPC=7B98 nxtRow=3 nop x1
+  finalPC=7D1B nxtRow=3 nop x1
+  finalPC=7E1B nxtRow=3 nop x1
+  finalPC=7F82 nxtRow=3 nop x1
+  finalPC=874A nxtRow=3 nop x1
+  finalPC=9265 nxtRow=3 nop x1
+  finalPC=95C0 nxtRow=3 nop x1
+  finalPC=98BC nxtRow=3 nop x1
+  finalPC=9DE9 nxtRow=3 nop x1
+  finalPC=A7A0 nxtRow=3 nop x1
+  finalPC=AAE6 nxtRow=3 nop x1
+  finalPC=AC41 nxtRow=3 nop x1
+  finalPC=BB4C nxtRow=3 nop x1
+  finalPC=BD36 nxtRow=3 nop x1
+  finalPC=C25D nxtRow=3 nop x1
+  finalPC=C60A nxtRow=3 nop x1
+  finalPC=C809 nxtRow=3 nop x1
+  finalPC=CAD2 nxtRow=3 nop x1
+  finalPC=CD27 nxtRow=3 nop x1
+  finalPC=CE8A nxtRow=3 nop x1
+  finalPC=CF44 nxtRow=3 nop x1
+  finalPC=D9D1 nxtRow=3 nop x1
+  finalPC=E444 nxtRow=3 nop x1
+  finalPC=E463 nxtRow=3 nop x1
+  finalPC=E6C0 nxtRow=3 nop x1
+  finalPC=EB2D nxtRow=3 nop x1
+  finalPC=ED9E nxtRow=3 nop x1
+  finalPC=F0DE nxtRow=3 nop x1
+  finalPC=F227 nxtRow=3 nop x1
+op 7c behaviour (16-cycle window, per test):
+  finalPC=0FB2 nxtRow=6 other x1
+  finalPC=13B8 nxtRow=6 other x1
+  finalPC=1852 nxtRow=5 other x1
+  finalPC=1AB2 nxtRow=5 other x1
+  finalPC=2110 nxtRow=6 other x1
+  finalPC=3489 nxtRow=6 other x1
+  finalPC=3DA7 nxtRow=6 other x1
+  finalPC=3E31 nxtRow=5 other x1
+  finalPC=467B nxtRow=6 other x1
+  finalPC=505F nxtRow=6 other x1
+  finalPC=5539 nxtRow=6 other x1
+  finalPC=58DA nxtRow=5 other x1
+  finalPC=5FDA nxtRow=6 other x1
+  finalPC=60B6 nxtRow=6 other x1
+  finalPC=6C0E nxtRow=5 other x1
+  finalPC=6FDF nxtRow=6 other x1
+  finalPC=7424 nxtRow=6 other x1
+  finalPC=7484 nxtRow=6 other x1
+  finalPC=7EEF nxtRow=5 other x1
+  finalPC=811F nxtRow=6 other x1
+  finalPC=8214 nxtRow=5 other x1
+  finalPC=8C43 nxtRow=6 other x1
+  finalPC=8E37 nxtRow=5 other x1
+  finalPC=8E7D nxtRow=6 other x1
+  finalPC=8F0D nxtRow=5 other x1
+  finalPC=9090 nxtRow=6 other x1
+  finalPC=96D4 nxtRow=5 other x1
+  finalPC=9A75 nxtRow=6 other x1
+  finalPC=9BDF nxtRow=5 other x1
+  finalPC=A0FB nxtRow=5 other x1
+  finalPC=ABC8 nxtRow=5 other x1
+  finalPC=B08A nxtRow=6 other x1
+  finalPC=B5C8 nxtRow=6 other x1
+  finalPC=B9A2 nxtRow=6 other x1
+  finalPC=C03D nxtRow=5 other x1
+  finalPC=C051 nxtRow=6 other x1
+  finalPC=C0A0 nxtRow=5 other x1
+  finalPC=C31F nxtRow=5 other x1
+  finalPC=C88D nxtRow=5 other x1
+  finalPC=CECF nxtRow=6 other x1
+  finalPC=D068 nxtRow=5 other x1
+  finalPC=D5B3 nxtRow=6 other x1
+  finalPC=D9EF nxtRow=6 other x1
+  finalPC=DD17 nxtRow=6 other x1
+  finalPC=DF30 nxtRow=6 other x1
+  finalPC=F063 nxtRow=5 other x1
+  finalPC=F3F2 nxtRow=6 other x1
+  finalPC=F92C nxtRow=6 other x1
+  finalPC=F985 nxtRow=5 other x1
+  finalPC=FFCC nxtRow=6 other x1
