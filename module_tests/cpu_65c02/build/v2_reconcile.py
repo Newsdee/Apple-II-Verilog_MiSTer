@@ -27,6 +27,7 @@ from rebuild_summary import select_tests               # noqa: E402
 
 ROOT = r'E:\MiSTer\Apple-II_FPGAdev\65x02'
 B = os.path.join(os.path.dirname(__file__))
+EVID = os.path.join(B, '..', 'evidence')   # long-generated raw results live here
 OPS = ['%02x' % i for i in range(256)]
 
 # (suite, v1 file, v2 file, golden file, summary header total 'pass/total')
@@ -65,9 +66,9 @@ def main():
 
     for suite, v1f, v2f, gf, (hdr_pass, hdr_total) in SUITES:
         sel = select_tests(ROOT, suite, OPS, 50, 1)
-        res_v1 = parse_results(os.path.join(B, v1f))
-        res_v2 = parse_results(os.path.join(B, v2f))
-        res_g = parse_results(os.path.join(B, gf))
+        res_v1 = parse_results(os.path.join(EVID, v1f))
+        res_v2 = parse_results(os.path.join(EVID, v2f))
+        res_g = parse_results(os.path.join(EVID, gf))
         p('=== %s: sel=%d v1lines=%d v2lines=%d goldlines=%d (header %d/%d)' %
           (suite, len(sel), len(res_v1), len(res_v2), len(res_g), hdr_pass, hdr_total))
 

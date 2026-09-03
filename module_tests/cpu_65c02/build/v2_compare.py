@@ -2,8 +2,9 @@
 """v2 campaign: per-opcode comparison of v1 / v2 / golden across the four
 suites (wdc65c02, 6502, rockwell65c02, synertek65c02).
 
-Inputs: build/sweep_<suite>_<core>.txt per-opcode summaries
-('PASS' or 'FAIL fl/n' lines) plus the retained v1/golden WDC+MOS files.
+Inputs: build/sweep_<suite>_<core>.txt per-opcode summaries — derived on
+demand from the raw results in evidence/ (auto-regenerated here if missing;
+takes several minutes of wall time).
 Outputs a ranked delta table and per-group rollups.
 """
 import os, sys
@@ -43,6 +44,14 @@ def parse(path):
 
 
 data = {}
+_missing = [k for k, p in FILES.items() if not os.path.exists(p)]
+if _missing:
+    import subprocess
+    print('regenerating %d missing summary file(s) from evidence/ (~15 min)...'
+          % len(_missing))
+    subprocess.check_call([r'C:\msys64\ucrt64\bin\python',
+                           os.path.join(B, 'regen_all_summaries.py'),
+                           '--apply'])
 for k, p in FILES.items():
     data[k] = parse(p)
 

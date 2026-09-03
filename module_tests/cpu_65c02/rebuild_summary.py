@@ -16,7 +16,7 @@ Batch index = position in that flattened list.
 
 Usage (from the Apple-II-Verilog_MiSTer repo root):
   python module_tests/cpu_65c02/rebuild_summary.py \
-      --results module_tests/cpu_65c02/build/sweep_wdc_abxfix_results.txt \
+      --results module_tests/cpu_65c02/evidence/sweep_wdc_abxfix_results.txt \
       --suite wdc65c02 --sample 50 --seed 1 \
       --out module_tests/cpu_65c02/build/sweep_wdc_abxfix.txt \
       [--final-offset 0] [--root E:/MiSTer/Apple-II_FPGAdev/65x02]

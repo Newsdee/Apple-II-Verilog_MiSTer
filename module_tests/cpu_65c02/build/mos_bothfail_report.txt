@@ -1,0 +1,192 @@
+sanity: v2nmos pass=7973 (header 8273)  golden pass=7749 (header 7869)
+total both-fail = 4827 across 105 opcodes
+
+classification:
+  64 broken-reference files:      3200  (64 ops)
+  xF column (A0-BF, 65C02 BBR/BBS vs MOS undefined):   100  (2 ops)
+  JAM (72/f2):                      100
+  everything else:                 1427  (37 ops)
+
+per-opcode both-fail (op: n/50, class):
+  02: 50  broken-ref
+  03: 50  broken-ref
+  04: 50  OTHER
+  07: 50  broken-ref
+  0b: 50  broken-ref
+  0c: 50  OTHER
+  0f: 50  OTHER
+  12: 50  broken-ref
+  13: 50  broken-ref
+  14: 50  broken-ref
+  17: 50  broken-ref
+  1a: 50  broken-ref
+  1b: 50  broken-ref
+  1c: 50  broken-ref
+  1f: 50  OTHER
+  22: 50  broken-ref
+  23: 50  broken-ref
+  27: 50  broken-ref
+  2b: 50  broken-ref
+  2f: 50  OTHER
+  32: 50  broken-ref
+  33: 50  broken-ref
+  37: 50  broken-ref
+  3a: 50  broken-ref
+  3b: 50  broken-ref
+  3f: 50  OTHER
+  42: 50  broken-ref
+  43: 50  broken-ref
+  47: 50  broken-ref
+  4b: 50  broken-ref
+  4f: 50  OTHER
+  52: 50  broken-ref
+  53: 50  broken-ref
+  57: 50  broken-ref
+  5a: 50  OTHER
+  5b: 50  broken-ref
+  5c: 50  OTHER
+  5f: 50  OTHER
+  62: 50  broken-ref
+  63: 50  broken-ref
+  64: 50  broken-ref
+  67: 50  broken-ref
+  6b: 50  broken-ref
+  6f: 50  OTHER
+  72: 50  JAM
+  73: 50  broken-ref
+  74: 50  broken-ref
+  77: 50  broken-ref
+  7a: 50  OTHER
+  7b: 50  broken-ref
+  7c: 50  OTHER
+  7f: 50  OTHER
+  83: 50  broken-ref
+  87: 50  broken-ref
+  8b: 50  broken-ref
+  8f: 50  OTHER
+  92: 50  broken-ref
+  93: 50  broken-ref
+  97: 50  broken-ref
+  9b: 50  broken-ref
+  9c: 50  broken-ref
+  9e: 50  broken-ref
+  9f: 50  OTHER
+  a3: 50  broken-ref
+  a7: 50  broken-ref
+  ab: 50  broken-ref
+  af: 50  xF
+  b2: 50  broken-ref
+  b3: 50  broken-ref
+  b7: 50  broken-ref
+  bb: 50  broken-ref
+  bf: 50  xF
+  c3: 50  broken-ref
+  c7: 50  broken-ref
+  cb: 50  OTHER
+  cf: 50  OTHER
+  d2: 50  broken-ref
+  d3: 50  broken-ref
+  d7: 50  broken-ref
+  da: 50  OTHER
+  db: 50  OTHER
+  dc: 50  OTHER
+  df: 50  OTHER
+  e3: 50  broken-ref
+  e7: 50  broken-ref
+  eb: 50  broken-ref
+  ef: 50  OTHER
+  f2: 50  JAM
+  f3: 50  broken-ref
+  f7: 50  broken-ref
+  fa: 50  OTHER
+  fb: 50  broken-ref
+  fc: 50  OTHER
+  ff: 50  OTHER
+  3c: 40  OTHER
+  34: 39  OTHER
+  89: 28  OTHER
+  fd:  4  OTHER
+  e5:  3  OTHER
+  e9:  3  OTHER
+  ed:  3  OTHER
+  79:  2  OTHER
+  e1:  2  OTHER
+  f1:  2  OTHER
+  f9:  1  OTHER
+
+sampled failure signatures for OTHER ops (both cores fail the same way?):
+  04 idx 00C8: complete: row 3 not a fetch at final pc 61BF (got 00D6/W)
+  04 idx 00C9: complete: row 3 not a fetch at final pc E82C (got 005C/W)
+  0c idx 0258: complete: row 4 not a fetch at final pc 15FE (got C24A/W)
+  0c idx 0259: complete: row 4 not a fetch at final pc A36E (got 9BEC/W)
+  0f idx 02EE: cyc2: addr 00C9 != expected 0E0D; cyc2: data EE != expected 37; cyc2: illegal access 00C9; cyc3: addr 00C9 != expected 37C9
+  0f idx 02EF: cyc2: addr 00B4 != expected F669; cyc2: data EE != expected 75; cyc2: illegal access 00B4; cyc3: addr 00B4 != expected 75B4
+  1f idx 060E: cyc2: addr 005D != expected 3B4F; cyc2: data EE != expected 2D; cyc2: illegal access 005D; cyc3: addr 005D != expected 2D8F
+  1f idx 060F: cyc2: addr 0090 != expected D5D1; cyc2: data EE != expected 8B; cyc2: illegal access 0090; cyc3: addr 0090 != expected 8BEE
+  2f idx 092E: cyc2: addr 00CD != expected DF6D; cyc2: data EE != expected D9; cyc2: illegal access 00CD; cyc3: addr 00CD != expected D9CD
+  2f idx 092F: cyc2: addr 0026 != expected 6EFA; cyc2: data EE != expected 4E; cyc2: illegal access 0026; cyc3: addr 0026 != expected 4E26
+  3f idx 0C4E: cyc2: addr 0006 != expected 7F41; cyc2: data EE != expected CC; cyc2: illegal access 0006; cyc3: addr 0006 != expected CC31
+  3f idx 0C4F: cyc2: addr 0004 != expected 0B86; cyc2: data EE != expected A7; cyc2: illegal access 0004; cyc3: addr 0004 != expected A7EB
+  4f idx 0F6E: cyc2: addr 0063 != expected DAEE; cyc2: data EE != expected 51; cyc2: illegal access 0063; cyc3: addr 0063 != expected 5163
+  4f idx 0F6F: cyc2: addr 00B8 != expected 92BA; cyc2: data EE != expected F8; cyc2: illegal access 00B8; cyc3: addr 00B8 != expected F8B8
+  5a idx 1194: complete: row 2 not a fetch at final pc F638 (got 0169/W)
+  5a idx 1195: complete: row 2 not a fetch at final pc B615 (got 0149/W)
+  5c idx 11F8: cyc3: addr 78E7 != expected 7824; cyc3: data EE != expected 65; cyc3: illegal access 78E7; cyc4: addr 240E != expected 7924
+  5c idx 11F9: cyc3: addr CF56 != expected CFE4; cyc3: data EE != expected AD; cyc3: illegal access CF56
+  5f idx 128E: cyc2: addr 0022 != expected 9C5A; cyc2: data EE != expected 9A; cyc2: illegal access 0022; cyc3: addr 0022 != expected 9A2A
+  5f idx 128F: cyc2: addr 006D != expected A1A4; cyc2: data EE != expected 12; cyc2: illegal access 006D; cyc3: addr 006D != expected 12E6
+  6f idx 15AE: cyc2: addr 00C6 != expected BEC0; cyc2: data EE != expected 8E; cyc2: illegal access 00C6; cyc3: addr 00C6 != expected 8EC6
+  6f idx 15AF: cyc2: addr 00BB != expected B4C6; cyc2: data EE != expected A1; cyc2: illegal access 00BB; cyc3: addr 00BB != expected A1BB
+  7a idx 17D4: complete: row 2 not a fetch at final pc 36DB (got 016C/R)
+  7a idx 17D5: complete: row 2 not a fetch at final pc C47E (got 012E/R)
+  7c idx 1838: cyc3: addr F3F0 != expected AF7B; cyc3: data F6 != expected 48; complete: row 5 not a fetch at final pc F3F2 (got B07C/R)
+  7c idx 1839: cyc3: addr 5FD8 != expected 8F0D; cyc3: data 37 != expected 0A; complete: row 5 not a fetch at final pc 5FDA (got 900E/R)
+  7f idx 18CE: cyc2: addr 00C6 != expected 7B62; cyc2: data EE != expected 69; cyc2: illegal access 00C6; cyc3: addr 00C6 != expected 69E7
+  7f idx 18CF: cyc2: addr 00E0 != expected 429C; cyc2: data EE != expected 4F; cyc2: illegal access 00E0; cyc3: addr 00E0 != expected 4F10
+  8f idx 1BEE: cyc2: addr 000A != expected 52D0; cyc2: data EE != expected D2; cyc2: illegal access 000A; cyc3: addr 000A != expected D20A
+  8f idx 1BEF: cyc2: addr 00FE != expected 8992; cyc2: data EE != expected FB; cyc2: illegal access 00FE; cyc3: addr 00FE != expected FBFE
+  9f idx 1F0E: cyc2: addr 005A != expected BDB7; cyc2: data EE != expected 6F; cyc2: illegal access 005A; cyc3: addr 005A != expected 6F65
+  9f idx 1F0F: cyc2: addr 0012 != expected 0A56; cyc2: data EE != expected A8; cyc2: illegal access 0012; cyc3: addr 0012 != expected A86F
+  cb idx 27A6: final pc 6AA9 != 6AAA; final x  F9 != B2; final p B6 != A4 (masked); complete: row 2 not a fetch at final pc 6AAA (got 6AA9/R)
+  cb idx 27A7: final pc 8F68 != 8F69; final x  33 != 58; final p 7F != 6C (masked); complete: row 2 not a fetch at final pc 8F69 (got 8F68/R)
+  cf idx 286E: cyc2: addr 0065 != expected 6458; cyc2: data EE != expected 37; cyc2: illegal access 0065; cyc3: addr 0065 != expected 3765
+  cf idx 286F: cyc2: addr 003B != expected E3C3; cyc2: data EE != expected 0C; cyc2: illegal access 003B; cyc3: addr 003B != expected 0C3B
+  da idx 2A94: complete: row 2 not a fetch at final pc 3AE3 (got 0160/W)
+  da idx 2A95: complete: row 2 not a fetch at final pc 15A3 (got 0196/W)
+  db idx 2AC6: cyc2: addr 4777 != expected 4778; cyc2: data B2 != expected 38; cyc3: addr 4777 != expected 38AA; cyc3: data B2 != expected B0
+  db idx 2AC7: cyc2: addr 9805 != expected 9806; cyc2: data 37 != expected B8; cyc3: addr 9805 != expected B87C; cyc3: data 37 != expected D0
+  dc idx 2AF8: cyc3: addr 2A91 != expected 2A21; cyc3: data EE != expected 62; cyc3: illegal access 2A91; cyc4: addr E9B7 != expected 2B21
+  dc idx 2AF9: cyc3: addr 55C9 != expected 5525; cyc3: data EE != expected 8B; cyc3: illegal access 55C9; cyc4: addr B06C != expected 5625
+  df idx 2B8E: cyc2: addr 00AA != expected BE9C; cyc2: data EE != expected 68; cyc2: illegal access 00AA; cyc3: addr 00AA != expected 681C
+  df idx 2B8F: cyc2: addr 009A != expected 6F10; cyc2: data EE != expected FB; cyc2: illegal access 009A; cyc3: addr 009A != expected FBA3
+  ef idx 2EAE: cyc2: addr 006B != expected 1DD0; cyc2: data EE != expected 36; cyc2: illegal access 006B; cyc3: addr 006B != expected 366B
+  ef idx 2EAF: cyc2: addr 0025 != expected 2F4A; cyc2: data EE != expected 26; cyc2: illegal access 0025; cyc3: addr 0025 != expected 2625
+  fa idx 30D4: complete: row 2 not a fetch at final pc 4981 (got 010F/R)
+  fa idx 30D5: complete: row 2 not a fetch at final pc A0B9 (got 0177/R)
+  fc idx 3138: cyc3: addr 4C81 != expected 4CB4; cyc3: data EE != expected 7B; cyc3: illegal access 4C81
+  fc idx 3139: cyc3: addr 780C != expected 788A; cyc3: data EE != expected D5; cyc3: illegal access 780C
+  ff idx 31CE: cyc2: addr 004E != expected BD73; cyc2: data EE != expected 4D; cyc2: illegal access 004E; cyc3: addr 004E != expected 4D00
+  ff idx 31CF: cyc2: addr 0042 != expected BDE1; cyc2: data EE != expected E6; cyc2: illegal access 0042; cyc3: addr 0042 != expected E61C
+  3c idx 0BB8: final p 74 != 34 (masked)
+  3c idx 0BB9: final p B9 != FB (masked)
+  34 idx 0A28: final p 75 != A5 (masked)
+  34 idx 0A29: final p F5 != A5 (masked)
+  89 idx 1AC4: final p 3C != 2E (masked)
+  89 idx 1AC5: final p 7C != 6E (masked)
+  fd idx 316F: final a  6F != 7F
+  fd idx 3171: final a  9D != AD
+  e5 idx 2CD8: final a  6E != 7E
+  e5 idx 2CDE: final a  0F != 1F
+  e9 idx 2D85: final a  2F != 3F
+  e9 idx 2D88: final a  6D != 7D
+  ed idx 2E57: final a  4C != 5C
+  ed idx 2E61: final a  0F != 1F
+  79 idx 17BA: final p 3D != 2F (masked)
+  79 idx 17D2: final p 7B != E9 (masked)
+  e1 idx 2C10: final a  7E != 8E
+  e1 idx 2C15: final a  0E != 1E
+  f1 idx 2F30: final a  3F != 4F
+  f1 idx 2F40: final a  3E != 4E
+  f9 idx 30CB: final a  3B != 4B
+
+new-only-fail by op (v2nmos):

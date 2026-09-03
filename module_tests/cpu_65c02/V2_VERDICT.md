@@ -3,8 +3,16 @@
 Scope: `rtl/new_cpu_v2/cpu_65c02.sv` (+ `cpu_alu.sv`), the v2 65C02 core.
 This document supersedes `FINAL_VERDICT.md` for all v2 claims. Every number
 below was re-verified on 2026-09-03 from the retained raw results
-(`build/sweep_*_results.txt`) with the current checker; provenance (suite
-commit, RTL/tool/binary hashes) is in `build/provenance.json`.
+(`module_tests/cpu_65c02/evidence/sweep_*_results.txt`) with the current
+checker; provenance (suite commit, RTL/tool/binary hashes, pass counts)
+is in `module_tests/cpu_65c02/evidence/provenance.json`.
+
+Artifact convention: everything whose generation takes longer than ~10
+minutes (raw sweep results, pinned Verilator binaries, provenance.json)
+lives in `module_tests/cpu_65c02/evidence/`; derived summaries
+(`build/sweep_*.txt`) are not stored and are regenerated on demand from
+the raw results by `build/regen_all_summaries.py` (seconds to a few
+minutes). Raw results are never touched by any analysis tool.
 
 ## Status
 
@@ -19,9 +27,10 @@ commit, RTL/tool/binary hashes) is in `build/provenance.json`.
 ## 1. WDC_MODE=1 results (target machine)
 
 Checker: `sst_driver.compare()` v2 — includes the instruction-complete
-check (§4). All 14 sweep summaries were regenerated from raw results with
-`build/regen_all_summaries.py` after the checker change; raw results are
-untouched.
+check (§4). After the checker change, all pass totals were recomputed
+directly from the raw results in `evidence/` with the current checker
+(`build/regen_all_summaries.py` reproduces them on demand; summaries are
+not stored). Raw results are untouched.
 
 | Suite (sampled) | v1 | **v2** | golden R65Cx2 |
 |---|---|---|---|
@@ -142,8 +151,9 @@ totals changed; all 7 groups are classified, **none is a new core defect**:
 
 Unchanged: wdc65c02 v1/v2/pre-OptionC, rockwell v1/v2/golden, synertek
 golden. The strengthened checker is strictly stronger and has been pinned:
-all summaries were regenerated with `regen_all_summaries.py` (dry run
-reproduces all 14 totals byte-identically).
+all pass totals are recomputed from the raw results in `evidence/` with
+the current checker, and `regen_all_summaries.py` (dry run) reproduces
+all 14 derived totals byte-identically.
 
 ## 5. BCD −0x10 class (48 tests) — document, do not chase
 
@@ -189,22 +199,43 @@ documented here in the meantime.
 
 ## 9. Provenance and reproduction
 
-- `build/provenance.json` (regenerated 2026-09-03): suite commit
-  `2f6980a2` (clean tree), SHA-256 of v1/v2/golden RTL, all SST binaries,
-  all analysis tools, all raw results + summaries, sampled test-id lists
-  for all four suites, and per-sweep `depends_on` closure.
+- `module_tests/cpu_65c02/evidence/` holds the long-generated evidence:
+  the 15 raw sweep result files, the 5 pinned Verilator binaries, and
+  `provenance.json` (regenerated 2026-09-03): suite commit `2f6980a2`
+  (clean tree), SHA-256 of v1/v2/golden RTL, all SST binaries, all
+  analysis tools, all raw results, sampled test-id lists for all four
+  suites, per-sweep `depends_on` closure, and recomputed per-sweep
+  `pass_count` (with `pass_count_inputs` cache keys so unchanged reruns
+  are cheap). Raw results and binaries are never rewritten.
+- The v2 WDC_MODE=1 SST binary (`Vcpu65_sst_tb_v2_wdc.exe`) was **rebuilt
+  2026-09-03** after the move into `evidence/`: the WDC_MODE=1 and
+  WDC_MODE=0 binaries shared the file name `Vcpu65_sst_tb_v2.exe` and one
+  overwrote the other. The rebuild used the exact command and sources
+  recorded in `build/sst_verilog_v2/Vcpu65_sst_tb_v2__verFiles.dat` (same
+  pinned Verilator, unchanged source mtimes) and reproduced the pinned
+  raw sweep byte-for-byte on 50/50 op-00 tests; its PE timestamp differs,
+  so its SHA-256 differs from the original build. See
+  `sweep.binary_rebuild_note` in provenance.json.
 - Regenerate the derived artifacts (raw results are never touched):
 
   ```
-  python module_tests/cpu_65c02/build/regen_all_summaries.py     # all 14 summaries
+  python module_tests/cpu_65c02/build/regen_all_summaries.py     # all 14 summaries -> build/
   python module_tests/cpu_65c02/build/v2nmos_report.py           # §2 numbers
   python module_tests/cpu_65c02/build/mos_bothfail_decomp.py     # both-fail classes
-  python module_tests/cpu_65c02/provenance.py                    # hashes
+  python module_tests/cpu_65c02/provenance.py                    # hashes -> evidence/
   ```
 
-- Checker version is now part of the provenance (`sweep.checker_note`):
-  any future change to `sst_driver.compare()` requires re-running
-  `regen_all_summaries.py` so stored summaries stay pinned to the checker.
+  A full pass runs `compare()` over every sampled test: a few minutes of
+  wall time on this machine (I/O-bound; CPU work is seconds).
+- Checker version is part of the provenance (`sweep.checker_note`): any
+  future change to `sst_driver.compare()` requires recomputing the derived
+  summaries and the provenance pass counts so they stay pinned to the
+  checker.
+- Historical v1 tools (`fail_sigs.py`, `mos_analysis.py`) still read the
+  old `build/sweep_*.txt` locations; their reports are frozen in
+  FINAL_VERDICT.md and are not regenerated. `v2_compare.py` reads
+  summaries from `build/` and auto-regenerates missing ones from
+  `evidence/` first.
 
 ## 10. Verdict
 
