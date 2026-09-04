@@ -1,0 +1,3 @@
+# Generated Verilator build trees (each level's Makefile `clean` removes these)
+level_*/build_*/
+level_*/obj_dir/
