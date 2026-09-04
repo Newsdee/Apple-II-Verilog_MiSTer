@@ -161,12 +161,21 @@ and STATE counts in the aggregate.
 
 ## Files
 
+Committed (benchmark root `module_tests/huc6280/`):
+
 - `huc6280_sst_driver.py` — batch generation, runs both sims, cross-compares.
 - `huc6280_sst_tb.vhd` — GHDL testbench for the HUC6280.
 - `huc6280_65c02_tb.sv` — Verilator testbench for the canonical core.
-- `rtl_tb/huc6280_cpu_tb.vhd` — patched HUC6280 CPU (observation + injection ports).
-- `build/cross_report.txt` — full per-opcode + examples output.
+- `patch_rtl.py` — one-shot idempotent patcher (adds OBS/INJ ports to rtl_tb/).
+- `cross_report.txt` — full per-opcode + examples output.
+- `huc6280_results.txt.gz`, `canonical_results.txt.gz` — gzipped raw traces.
 - `PROGRESS.md` — harness design, build/run instructions, GHDL quirks.
+- `.gitignore` — ignores `rtl_tb/` (build/ is ignored by `module_tests/.gitignore`).
+
+Regenerable, not committed (`rtl_tb/`, `build/`):
+
+- `rtl_tb/huc6280_cpu_tb.vhd` — patched HUC6280 CPU (copy + `patch_rtl.py`).
+- `build/` — batch, plain-text sim outputs, Verilator build, GHDL work lib.
 
 ## Reproduce
 

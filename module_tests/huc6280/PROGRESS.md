@@ -379,8 +379,11 @@ The full cross-comparison benchmark is done. See **REPORT.md** for the findings.
 - `huc6280_sst_driver.py` — loads WDC tests, writes one batch, runs BOTH sims via
   subprocess, cross-compares (cycle count, final state one cycle after the
   next-fetch, remap-normalized bus sequence), aggregates per opcode.
+- `patch_rtl.py` — one-shot idempotent patcher (adds OBS_* + INJ_* ports to rtl_tb/).
 - `rtl_tb/huc6280_cpu_tb.vhd` — patched HUC6280 CPU (OBS_* + INJ_* ports).
-- `build/cross_report.txt` — full per-opcode + examples output.
+- `cross_report.txt` — full per-opcode + examples output.
+- `huc6280_results.txt.gz`, `canonical_results.txt.gz` — gzipped raw traces
+  (the plain-text `build/*.txt` sim outputs are git-ignored).
 
 ### Final results (256 opcodes × 5 tests = 1270, seed 1)
 IDENTICAL 12.4% / REMAP 7.2% / TIMING 7.7% / STATE 22.8% / BUS 49.2% / NOFETCH 0.7%.

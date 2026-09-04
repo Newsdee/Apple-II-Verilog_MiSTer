@@ -89,12 +89,12 @@ V_SRC = \
 		$(RTL)/timing_generator.v \
 		$(RTL)/video_generator.v \
 		$(RTL)/super_serial_card.v  \
-		$(RTL)/t65/t65_alu.v  $(RTL)/t65/t65_mcode.v  $(RTL)/t65/t65_pack.v  $(RTL)/t65/t65.v \
+		$(RTL)/cpu/nmos6502/cpu_65c02.sv  $(RTL)/cpu/nmos6502/cpu_alu.sv  \
 		$(RTL)/hdd.v \
 		$(RTL)/uart_6551.v \
 		$(RTL)/6551tx.v \
 		$(RTL)/6551rx.v \
-		$(RTL)/cpu_65c02.sv  $(RTL)/cpu_alu.sv \
+		$(RTL)/cpu/wdc65c02/cpu_65c02.sv  $(RTL)/cpu/wdc65c02/cpu_alu.sv \
 		$(RTL)/vga_controller.v  \
 		$(RTL)/apple2_font_rom.v  \
 		$(OSK_DIR)/virtual_keyboard_controller.sv  \
