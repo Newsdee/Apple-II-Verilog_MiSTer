@@ -166,7 +166,7 @@ module apple2_top(
     input         virtual_control;
     input         virtual_open_apple;
     input         virtual_closed_apple;
-    input  [5:0]  joy;
+    input  [7:0]  joy;
     input  [15:0] joy_an;
 
     // disk control

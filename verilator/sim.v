@@ -141,7 +141,7 @@ wire CLK_VIDEO = clk_sys;
 
 wire  [7:0] pdl  = {~paddle_0[7], paddle_0[6:0]};
 wire [15:0] joya;
-wire  [5:0] joyd;
+wire  [7:0] joyd;
 
 joystick_input joystick_input
 (
@@ -253,7 +253,7 @@ virtual_keyboard_controller virtual_keyboard_controller
 	.clk(clk_sys),
 	.reset(reset),
 	.ps2_key(ps2_key),
-	.joystick({joystick_0[9:8], joystick_0[13:12], joystick_0[5:0]}),
+	.joystick({joystick_0[10:8], joystick_0[13:12], joystick_0[5:0]}),
 	.enabled(virtual_keyboard_enabled),
 	.filtered_ps2_key(filtered_ps2_key),
 	.active(virtual_keyboard_active),
@@ -354,7 +354,7 @@ apple2_top apple2_top
 	.virtual_open_apple(virtual_open_apple),
 	.virtual_closed_apple(virtual_closed_apple),
 
-	.joy(virtual_keyboard_active ? 6'h00 : joyd),
+	.joy(virtual_keyboard_active ? 8'h00 : joyd),
 	.joy_an(virtual_keyboard_active ? 16'h0000 : joya),
 
 	.mb_4_inslot(1'b1),

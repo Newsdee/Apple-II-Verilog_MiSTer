@@ -251,7 +251,14 @@ module keyboard(
                 joy_valid        <= 1'b1;
                 key_pressed      <= 1'b1;
                 akd              <= 1'b1;
+                rep_timer        <= 23'd7000000;		// 0.5s, like a real key-down
             end
+            // Joy key is a one-shot, not a held key: clear the "key down" flag
+            // (akd) once the joy key has been read, so the PS/2 auto-repeat
+            // engine (gated by akd) stops instead of re-asserting key_pressed
+            // every 65ms and streaming rom_out (the last PS/2 key) forever.
+            if (reads == 1'b1 && joy_valid)
+                akd <= 1'b0;
 `endif
             if (virtual_active)
             begin

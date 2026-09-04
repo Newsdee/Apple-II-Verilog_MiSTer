@@ -463,6 +463,11 @@ integer seam_index;
 // SEAM_RUN_FILL/SEAM_RUN_WIDE asserted.
 wire run_fill_en = SEAM_RUN_FILL && RUN_FILL_OK;
 
+// TAD feed index, explicitly 4 bits: the 9-deep window needs 4 bits to
+// address all elements (a bare "? 5 : 7" sizes to 3 bits and trips Quartus
+// Warning 10027).
+wire [3:0] tad_feed_idx = (GRAY_SEAM_FIX && run_fill_en) ? 4'd5 : 4'd7;
+
 always @(posedge CLK_14M) begin: seam_cleanup
     integer c_luma;
     integer l_luma;
@@ -500,7 +505,7 @@ always @(posedge CLK_14M) begin: seam_cleanup
     // or 5 = raw-4 with the run fill). GRAY_SEAM_FIX=0 always uses index 7
     // so the original strobe timing (TAD_13 = raw-16) is bit-identical.
     timing_active_delay <= {timing_active_delay[14:0],
-        seam_valid_window[(GRAY_SEAM_FIX && run_fill_en) ? 5 : 7]};
+        seam_valid_window[tad_feed_idx]};
     seam_vbl_d <= raw_vbl;
     seam_color_mode_d <= raw_color_mode;
     if (GRAY_SEAM_FIX) begin
@@ -724,7 +729,8 @@ always @(posedge CLK_14M) begin: seam_cleanup
                     end
                 end
             end
-            seam_rgb <= fill_ok ? fill_rgb : seam_rgb_window[5];
+            seam_rgb <= (seam_color_line_window[5] && fill_ok)
+                ? fill_rgb : seam_rgb_window[5];
             // Strobe keeps the same 16-sample lead as the other paths: the
             // run-fill feed (window[5] = raw-4) is 2 samples older than the
             // gray-fill feed (window[7] = raw-2), so the same absolute
@@ -790,7 +796,8 @@ always @(posedge CLK_14M) begin: seam_cleanup
                     end
                 end
             end
-            seam_rgb <= fill_ok ? fill_rgb : seam_rgb_window[7];
+            seam_rgb <= (seam_color_line_window[7] && fill_ok)
+                ? fill_rgb : seam_rgb_window[7];
             seam_timing_active <= timing_active_delay[15];
         end
         seam_vbl <= seam_vbl_d;

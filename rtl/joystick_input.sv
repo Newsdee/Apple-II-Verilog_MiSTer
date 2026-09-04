@@ -35,7 +35,7 @@ module joystick_input #(
 	input  wire  [2:0] x_center,
 	input  wire        relative_mode,
 	output wire [15:0] joy_an,
-	output wire  [5:0] joy
+	output wire  [7:0] joy
 );
 
 localparam integer RELATIVE_UPDATE_BITS = $clog2(RELATIVE_UPDATE_CYCLES);
@@ -171,7 +171,7 @@ end
 
 assign joy_an = relative_mode ?
 	{relative_x_output[7:0], relative_y_output[7:0]} : absolute_axes;
-assign joy = joystick_digital[5:0] &
-	{2'b11, {2{~|axes[7:0]}}, {2{~|axes[15:8]}}};
+assign joy = joystick_digital[7:0] &
+	{2'b11, 2'b11, {2{~|axes[7:0]}}, {2{~|axes[15:8]}}};
 
 endmodule

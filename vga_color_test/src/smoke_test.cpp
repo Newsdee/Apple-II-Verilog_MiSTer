@@ -264,6 +264,30 @@ int run_smoke_test() {
             dump_failure("bw_mono", frame);
     }
 
+    // --- Gate 4b: seam cleanup bypasses monochrome lines ---
+    {
+        Settings off = s;
+        off.screen_mode = 1;
+        off.color_line_mode = kCLNoColor;
+        Settings on = off;
+        on.gray_seam_fix = true;
+        on.seam_run_fill = true;
+        on.seam_run_wide = true;
+        std::vector<uint8_t> fa(frame.size()), fb(frame.size());
+        rvs.offset = off.phase + off.align;
+        FrameResult ra = capture_clean(sim, off, rvs, &fa);
+        FrameResult rb = capture_clean(sim, on, rvs, &fb);
+        int differences = 0;
+        for (size_t i = 0; i < fa.size(); ++i)
+            if (fa[i] != fb[i]) differences++;
+        if (!check("mono-seam-bypass", ra.ok() && rb.ok() && differences == 0,
+                   rep->path + ": " + std::to_string(differences) +
+                   " channel differences (want 0)")) {
+            dump_failure("mono_seam_off", fa);
+            dump_failure("mono_seam_on", fb);
+        }
+    }
+
     // --- Gate 5: determinism across clean reconstructions ---
     {
         std::vector<uint8_t> a(frame.size()), b(frame.size());
