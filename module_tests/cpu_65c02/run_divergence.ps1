@@ -69,8 +69,8 @@ if (-not $CompareOnly) {
 
     Write-Host "=== [3/6] cpu_65c02 under r65c02 stimulus: build + run ==="
     Test-VerilatorBuild -Top 'cpu65_r65_tb' -Mdir (Join-Path $build 'r65_verilog') `
-        -Sources @((Join-Path $repo 'rtl/new_cpu/cpu_65c02.sv'),
-                   (Join-Path $repo 'rtl/new_cpu/cpu_alu.sv'),
+        -Sources @((Join-Path $repo 'rtl/cpu/wdc65c02/cpu_65c02.sv'),
+                   (Join-Path $repo 'rtl/cpu/wdc65c02/cpu_alu.sv'),
                    (Join-Path $here 'cpu65_r65_tb.sv'))
     & (Join-Path $build "r65_verilog/Vcpu65_r65_tb.exe") `
         "+TOTAL=$total" "+IRQPULSE=$irqPulse" "+NMIPULSE=$nmiPulse"
@@ -99,8 +99,8 @@ if (-not $CompareOnly) {
 
     Write-Host "=== [6/6] cpu_65c02 under t65 stimulus: build + run (phases 0+1) ==="
     Test-VerilatorBuild -Top 'cpu65_t65_tb' -Mdir (Join-Path $build 't65_verilog') `
-        -Sources @((Join-Path $repo 'rtl/new_cpu/cpu_65c02.sv'),
-                   (Join-Path $repo 'rtl/new_cpu/cpu_alu.sv'),
+        -Sources @((Join-Path $repo 'rtl/cpu/wdc65c02/cpu_65c02.sv'),
+                   (Join-Path $repo 'rtl/cpu/wdc65c02/cpu_alu.sv'),
                    (Join-Path $here 'cpu65_t65_tb.sv'))
     & (Join-Path $build "t65_verilog/Vcpu65_t65_tb.exe") +PHASE=0
     if ($LASTEXITCODE -ne 0) { throw "cpu_65c02 t65 sim phase 0 failed ($LASTEXITCODE)" }

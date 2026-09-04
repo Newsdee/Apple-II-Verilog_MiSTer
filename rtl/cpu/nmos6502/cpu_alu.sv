@@ -56,10 +56,12 @@ module cpu_alu
 	// Decimal adjust (W65C02S behavior: flags from the adjusted result)
 	wire [4:0]  d_lo    = {1'b0, a[3:0]} + {1'b0, b_eff[3:0]} + {4'd0, cin_eff};
 	wire        d_lo_c  = decimal_add ? (d_lo > 5'd9) : d_lo[4];
-	wire [4:0]  d_lo_adj = d_lo + ((d_lo_c && decimal_add) ? 5'd6 : 5'd0);
+	// Only the low nibble of each +6 correction is kept, so the adders are
+	// 4 bits wide; the nibble carries are the separate d_*_c terms.
+	wire [3:0]  d_lo_adj = d_lo[3:0] + ((d_lo_c && decimal_add) ? 4'd6 : 4'd0);
 	wire [4:0]  d_hi    = {1'b0, a[7:4]} + {1'b0, b_eff[7:4]} + {4'd0, d_lo_c};
 	wire        d_hi_c  = (d_hi > 5'd9);
-	wire [4:0]  d_hi_adj = d_hi + (d_hi_c ? 5'd6 : 5'd0);
+	wire [3:0]  d_hi_adj = d_hi[3:0] + (d_hi_c ? 4'd6 : 4'd0);
 
 	// Decimal subtract (W65C02S/CMOS): correct the full binary result by
 	// -$06 on low-nibble borrow and -$60 on byte borrow. The whole-byte
@@ -75,9 +77,14 @@ module cpu_alu
 		case (op)
 			ALU_ADC: begin
 				if (decimal_add) begin
-					result    = {d_hi_adj[3:0], d_lo_adj[3:0]};
-					carry_out = d_hi_c || d_hi[4];
-					overflow  = (a[7] == b_eff[7]) && (d_hi_adj[3] != a[7]);
+					result    = {d_hi_adj, d_lo_adj};
+					carry_out = d_hi_c;
+					// V is the overflow of the intermediate sum before
+					// the high-nibble +6, i.e. bit 7 of
+					// (hi << 4 | adjusted lo), which is exactly d_hi[3].
+					// Taking it after the correction gets the flag wrong
+					// on roughly a quarter of the operand space.
+					overflow  = (a[7] == b_eff[7]) && (d_hi[3] != a[7]);
 				end else begin
 					result    = sum[7:0];
 					carry_out = sum[8];
@@ -85,15 +92,11 @@ module cpu_alu
 				end
 			end
 			ALU_SBC: begin
-				if (decimal_sub) begin
-					result    = s_cmos;
-					carry_out = sum[8];
-					overflow  = bin_v;
-				end else begin
-					result    = sum[7:0];
-					carry_out = sum[8];
-					overflow  = bin_v;
-				end
+				// Decimal only changes the result; carry and overflow
+				// come from the binary subtraction either way.
+				result    = decimal_sub ? s_cmos : sum[7:0];
+				carry_out = sum[8];
+				overflow  = bin_v;
 			end
 			ALU_CMP: begin
 				result    = sum[7:0];

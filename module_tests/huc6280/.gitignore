@@ -1,0 +1,9 @@
+# Regenerable artifacts for the HUC6280 benchmark (see PROGRESS.md / REPORT.md).
+# The benchmark root holds the source + the (gzipped) results; build/ holds
+# intermediate artifacts and is ignored by module_tests/.gitignore (**/build/).
+
+# rtl_tb: copies of the TurboGrafx16 HUC6280 RTL + patch_rtl.py injection ports.
+# Regenerate: copy TurboGrafx16_MiSTer/rtl/HUC6280/*.vhd here as *_tb.vhd
+# (HUC6280_CPU->huc6280_cpu_tb, HUC6280_AG->huc6280_ag_tb, HUC6280_ALU->alu_tb),
+# then run patch_rtl.py from the benchmark root.
+rtl_tb/

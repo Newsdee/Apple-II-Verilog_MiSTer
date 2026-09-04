@@ -2,9 +2,8 @@
 //
 // 65C02 CPU core for the Sitronix ST2204 (GameKing).
 //
-// Written new for this project (PLAN_gameking_core_20260731.md decision 1):
-// full W65C02S instruction set including the Rockwell RMB/SMB/BBR/BBS bit
-// ops, WAI, and STP, with per-opcode cycle counts following the W65C02S
+// The full W65C02S instruction set, including the Rockwell RMB/SMB/BBR/BBS
+// bit ops, WAI and STP, with per-opcode cycle counts following the W65C02S
 // datasheet. Undefined opcodes execute as the W65C02S NOPs of documented
 // length and cycle count.
 //
@@ -16,10 +15,40 @@
 //
 // ST2xxx integration stays outside this core: it issues standard vectors
 // and reports `rti_done` so the SoC can manage the IRR bank override.
+//
+// Pin map against the W65C02S package, for reuse in other cores. Active-low
+// pins keep the _n suffix; buses are split into din/dout with an output
+// enable rather than tri-stated, per this project's HDL rules.
+//
+//   A0-A15  addr            RWB     we (1 = write)
+//   D0-D7   din / dout      SOB     so_n
+//   BE      be              SYNC    sync
+//   IRQB    irq_n           VPB     vector_pull (active HIGH here)
+//   MLB     ml_n            PHI2    clk + ce (+ ce_n at mid-cycle)
+//   NMIB    nmi_n           RESB    reset (active HIGH here)
+//   RDY     rdy             PHI1O   phi1o
+//                           PHI2O   phi2o
+//
+// BE drives bus_oe (address + RWB) and dout_oe (data, write cycles only)
+// instead of tri-stating. PHI1O/PHI2O are real complementary clocks
+// reconstructed from the ce/ce_n pair, not enable pulses, so they need
+// ce_n driven at the bus-cycle midpoint to be meaningful. RDY is input-only:
+// WAI reports through in_wai the way the WDC hard core exports WAIT, which
+// the datasheet describes as the correct substitute for the bi-directional
+// pin. stall, stp_nop and the savestate bus are additions, not 65C02 pins.
+//
+// WDC_MODE selects between the NMOS 6502 and W65C02S bus/flag behaviors
+// listed in W65C02S datasheet Table 7-1 (Microprocessor Operational
+// Enhancements). It changes bus cycles and flags only - the decoded
+// instruction set is always the 65C02 one (the Rockwell bit ops, the
+// (zp) mode and the NOP-ified undefined opcodes are present in both
+// modes), and decimal ADC/SBC always produce the CMOS-correct N/Z.
+// The ST2204 is a 65C02, so this core is instantiated with WDC_MODE = 1.
 
 module cpu_65c02
 #(
-	parameter [9:0] SS_BASE = 10'd0    // savestate word base address
+	parameter [9:0] SS_BASE  = 10'd0,  // savestate word base address
+	parameter       WDC_MODE = 1'b1    // 1: W65C02S, 0: NMOS 6502
 )
 (
 	input  wire        clk,
@@ -31,6 +60,12 @@ module cpu_65c02
 	input  wire        irq_n,          // level-sensitive IRQ
 	input  wire        nmi_n,          // edge-sensitive NMI
 	input  wire        rdy,            // classic RDY (honored on all cycles)
+	input  wire        so_n,           // Set Overflow: a negative transition
+	                                   // sets V. Tie high if unused.
+	input  wire        be,             // Bus Enable: 1 = the address bus,
+	                                   // data bus and `we` are driven. Low
+	                                   // only parks the buffers; it does not
+	                                   // disturb internal operation.
 	input  wire        stp_nop,        // 1: execute STP as a NOP. The
 	                                   // GameKing's idle auto-power-off
 	                                   // uses STP, which only reset can
@@ -43,6 +78,12 @@ module cpu_65c02
 	output reg         we,             // write cycle
 	output reg         sync,           // opcode fetch cycle
 	output reg         vector_pull,    // fetching a vector byte
+	output wire        ml_n,           // Memory Lock, low through a locked
+	                                   // RMW's modify and write cycles
+	output wire        phi1o,          // Phase 1 Out: the inverse of PHI2
+	output wire        phi2o,          // Phase 2 Out: PHI2 buffered
+	output wire        bus_oe,         // addr and we are being driven
+	output wire        dout_oe,        // dout is being driven
 	output wire        int_seq,        // vector fetch is a hardware interrupt (not BRK)
 	output wire        rti_done,       // high through RTI's final cycle
 	output reg         in_wai,         // executed WAI, waiting for interrupt
@@ -184,12 +225,8 @@ module cpu_65c02
 				3'b111: dc_mode = (d_aaa == 3'b101) ? M_ABY : M_ABX;
 			endcase
 			if (d_bbb == 3'b100) begin
-				// $x2 column: 65C02 (zp) versions of the cc=01 ops for rows
-				// 1,3,5,7,9,B,D,F; rows 0,2,4,6,8,A,C,E are 2-byte 2-cycle NOPs.
-				if (ir[4] == 1'b0) begin
-					// never reached: bbb=100 means ir[4:2]=100 so ir[4]=1
-					dc_class = C_NOP;
-				end
+				// $x2 column: 65C02 (zp) versions of the cc=01 ops. bbb=100
+				// forces ir[4]=1, so every row here is a real (zp) opcode.
 				case (d_aaa)
 					3'b000: begin dc_class = C_ALU; dc_alu = ALU_ORA; dc_dst = R_A; dc_wr_nz = 1'b1; end   // $12
 					3'b001: begin dc_class = C_ALU; dc_alu = ALU_AND; dc_dst = R_A; dc_wr_nz = 1'b1; end   // $32
@@ -252,7 +289,6 @@ module cpu_65c02
 			end
 			// $9E STZ abs,X and $96/$B6 zp,Y and $BE abs,Y adjustments
 			if (ir == 8'h9E) begin dc_class = C_STORE; dc_src = R_Z; dc_mode = M_ABX; dc_alu = ALU_PASS; dc_wr_nz = 1'b0; dc_wr_c = 1'b0; end
-			if (ir == 8'hBE) begin dc_mode = M_ABY; end
 			// $1A INC A / $3A DEC A (cc=10, bbb=110 rows 0/1)
 			if (ir == 8'h1A) begin dc_mode = M_ACC; dc_class = C_TXFR; dc_src = R_A; dc_dst = R_A; dc_alu = ALU_INC; dc_wr_nz = 1'b1; end
 			if (ir == 8'h3A) begin dc_mode = M_ACC; dc_class = C_TXFR; dc_src = R_A; dc_dst = R_A; dc_alu = ALU_DEC; dc_wr_nz = 1'b1; end
@@ -358,12 +394,117 @@ module cpu_65c02
 	// BBR/BBS test result (bit of zp data in dl, tested against ir[7])
 	wire bbrs_taken = (dl[ir[6:4]] == ir[7]);
 
-	// RTI completion, combinational through the final RTI cycle so the
-	// SoC drops the IRR interrupt-bank override at the edge that launches
-	// the return-address fetch. The registered form cleared it one cycle
-	// late: the first post-RTI OPCODE fetched from the IRR bank while its
-	// operands fetched from PRR - a mixed-bank instruction that sent cart
-	// games into the weeds (found by the Verilator harness on Soldier).
+	// $x3 and $xB (except WAI $CB and STP $DB) are the 65C02's 1-byte,
+	// 1-cycle NOPs (datasheet Table 7-1). They retire inside the opcode
+	// fetch itself, so the test has to come off `din` - `ir` only lands
+	// at the edge that ends that cycle.
+	wire nop1_op = (din[1:0] == 2'b11) && !din[2] &&
+	               (din != 8'hCB) && (din != 8'hDB);
+
+	// NMI is edge-triggered. The real pin is sampled once per bus cycle by
+	// PHI2, so sample it on `ce` and detect the edge between two sampled
+	// copies rather than against the live pin: that matches the hardware's
+	// rejection of a glitch narrower than a cycle, and keeps an
+	// asynchronous NMI source out of combinational logic. The cost is one
+	// extra bus cycle of NMI latency (pin low -> nmi_pending takes two ce
+	// edges, where silicon takes one); a consumer that needs the exact
+	// latency AND knows its NMI source is already synchronous to clk can
+	// drop nmi_sync and edge-detect nmi_last against the pin directly.
+	// Moot on the ST2204, which ties nmi_n high. Naming the edge also lets
+	// the vector-fetch clear keep an edge that lands on the very same clock
+	// instead of losing it.
+	reg  nmi_sync;
+	wire nmi_edge = nmi_last && !nmi_sync;
+
+	// RESET is the same seven-cycle sequence as BRK/IRQ/NMI with the three
+	// pushes turned into reads, so it runs through the same states with the
+	// write strobe suppressed. The WDC datasheet ("a reset sequence lasting
+	// seven clock cycles") and Rockwell ("an initialization sequence lasting
+	// seven clock cycles") both give the length; the GTE/CMD table adds that
+	// the CMOS part reads three stack locations where NMOS wrote; and
+	// pagetable.com's cycle-by-cycle trace shows the accesses landing at
+	// $0100/$01FF/$01FE from a cold start with SP "decremented 3 times for
+	// the three fake push operations", i.e. ending at $FD.
+	reg rst_seq;
+
+	// Set Overflow. All three datasheets agree a NEGATIVE TRANSITION sets V:
+	// WDC "A negative transition on the Set Overflow (SOB) pin sets the
+	// overflow bit (V)", Rockwell and GTE/CMD the same. They place the
+	// sample at the PHI2 rising edge (GTE: "the trailing edge of Phi1"),
+	// i.e. the START of a bus cycle, where IRQB/NMIB are sampled at the end
+	// of one. A ce-gated core has no bus-visible sub-cycle phase, so this
+	// samples once per cycle on ce like the other pins; what the phase does
+	// decide is the collision case, and that IS modelled: the set below sits
+	// ahead of the instruction block, so an instruction writing V in the
+	// same cycle (CLV, PLP, BIT, ADC) lands later and wins, matching a pin
+	// sampled at the start of a cycle against a result written at its end.
+	reg  so_sync, so_last;
+	wire so_edge = so_last && !so_sync;
+
+	// Memory Lock, low across the modify and write cycles of a read-modify-
+	// write so a second bus master cannot interleave into one.
+	//
+	// The two datasheets enumerate it differently. WDC 3.5: "low during the
+	// Modify and Write cycles of ASL, DEC, INC, LSR, ROL, ROR, TRB, and TSB
+	// memory referencing instructions". Rockwell: "ML goes low during ASL,
+	// DEC, INC, LSR, ROL, ROR, RMB, SMB, TRB, TSB memory referencing
+	// instructions" - the same list plus RMB and SMB. Rockwell's is followed:
+	// those are Rockwell's own instructions, the lists are otherwise
+	// word-for-word identical so an omission is likelier than a deliberate
+	// exclusion, they are read-modify-write and need exactly the protection
+	// ML provides, and locking is the safe direction under arbitration.
+	//
+	// Accumulator-mode shifts are not memory referencing and never reach
+	// these states. In NMOS mode the same two states carry the two writes,
+	// so the window is the modify and write cycles either way.
+	wire ml_locked = (dc_class == C_RMW) || (dc_class == C_TRB) ||
+	                 (dc_class == C_RSMB);
+	assign ml_n = !(ml_locked && ((state == S_RMW_M) || (state == S_RMW_WR)));
+
+	// PHI1O / PHI2O. "The Phase 2 Out (PHI2O) signal is generated from PHI2.
+	// Phase 1 Out (PHI1O) is the inverted PHI2 signal" (WDC 3.8) - they are
+	// buffers of the clock input, not derived from instruction flow, so they
+	// are real complementary clocks rather than enable pulses.
+	//
+	// PHI2 itself is reconstructed from the enable pair: a bus cycle ends at
+	// `ce`, which is the PHI2 falling edge (where din is sampled), and `ce_n`
+	// marks its midpoint, which is the PHI2 rising edge. That yields a square
+	// wave of the bus-cycle period, low across the first half of a cycle
+	// while the address settles and high across the second half.
+	//
+	// Being buffers of a pin they keep running through stall, RDY-low, WAI
+	// and STP - an external oscillator does not stop because the core is
+	// halted - so this sits in its own block outside the sequencer's gating.
+	// It is held low through reset rather than free-running, which departs
+	// from a real oscillator but gives a defined power-up state; RESB is
+	// brief and anything clocked from PHI2O is in reset alongside it.
+	// A consumer that leaves ce_n tied low gets no midpoint and therefore no
+	// PHI2 edge - drive the ce/ce_n pair if these outputs are used.
+	reg phi2_r;
+	always @(posedge clk) begin
+		if (reset)                                        phi2_r <= 1'b0;
+		else if (ss_wren && (ss_addr == SS_BASE + 10'd2)) phi2_r <= ss_wdata[19];
+		else if (ce_n)                                    phi2_r <= 1'b1;
+		else if (ce)                                      phi2_r <= 1'b0;
+	end
+	assign phi2o = phi2_r;
+	assign phi1o = ~phi2_r;
+
+	// BE gates the output buffers only. Rather than tri-state inside the
+	// core, expose the enables and let the integrator drive pads.
+	assign bus_oe  = be;
+	assign dout_oe = be && we;
+
+	// A one-cycle NOP merges into the instruction after it: no interrupt
+	// sequence may begin on that boundary, and a run of them merges with
+	// whatever non-one-cycle-NOP finally turns up. Measured on hardware by
+	// Jeff Laughton, documented in 6502.org's 65C02 Opcodes (section 9).
+	reg nop1_hold;
+
+	// RTI completion, combinational through the final RTI cycle so the SoC
+	// drops the IRR interrupt-bank override at the edge that launches the
+	// return-address fetch. A cycle later is too late: the first post-RTI
+	// opcode would come from the IRR bank while its operands came from PRR.
 	assign rti_done = (state == S_VEC_HI) && (ir == 8'h40);
 
 	// Branch target low-byte adder and page-cross detect (offset in dl)
@@ -372,6 +513,18 @@ module cpu_65c02
 
 	// PC incrementer used where a slice of PC+1 is needed
 	wire [15:0] pc_inc = reg_pc + 16'd1;
+
+	// Address of the instruction's last byte during the index address
+	// phase, which is what the W65C02S drives on the indexing dummy
+	// cycle. For abs,X/abs,Y the high-byte fetch happens in the same
+	// state, so reg_pc still points at it; for (zp),Y the operand fetch
+	// already advanced past the instruction, so it is one back.
+	wire [15:0] pc_dec = reg_pc - 16'd1;
+
+	// Index low-byte sums for the address phase. The carry both selects
+	// the fix cycle and, in WDC mode, picks the dummy-cycle address.
+	wire [8:0] abs_idx_sum = {1'b0, dl} + {1'b0, idx_reg};
+	wire [8:0] izy_idx_sum = {1'b0, dl} + {1'b0, reg_y};
 
 	assign int_seq = int_active;
 
@@ -416,7 +569,6 @@ module cpu_65c02
 	localparam [5:0] S_FETCH   = 6'd0;
 	localparam [5:0] S_OP2     = 6'd1;   // second cycle: operand/dummy at PC
 	localparam [5:0] S_ZPX_D   = 6'd2;   // dummy read at un-indexed zp
-	localparam [5:0] S_ABS_LO  = 6'd3;
 	localparam [5:0] S_ABS_HI  = 6'd4;
 	localparam [5:0] S_IDX_FIX = 6'd5;   // page-cross / forced index dummy
 	localparam [5:0] S_IZX_LO  = 6'd6;
@@ -424,10 +576,20 @@ module cpu_65c02
 	localparam [5:0] S_IZY_LO  = 6'd8;
 	localparam [5:0] S_IZY_HI  = 6'd9;
 	localparam [5:0] S_READ    = 6'd10;
-	// (no BCD extra-cycle state: D=1 ADC/SBC needs no extra bus cycle — the
-	//  decimal correction is combinational in the ALU, matching R65Cx2 and
-	//  real 65xx silicon; the WDC SST suite's $007F/$0000 dummy reads are a
-	//  reference-model artifact, see module_tests/cpu_65c02/wdc_vs_6502_analysis.md)
+	// Decimal ADC/SBC extra cycle. Every 65C02 branch spends it, and the
+	// Rockwell part is no exception - its own datasheet's enhancement table
+	// reads "Flags after decimal operation: Valid flag adds one additional
+	// cycle", and its opcode matrix daggers every ADC/SBC entry with "Add 1
+	// to N if in decimal mode". W65C02S datasheet Table 7-1 says the same
+	// ("Valid flags. One additional cycle"), 6502.org's Decimal Mode 3.2.3
+	// spells out SED / ADC #$00 as 3 cycles on the 65C02 against 2 on the
+	// 6502 and 65816, and the SingleStepTests sets show 3 cycles with D=1
+	// on the WDC, Rockwell AND Synertek parts alike.
+	// The address those vectors record for the cycle is one fixed constant
+	// per file ($007F/$0059/$0056, the same for all 10,000 tests whatever
+	// PC is), so it carries no information; the re-read at PC that this
+	// state drives is the conventional model. Not taken when WDC_MODE = 0.
+	localparam [5:0] S_DEC_FIX = 6'd11;
 	localparam [5:0] S_RMW_M   = 6'd12;  // second read of EA (65C02)
 	localparam [5:0] S_RMW_WR  = 6'd13;
 	localparam [5:0] S_WRITE   = 6'd14;
@@ -460,10 +622,14 @@ module cpu_65c02
 	localparam [5:0] S_WAI     = 6'd41;
 	localparam [5:0] S_STP     = 6'd42;
 	localparam [5:0] S_NOP8    = 6'd43;  // $5C filler cycles
+	localparam [5:0] S_JMP_PC  = 6'd44;  // JMP (abs): pointer high re-read
+	localparam [5:0] S_ZPR_M   = 6'd45;  // BBR/BBS second zp read
+	localparam [5:0] S_ZPR_FIX = 6'd46;  // BBR/BBS branch page fix
 
 	reg [5:0] state;
 	reg [2:0] nop8_cnt;
 	reg       idx_carry;      // page-cross flag from indexed low-byte add
+	reg       int_i_mask;     // I as seen by the interrupt sampler
 	reg [7:0] idx_reg;        // X or Y for the active indexed mode
 
 	// Deferred register/flag writeback (applied at instruction end)
@@ -498,8 +664,24 @@ module cpu_65c02
 		end
 	endtask
 
-	// Interrupt recognition at fetch
-	wire take_int = nmi_pending || (~irq_n && !fl_i);
+	// Interrupt recognition. Two independent hardware behaviors are modelled:
+	//
+	// The LEVEL. IRQB is sampled during phi2 of every cycle, and per NESdev's
+	// CPU_interrupts wiki page "it's really the status of the interrupt lines
+	// at the end of the second-to-last cycle that matters" - polling happens
+	// in the final cycle, before the next opcode fetch. This core decides at
+	// that fetch, one cycle later, so it polls irq_l2: sampling twice puts
+	// the value from the end of the second-to-last cycle under the decision.
+	// No manufacturer datasheet states the polling cycle, so this follows
+	// the visual6502-derived community analysis.
+	//
+	// The MASK. CLI, SEI and PLP change I *after* polling, so they delay an
+	// interrupt by one whole instruction; RTI restores I *before* polling and
+	// takes effect at once. int_i_mask is that delayed view of I, refreshed
+	// at every opcode fetch and forced immediately where hardware has no
+	// delay (interrupt entry sets it, RTI restores it from the pulled P).
+	reg  irq_l1, irq_l2;
+	wire take_int = !nop1_hold && (nmi_pending || (irq_l2 && !int_i_mask));
 
 	always @(posedge clk) begin
 		if (reset) begin
@@ -507,35 +689,53 @@ module cpu_65c02
 			reg_x       <= 8'h00;
 			reg_y       <= 8'h00;
 			reg_s       <= 8'h00;
-			reg_pc      <= 16'h0000;
+			reg_pc      <= 16'h0100;
 			fl_n        <= 1'b0;
 			fl_v        <= 1'b0;
 			fl_d        <= 1'b0;
 			fl_i        <= 1'b1;
 			fl_z        <= 1'b0;
 			fl_c        <= 1'b0;
+			int_i_mask  <= 1'b1;
+			nop1_hold   <= 1'b0;
+			so_sync     <= 1'b1;
+			so_last     <= 1'b1;
+			irq_l1      <= 1'b0;
+			irq_l2      <= 1'b0;
+			rst_seq     <= 1'b1;
 			ir          <= 8'h00;
 			dl          <= 8'h00;
 			ea          <= 16'h0000;
-			addr        <= 16'hFFFC;
+			addr        <= 16'h0100;
 			dout        <= 8'h00;
 			we          <= 1'b0;
 			sync        <= 1'b0;
-			vector_pull <= 1'b1;
+			vector_pull <= 1'b0;
 			in_wai      <= 1'b0;
 			in_stp      <= 1'b0;
 			nmi_pending <= 1'b0;
+			nmi_sync    <= 1'b1;
 			nmi_last    <= 1'b1;
 			int_active  <= 1'b1;    // reset behaves as an interrupt sequence
 			int_is_nmi  <= 1'b0;
-			state       <= S_VEC_LO;
+			state       <= S_FETCH;
 			nop8_cnt    <= 3'd0;
 			idx_carry   <= 1'b0;
 			idx_reg     <= 8'h00;
 		end else begin
-			// NMI edge detect runs every clock
-			nmi_last <= nmi_n;
-			if (nmi_last && !nmi_n) nmi_pending <= 1'b1;
+			// NMIB sampling tracks PHI2, so it continues through stall,
+			// RDY-low and WAI; only a stopped console clock enable stops it.
+			if (ce) begin
+				nmi_sync <= nmi_n;
+				nmi_last <= nmi_sync;
+				irq_l1   <= ~irq_n;
+				irq_l2   <= irq_l1;
+				so_sync  <= so_n;
+				so_last  <= so_sync;
+				if (nmi_edge) nmi_pending <= 1'b1;
+				// Ahead of the instruction block on purpose - see above.
+				if (so_edge) fl_v <= 1'b1;
+			end
 
 			if (ce && !stall && rdy && !in_stp) begin
 				we       <= 1'b0;
@@ -546,7 +746,8 @@ module cpu_65c02
 				// ------------------------------------------------------
 				S_FETCH: begin
 					// din = opcode
-					if (take_int) begin
+					idx_carry <= 1'b0;   // no indexed fix cycle is pending
+					if (take_int || rst_seq) begin
 						// discard opcode, run interrupt sequence
 						ir         <= 8'h00;
 						int_active <= 1'b1;
@@ -556,9 +757,18 @@ module cpu_65c02
 					end else begin
 						ir         <= din;
 						int_active <= 1'b0;
+						int_i_mask <= fl_i;
+						nop1_hold  <= nop1_op;
 						reg_pc     <= reg_pc + 16'd1;
 						addr       <= reg_pc + 16'd1;
-						state      <= S_OP2;
+						if (nop1_op) begin
+							// 1 byte, 1 cycle: this fetch is the whole
+							// instruction, so launch the next one now.
+							sync  <= 1'b1;
+							state <= S_FETCH;
+						end else begin
+							state <= S_OP2;
+						end
 					end
 				end
 				// ------------------------------------------------------
@@ -607,6 +817,12 @@ module cpu_65c02
 							end else if (dc_class == C_STP && !stp_nop) begin
 								in_stp <= 1'b1;
 								state  <= S_STP;
+							end else if (dc_class == C_STP) begin
+								// STP disabled: still retire in its real
+								// three cycles rather than two.
+								addr     <= reg_pc;
+								nop8_cnt <= 3'd1;
+								state    <= S_NOP8;
 							end else begin
 								addr  <= reg_pc;
 								sync  <= 1'b1;
@@ -623,9 +839,14 @@ module cpu_65c02
 								if (dc_class == C_ALU || dc_class == C_LOAD)
 									do_writeback(dc_dst, alu_result);
 							end
-							addr  <= reg_pc + 16'd1;
-							sync  <= 1'b1;
-							state <= S_FETCH;
+							addr <= reg_pc + 16'd1;
+							if (WDC_MODE && fl_d &&
+							    (dc_alu == ALU_ADC || dc_alu == ALU_SBC)) begin
+								state <= S_DEC_FIX;
+							end else begin
+								sync  <= 1'b1;
+								state <= S_FETCH;
+							end
 						end
 						M_ZP: begin
 							reg_pc <= reg_pc + 16'd1;
@@ -704,7 +925,7 @@ module cpu_65c02
 									if (!int_active) reg_pc <= pc_inc;
 									addr  <= {8'h01, reg_s};
 									dout  <= int_active ? reg_pc[15:8] : pc_inc[15:8];
-									we    <= 1'b1;
+									we    <= !rst_seq;   // reset reads instead
 									state <= S_BRK_PH;
 								end
 								C_JSR: begin
@@ -730,13 +951,6 @@ module cpu_65c02
 							state <= S_FETCH;
 						end
 					endcase
-					// M_IMP one-cycle NOPs ($x3/$xB): 1 byte, 1 cycle total.
-					// They re-fetch immediately without consuming this byte.
-					if (dc_class == C_NOP && dc_mode == M_IMP && d_cc == 2'b11) begin
-						addr  <= reg_pc;
-						sync  <= 1'b1;
-						state <= S_FETCH;
-					end
 				end
 				// ------------------------------------------------------
 				S_ZPX_D: begin
@@ -767,44 +981,46 @@ module cpu_65c02
 					end else if (dc_mode == M_IAB) begin
 						ea    <= {din, dl};
 						addr  <= {din, dl};
-						state <= S_IDX_FIX;   // 6-cycle (abs): extra internal cycle
+						state <= S_JMP_LO;
 					end else if (dc_mode == M_IAX) begin
 						ea    <= {din, dl} + {8'd0, reg_x};
-						addr  <= reg_pc + 16'd1;   // internal indexing cycle
+						addr  <= pc_dec;           // internal cycle at PC+1
 						state <= S_IDX_FIX;
 					end else if (dc_mode == M_ABX || dc_mode == M_ABY) begin
-						{idx_carry, ea[7:0]} <= {1'b0, dl} + {1'b0, idx_reg};
+						{idx_carry, ea[7:0]} <= abs_idx_sum;
 						ea[15:8] <= din;
-						// Cross/forced-dummy decision happens next cycle via
-						// idx_carry; launch the (possibly wrong-page) access.
-						// WDC 65C02 abs,X convention: the forced/penalty cycle
-						// re-reads b2 at pc+2 (reg_pc during S_ABS_HI) rather than
-						// the no-carry EA. Stores and INC/DEC abs,X take it
-						// unconditionally; reads and shift-RMW only on page cross.
-						// M_ABY keeps the no-carry-EA dummy (unchanged).
-						if (dc_mode == M_ABX &&
-						    (dc_class == C_STORE ||
-						     (dc_class == C_RMW &&
-						      !(dc_alu == ALU_ASL || dc_alu == ALU_LSR ||
-						        dc_alu == ALU_ROL || dc_alu == ALU_ROR)))) begin
-							addr <= reg_pc;                    // b2 re-read: forced fix cycle
-						end else if (dc_mode == M_ABX &&
-						           ({1'b0, dl} + {1'b0, idx_reg}) > 9'd255) begin
-							addr <= reg_pc;                    // b2 re-read: cross penalty
-						end else begin
-							addr <= {din, dl + idx_reg};       // EAnc: real access / ABY dummy
-						end
+						// Stores and INC/DEC abs,X always spend a fix cycle;
+						// reads and shift-RMW only when the index carried.
+						// On that cycle the 65C02 re-reads the last
+						// instruction byte and the NMOS 6502 the un-fixed
+						// (wrong-page) address - worded identically in the
+						// WDC and Rockwell enhancement tables. Everywhere
+						// else this launches the real access.
 						if (dc_class == C_STORE) begin
+							addr  <= WDC_MODE ? reg_pc : {din, abs_idx_sum[7:0]};
 							state <= S_IDX_FIX;   // stores always take the fix cycle
-						end else if (dc_class == C_RMW &&
+						end else if (WDC_MODE && dc_class == C_RMW &&
 						             (dc_alu == ALU_ASL || dc_alu == ALU_LSR ||
 						              dc_alu == ALU_ROL || dc_alu == ALU_ROR)) begin
+							addr  <= abs_idx_sum[8] ? reg_pc : {din, abs_idx_sum[7:0]};
 							state <= S_READ;      // W65C02S shift RMW abs,X: 6+p
 						end else if (dc_class == C_RMW || dc_class == C_TRB) begin
+							addr  <= WDC_MODE ? reg_pc : {din, abs_idx_sum[7:0]};
 							state <= S_IDX_FIX;   // INC/DEC abs,X always 7
 						end else begin
+							addr  <= (WDC_MODE && abs_idx_sum[8]) ? reg_pc
+							                                      : {din, abs_idx_sum[7:0]};
 							state <= S_READ;      // page cross inserts fix in S_READ
 						end
+					end else if (dc_class == C_NOP && ir == 8'h5C) begin
+						// "5C bb aa", after fetching its three bytes,
+						// accesses FFbb, and then spends four cycles
+						// accessing FFFF (LLX, "The 6502/65C02/65C816
+						// Instruction Set Decoded"). Not the absolute
+						// operand - dl is the low operand byte bb.
+						ea    <= {8'hFF, dl};
+						addr  <= {8'hFF, dl};
+						state <= S_READ;
 					end else begin
 						ea   <= {din, dl};
 						addr <= {din, dl};
@@ -868,12 +1084,16 @@ module cpu_65c02
 							state <= S_READ;
 						end
 					end else begin
-						{idx_carry, ea[7:0]} <= {1'b0, dl} + {1'b0, reg_y};
+						{idx_carry, ea[7:0]} <= izy_idx_sum;
 						ea[15:8] <= din;
-						addr <= {din, dl + reg_y};
+						// Same dummy-cycle rule as abs,X; the last
+						// instruction byte of a 2-byte opcode is PC-1 here.
 						if (dc_class == C_STORE) begin
+							addr  <= WDC_MODE ? pc_dec : {din, izy_idx_sum[7:0]};
 							state <= S_IDX_FIX;
 						end else begin
+							addr  <= (WDC_MODE && izy_idx_sum[8]) ? pc_dec
+							                                      : {din, izy_idx_sum[7:0]};
 							state <= S_READ;
 						end
 					end
@@ -891,8 +1111,15 @@ module cpu_65c02
 						// din = memory operand
 						case (dc_class)
 							C_RMW, C_TRB, C_RSMB: begin
-								dl    <= din;
-								addr  <= ea;        // 65C02 second read
+								dl   <= din;
+								addr <= ea;
+								// 65C02: two reads then one write. NMOS:
+								// one read then the unmodified value is
+								// written back before the modified one.
+								if (!WDC_MODE) begin
+									dout <= din;
+									we   <= 1'b1;
+								end
 								state <= S_RMW_M;
 							end
 							C_BIT: begin
@@ -907,7 +1134,8 @@ module cpu_65c02
 								addr  <= reg_pc;
 								sync  <= 1'b1;
 								if (ir == 8'h5C) begin
-									nop8_cnt <= 3'd4;   // $5C burns 4 extra cycles
+									addr     <= 16'hFFFF;
+									nop8_cnt <= 3'd4;   // four cycles at $FFFF
 									sync     <= 1'b0;
 									state    <= S_NOP8;
 								end else begin
@@ -918,15 +1146,28 @@ module cpu_65c02
 								set_alu_flags;
 								if (dc_class == C_ALU || dc_class == C_LOAD)
 									do_writeback(dc_dst, alu_result);
-								addr  <= reg_pc;
-								sync  <= 1'b1;
-								state <= S_FETCH;
+								addr <= reg_pc;
+								if (WDC_MODE && fl_d &&
+								    (dc_alu == ALU_ADC || dc_alu == ALU_SBC)) begin
+									state <= S_DEC_FIX;
+								end else begin
+									sync  <= 1'b1;
+									state <= S_FETCH;
+								end
 							end
 						endcase
 					end
 				end
+				S_DEC_FIX: begin
+					// Decimal ADC/SBC extra cycle; the re-read at PC was
+					// already launched. Flags landed with the result.
+					addr  <= reg_pc;
+					sync  <= 1'b1;
+					state <= S_FETCH;
+				end
 				S_RMW_M: begin
-					// din = second read (discard); write modified value
+					// din = second read (or NMOS old-value write); write
+					// the modified value
 					addr  <= ea;
 					we    <= 1'b1;
 					if (dc_class == C_RSMB) begin
@@ -953,11 +1194,16 @@ module cpu_65c02
 					state <= S_FETCH;
 				end
 				S_NOP8: begin
+					// Shared by $5C's four $FFFF cycles and, with a count of
+					// one, by STP-as-NOP's third cycle at PC. The last cycle
+					// hands the bus back to PC for the next opcode fetch.
 					nop8_cnt <= nop8_cnt - 3'd1;
-					addr     <= reg_pc;
 					if (nop8_cnt == 3'd1) begin
+						addr  <= reg_pc;
 						sync  <= 1'b1;
 						state <= S_FETCH;
+					end else begin
+						addr  <= (ir == 8'h5C) ? 16'hFFFF : reg_pc;
 					end
 				end
 				// ------------------------------------------------------
@@ -1062,6 +1308,7 @@ module cpu_65c02
 				end
 				S_RTI_PL: begin
 					do_writeback(R_P, din);
+					int_i_mask <= din[2];      // RTI's I takes effect at once
 					reg_s <= reg_s + 8'd1;
 					addr  <= {8'h01, reg_s + 8'd1};
 					state <= S_RTI_PH;
@@ -1078,24 +1325,29 @@ module cpu_65c02
 					reg_s <= reg_s - 8'd1;
 					addr  <= {8'h01, reg_s - 8'd1};
 					dout  <= reg_pc[7:0];
-					we    <= 1'b1;
+					we    <= !rst_seq;
 					state <= S_BRK_PL;
 				end
 				S_BRK_PL: begin
 					reg_s <= reg_s - 8'd1;
 					addr  <= {8'h01, reg_s - 8'd1};
 					dout  <= {fl_n, fl_v, 1'b1, ~int_active, fl_d, fl_i, fl_z, fl_c};
-					we    <= 1'b1;
+					we    <= !rst_seq;
 					state <= S_BRK_P;
 				end
 				S_BRK_P: begin
 					reg_s <= reg_s - 8'd1;
 					fl_i  <= 1'b1;
-					fl_d  <= 1'b0;             // 65C02 clears D on interrupt
+					int_i_mask <= 1'b1;           // masking here is immediate
+					if (WDC_MODE) fl_d <= 1'b0;   // 65C02 clears D on interrupt
 					vector_pull <= 1'b1;
-					if (int_is_nmi) begin
+					rst_seq     <= 1'b0;
+					if (rst_seq) begin
+						addr <= 16'hFFFC;
+					end else if (int_is_nmi) begin
 						addr <= 16'hFFFA;
-						nmi_pending <= 1'b0;
+						// keep an NMI edge landing on this very clock
+						nmi_pending <= nmi_edge;
 					end else begin
 						addr <= 16'hFFFE;
 					end
@@ -1116,11 +1368,31 @@ module cpu_65c02
 				end
 				// ------------------------------------------------------
 				S_JMP_LO: begin
-					dl    <= din;
-					addr  <= ea + 16'd1;
+					dl <= din;                 // target lo
+					// (abs) increments the pointer inside its page on both
+					// parts; (abs,X) carries. Table 7-1's "page address
+					// increments, one additional cycle" is that extra cycle
+					// in S_JMP_HI, not a different address here.
+					addr  <= (dc_mode == M_IAB) ? {ea[15:8], ea[7:0] + 8'd1}
+					                            : (ea + 16'd1);
 					state <= S_JMP_HI;
 				end
 				S_JMP_HI: begin
+					// On the 65C02 the wrapped read above is discarded and a
+					// sixth cycle repeats it at the carried address - the
+					// two coincide unless the pointer ended $xxFF. NMOS
+					// keeps the wrapped byte, and (abs,X) never wrapped.
+					if (WDC_MODE && dc_mode == M_IAB) begin
+						addr  <= ea + 16'd1;
+						state <= S_JMP_PC;
+					end else begin
+						reg_pc <= {din, dl};
+						addr   <= {din, dl};
+						sync   <= 1'b1;
+						state  <= S_FETCH;
+					end
+				end
+				S_JMP_PC: begin
 					reg_pc <= {din, dl};
 					addr   <= {din, dl};
 					sync   <= 1'b1;
@@ -1129,29 +1401,47 @@ module cpu_65c02
 				// ------------------------------------------------------
 				S_ZPR_RD: begin
 					dl    <= din;              // zp data to test
-					addr  <= reg_pc;           // fetch offset
+					addr  <= ea;               // zp is read twice, as in
+					state <= S_ZPR_M;          // every Rockwell bit op
+				end
+				S_ZPR_M: begin
+					addr  <= reg_pc;           // now fetch the offset
 					state <= S_ZPR_OFF;
 				end
 				S_ZPR_OFF: begin
+					// din = offset; reg_pc becomes the branch base (PC+3).
 					reg_pc <= reg_pc + 16'd1;
-					ea[7:0] <= din;            // offset parked in ea low
-					addr   <= reg_pc + 16'd1;  // internal cycle
-					state  <= S_ZPR_INT;
-				end
-				S_ZPR_INT: begin
+					addr   <= reg_pc + 16'd1;
 					if (bbrs_taken) begin
-						dl    <= ea[7:0];      // hand offset to branch path
-						addr  <= reg_pc;
-						state <= S_BRA_ADD;
+						dl    <= din;          // offset drives the adder
+						state <= S_ZPR_INT;
 					end else begin
-						addr  <= reg_pc;
 						sync  <= 1'b1;
 						state <= S_FETCH;
 					end
 				end
+				S_ZPR_INT: begin
+					// Unlike a plain branch, whose fix cycle reads the
+					// half-corrected target, BBR/BBS re-read the base.
+					reg_pc[7:0] <= bra_sum[7:0];
+					if (bra_cross) begin
+						addr  <= reg_pc;
+						state <= S_ZPR_FIX;
+					end else begin
+						addr  <= {reg_pc[15:8], bra_sum[7:0]};
+						sync  <= 1'b1;
+						state <= S_FETCH;
+					end
+				end
+				S_ZPR_FIX: begin
+					reg_pc[15:8] <= reg_pc[15:8] + (dl[7] ? 8'hFF : 8'h01);
+					addr  <= {reg_pc[15:8] + (dl[7] ? 8'hFF : 8'h01), reg_pc[7:0]};
+					sync  <= 1'b1;
+					state <= S_FETCH;
+				end
 				// ------------------------------------------------------
 				S_WAI: begin
-					if (nmi_pending || ~irq_n) begin
+					if (nmi_pending || irq_l1) begin
 						in_wai <= 1'b0;
 						addr   <= reg_pc;
 						sync   <= 1'b1;
@@ -1202,6 +1492,14 @@ module cpu_65c02
 				addr        <= ss_wdata[15:0];
 			end
 			if (ss_wren && (ss_addr == SS_BASE + 10'd2)) begin
+				so_last     <= ss_wdata[18];
+				so_sync     <= ss_wdata[17];
+				irq_l2      <= ss_wdata[16];
+				irq_l1      <= ss_wdata[15];
+				rst_seq     <= ss_wdata[14];
+				nmi_sync    <= ss_wdata[13];
+				nop1_hold   <= ss_wdata[12];
+				int_i_mask  <= ss_wdata[11];
 				we          <= ss_wdata[10];
 				sync        <= ss_wdata[9];
 				vector_pull <= ss_wdata[8];
@@ -1242,8 +1540,8 @@ module cpu_65c02
 			{dl, ea, state, nmi_pending, nmi_last, int_active, int_is_nmi,
 			 in_wai, in_stp, idx_carry, idx_reg, nop8_cnt, addr} :
 		(ss_addr == SS_BASE + 10'd2) ?
-			{53'd0, we, sync, vector_pull, dout} : 64'd0;
-
-	wire unused_ok = &{1'b0, ce_n, alu_zf, ss_wdata[63:11]};
+			{44'd0, phi2_r, so_last, so_sync, irq_l2, irq_l1, rst_seq,
+			 nmi_sync, nop1_hold, int_i_mask,
+			 we, sync, vector_pull, dout} : 64'd0;
 
 endmodule

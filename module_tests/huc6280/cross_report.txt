@@ -1,0 +1,375 @@
+HUC6280 vs canonical 65C02 — cross-comparison
+tests=1270 ops=256 sample=5 seed=1
+
+=== category totals ===
+  IDENTICAL    157  ( 12.4%)
+  REMAP         92  (  7.2%)
+  TIMING        98  (  7.7%)
+  STATE        289  ( 22.8%)
+  BUS          625  ( 49.2%)
+  NOFETCH        9  (  0.7%)
+
+=== per-opcode (id/remap/time/state/bus/nofetch of total) ===
+  00: 0/5 id, remap=0 time=0 state=0 bus=0 nofetch=5
+  01: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  02: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  03: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  04: 0/5 id, remap=0 time=0 state=1 bus=4 nofetch=0
+  05: 0/5 id, remap=0 time=0 state=4 bus=1 nofetch=0
+  06: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  07: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  08: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  09: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  0a: 4/5 id, remap=0 time=0 state=1 bus=0 nofetch=0
+  0b: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  0c: 0/5 id, remap=0 time=0 state=4 bus=1 nofetch=0
+  0d: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  0e: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  0f: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  10: 3/5 id, remap=0 time=2 state=0 bus=0 nofetch=0
+  11: 0/5 id, remap=0 time=0 state=3 bus=2 nofetch=0
+  12: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  13: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  14: 0/5 id, remap=0 time=0 state=2 bus=3 nofetch=0
+  15: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  16: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  17: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  18: 4/5 id, remap=0 time=0 state=1 bus=0 nofetch=0
+  19: 0/5 id, remap=0 time=0 state=4 bus=1 nofetch=0
+  1a: 4/5 id, remap=0 time=0 state=1 bus=0 nofetch=0
+  1b: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  1c: 0/5 id, remap=0 time=0 state=4 bus=1 nofetch=0
+  1d: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  1e: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  1f: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  20: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  21: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  22: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  23: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  24: 0/5 id, remap=5 time=0 state=0 bus=0 nofetch=0
+  25: 0/5 id, remap=0 time=0 state=4 bus=1 nofetch=0
+  26: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  27: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  28: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  29: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  2a: 3/5 id, remap=0 time=0 state=2 bus=0 nofetch=0
+  2b: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  2c: 0/5 id, remap=0 time=5 state=0 bus=0 nofetch=0
+  2d: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  2e: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  2f: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  30: 2/5 id, remap=0 time=1 state=0 bus=2 nofetch=0
+  31: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  32: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  33: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  34: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  35: 0/5 id, remap=0 time=0 state=3 bus=2 nofetch=0
+  36: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  37: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  38: 4/5 id, remap=0 time=0 state=1 bus=0 nofetch=0
+  39: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  3a: 4/5 id, remap=0 time=0 state=1 bus=0 nofetch=0
+  3b: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  3c: 0/5 id, remap=0 time=2 state=0 bus=3 nofetch=0
+  3d: 0/5 id, remap=0 time=0 state=4 bus=1 nofetch=0
+  3e: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  3f: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  40: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  41: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  42: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  43: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  44: 0/5 id, remap=0 time=0 state=1 bus=0 nofetch=4
+  45: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  46: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  47: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  48: 0/5 id, remap=5 time=0 state=0 bus=0 nofetch=0
+  49: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  4a: 3/5 id, remap=0 time=0 state=2 bus=0 nofetch=0
+  4b: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  4c: 0/5 id, remap=0 time=5 state=0 bus=0 nofetch=0
+  4d: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  4e: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  4f: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  50: 2/5 id, remap=0 time=2 state=0 bus=1 nofetch=0
+  51: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  52: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  53: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  54: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  55: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  56: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  57: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  58: 5/5 id, remap=0 time=0 state=0 bus=0 nofetch=0
+  59: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  5a: 0/5 id, remap=4 time=0 state=1 bus=0 nofetch=0
+  5b: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  5c: 0/5 id, remap=0 time=0 state=2 bus=3 nofetch=0
+  5d: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  5e: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  5f: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  60: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  61: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  62: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  63: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  64: 0/5 id, remap=5 time=0 state=0 bus=0 nofetch=0
+  65: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  66: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  67: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  68: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  69: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  6a: 5/5 id, remap=0 time=0 state=0 bus=0 nofetch=0
+  6b: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  6c: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  6d: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  6e: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  6f: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  70: 2/5 id, remap=0 time=3 state=0 bus=0 nofetch=0
+  71: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  72: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  73: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  74: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  75: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  76: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  77: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  78: 4/5 id, remap=0 time=0 state=1 bus=0 nofetch=0
+  79: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  7a: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  7b: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  7c: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  7d: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  7e: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  7f: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  80: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  81: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  82: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  83: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  84: 0/5 id, remap=5 time=0 state=0 bus=0 nofetch=0
+  85: 0/5 id, remap=5 time=0 state=0 bus=0 nofetch=0
+  86: 0/5 id, remap=5 time=0 state=0 bus=0 nofetch=0
+  87: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  88: 3/5 id, remap=0 time=0 state=2 bus=0 nofetch=0
+  89: 4/5 id, remap=0 time=0 state=1 bus=0 nofetch=0
+  8a: 4/5 id, remap=0 time=0 state=1 bus=0 nofetch=0
+  8b: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  8c: 0/5 id, remap=0 time=5 state=0 bus=0 nofetch=0
+  8d: 0/5 id, remap=0 time=5 state=0 bus=0 nofetch=0
+  8e: 0/5 id, remap=0 time=5 state=0 bus=0 nofetch=0
+  8f: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  90: 1/5 id, remap=0 time=4 state=0 bus=0 nofetch=0
+  91: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  92: 0/5 id, remap=5 time=0 state=0 bus=0 nofetch=0
+  93: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  94: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  95: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  96: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  97: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  98: 4/5 id, remap=0 time=0 state=1 bus=0 nofetch=0
+  99: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  9a: 5/5 id, remap=0 time=0 state=0 bus=0 nofetch=0
+  9b: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  9c: 0/5 id, remap=0 time=5 state=0 bus=0 nofetch=0
+  9d: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  9e: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  9f: 1/5 id, remap=0 time=0 state=0 bus=4 nofetch=0
+  a0: 5/5 id, remap=0 time=0 state=0 bus=0 nofetch=0
+  a1: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  a2: 5/5 id, remap=0 time=0 state=0 bus=0 nofetch=0
+  a3: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  a4: 0/5 id, remap=5 time=0 state=0 bus=0 nofetch=0
+  a5: 0/5 id, remap=5 time=0 state=0 bus=0 nofetch=0
+  a6: 0/5 id, remap=5 time=0 state=0 bus=0 nofetch=0
+  a7: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  a8: 4/5 id, remap=0 time=0 state=1 bus=0 nofetch=0
+  a9: 5/5 id, remap=0 time=0 state=0 bus=0 nofetch=0
+  aa: 5/5 id, remap=0 time=0 state=0 bus=0 nofetch=0
+  ab: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  ac: 0/5 id, remap=0 time=5 state=0 bus=0 nofetch=0
+  ad: 0/5 id, remap=0 time=5 state=0 bus=0 nofetch=0
+  ae: 0/5 id, remap=0 time=5 state=0 bus=0 nofetch=0
+  af: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  b0: 2/5 id, remap=0 time=2 state=0 bus=1 nofetch=0
+  b1: 0/5 id, remap=1 time=0 state=0 bus=4 nofetch=0
+  b2: 0/5 id, remap=5 time=0 state=0 bus=0 nofetch=0
+  b3: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  b4: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  b5: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  b6: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  b7: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  b8: 2/5 id, remap=0 time=0 state=3 bus=0 nofetch=0
+  b9: 0/5 id, remap=0 time=1 state=0 bus=4 nofetch=0
+  ba: 4/5 id, remap=0 time=0 state=1 bus=0 nofetch=0
+  bb: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  bc: 0/5 id, remap=0 time=3 state=0 bus=2 nofetch=0
+  bd: 0/5 id, remap=0 time=4 state=0 bus=1 nofetch=0
+  be: 0/5 id, remap=0 time=1 state=0 bus=4 nofetch=0
+  bf: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  c0: 5/5 id, remap=0 time=0 state=0 bus=0 nofetch=0
+  c1: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  c2: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  c3: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  c4: 0/5 id, remap=5 time=0 state=0 bus=0 nofetch=0
+  c5: 0/5 id, remap=5 time=0 state=0 bus=0 nofetch=0
+  c6: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  c7: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  c8: 5/5 id, remap=0 time=0 state=0 bus=0 nofetch=0
+  c9: 5/5 id, remap=0 time=0 state=0 bus=0 nofetch=0
+  ca: 5/5 id, remap=0 time=0 state=0 bus=0 nofetch=0
+  cc: 0/5 id, remap=0 time=5 state=0 bus=0 nofetch=0
+  cd: 0/5 id, remap=0 time=5 state=0 bus=0 nofetch=0
+  ce: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  cf: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  d0: 2/5 id, remap=0 time=0 state=0 bus=3 nofetch=0
+  d1: 0/5 id, remap=2 time=0 state=0 bus=3 nofetch=0
+  d2: 0/5 id, remap=5 time=0 state=0 bus=0 nofetch=0
+  d3: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  d4: 0/5 id, remap=0 time=0 state=3 bus=2 nofetch=0
+  d5: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  d6: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  d7: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  d8: 5/5 id, remap=0 time=0 state=0 bus=0 nofetch=0
+  d9: 0/5 id, remap=0 time=1 state=0 bus=4 nofetch=0
+  da: 0/5 id, remap=2 time=0 state=3 bus=0 nofetch=0
+  dc: 0/5 id, remap=0 time=0 state=2 bus=3 nofetch=0
+  dd: 0/5 id, remap=0 time=1 state=0 bus=4 nofetch=0
+  de: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  df: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  e0: 5/5 id, remap=0 time=0 state=0 bus=0 nofetch=0
+  e1: 0/5 id, remap=0 time=0 state=1 bus=4 nofetch=0
+  e2: 0/5 id, remap=0 time=5 state=0 bus=0 nofetch=0
+  e3: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  e4: 0/5 id, remap=5 time=0 state=0 bus=0 nofetch=0
+  e5: 0/5 id, remap=4 time=0 state=1 bus=0 nofetch=0
+  e6: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  e7: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  e8: 5/5 id, remap=0 time=0 state=0 bus=0 nofetch=0
+  e9: 3/5 id, remap=0 time=1 state=1 bus=0 nofetch=0
+  ea: 5/5 id, remap=0 time=0 state=0 bus=0 nofetch=0
+  eb: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  ec: 0/5 id, remap=0 time=5 state=0 bus=0 nofetch=0
+  ed: 0/5 id, remap=0 time=3 state=2 bus=0 nofetch=0
+  ee: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  ef: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  f0: 4/5 id, remap=0 time=0 state=0 bus=1 nofetch=0
+  f1: 0/5 id, remap=1 time=0 state=2 bus=2 nofetch=0
+  f2: 0/5 id, remap=3 time=0 state=2 bus=0 nofetch=0
+  f3: 0/5 id, remap=0 time=0 state=5 bus=0 nofetch=0
+  f4: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  f5: 0/5 id, remap=0 time=0 state=1 bus=4 nofetch=0
+  f6: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  f7: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  f8: 5/5 id, remap=0 time=0 state=0 bus=0 nofetch=0
+  f9: 0/5 id, remap=0 time=2 state=3 bus=0 nofetch=0
+  fa: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  fb: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  fc: 0/5 id, remap=0 time=0 state=4 bus=1 nofetch=0
+  fd: 0/5 id, remap=0 time=0 state=2 bus=3 nofetch=0
+  fe: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+  ff: 0/5 id, remap=0 time=0 state=0 bus=5 nofetch=0
+
+=== timing deltas (huc - can cycles) ===
+  +0: 11
+  +1: 155
+  +2: 23
+  +3: 1
+
+=== examples of differences ===
+-- REMAP --
+  #180 op=24 [24 34 86] pc 47C3->47C5
+     cyc huc=4 can=3 (delta +1) | zp/stack remap only
+  #181 op=24 [24 1e bd] pc DE9A->DE9C
+     cyc huc=4 can=3 (delta +1) | zp/stack remap only
+  #182 op=24 [24 1e 9b] pc 0103->0105
+     cyc huc=4 can=3 (delta +1) | zp/stack remap only
+  #183 op=24 [24 4e b7] pc 6510->6512
+     cyc huc=4 can=3 (delta +1) | zp/stack remap only
+  #184 op=24 [24 62 ed] pc 0C47->0C49
+     cyc huc=4 can=3 (delta +1) | zp/stack remap only
+  #360 op=48 [48 75 0a] pc 1B6B->1B6C
+     cyc huc=3 can=3 (delta +0) | zp/stack remap only
+-- TIMING --
+  #83 op=10 [10 32 43] pc 8168->819C
+     huc=4cyc can=3cyc (delta +1)
+  #84 op=10 [10 33 03] pc 0351->0386
+     huc=4cyc can=3cyc (delta +1)
+  #220 op=2c [2c 49 95] pc BE24->BE27
+     huc=5cyc can=4cyc (delta +1)
+  #221 op=2c [2c 4c 63] pc BDA2->BDA5
+     huc=5cyc can=4cyc (delta +1)
+  #222 op=2c [2c d3 ea] pc 9FD8->9FDB
+     huc=5cyc can=4cyc (delta +1)
+  #223 op=2c [2c 29 0f] pc 9054->9057
+     huc=5cyc can=4cyc (delta +1)
+-- STATE --
+  #5 op=01 [01 10 02] pc 643A->643C
+     cyc huc=10 can=6 | huc(643d,e8,07,3c,37,fd) can(643d,e8,ff,3c,37,fd)
+  #6 op=01 [01 3a 28] pc 9380->9382
+     cyc huc=10 can=6 | huc(9383,61,bc,81,d4,f1) can(9383,61,be,81,d4,f1)
+  #7 op=01 [01 7b 68] pc 6D9B->6D9D
+     cyc huc=10 can=6 | huc(6d9e,fb,53,f4,61,b5) can(6d9e,fb,5b,f4,61,35)
+  #8 op=01 [01 63 35] pc 0259->025B
+     cyc huc=10 can=6 | huc(025c,ce,b1,ea,ad,b4) can(025c,ce,bd,ea,ad,b4)
+  #9 op=01 [01 25 41] pc 414B->414D
+     cyc huc=10 can=6 | huc(414e,10,4e,dc,96,b8) can(414e,10,5f,dc,96,38)
+  #10 op=02 [02 4d d1] pc 97C2->97C4
+     cyc huc=4 can=2 | huc(97c5,7c,07,b5,3d,33) can(97c5,7c,07,3d,b5,33)
+-- BUS --
+  #15 op=03 [03 5d c4] pc 7015->7016
+     cyc huc=1 can=2 | huc=[(28693, 'R', 3)] can=[(28693, 'R', 3), (28694, 'R', 93)]
+  #16 op=03 [03 24 3f] pc 84B9->84BA
+     cyc huc=1 can=2 | huc=[(33977, 'R', 3)] can=[(33977, 'R', 3), (33978, 'R', 36)]
+  #17 op=03 [03 30 fe] pc A3B5->A3B6
+     cyc huc=1 can=2 | huc=[(41909, 'R', 3)] can=[(41909, 'R', 3), (41910, 'R', 48)]
+  #18 op=03 [03 2d 63] pc 8E3C->8E3D
+     cyc huc=1 can=2 | huc=[(36412, 'R', 3)] can=[(36412, 'R', 3), (36413, 'R', 45)]
+  #19 op=03 [03 50 89] pc 2C54->2C55
+     cyc huc=1 can=2 | huc=[(11348, 'R', 3)] can=[(11348, 'R', 3), (11349, 'R', 80)]
+  #20 op=04 [04 e4 0a] pc B644->B646
+     cyc huc=6 can=5 | huc=[(46660, 'R', 4), (46661, 'R', 228), (8420, 'R', 58), (8420, 'W', 58)] can=[(46660, 'R', 4), (46661, 'R', 228), (228, 'R', 58), (228, 'R', 58), (228, 'W', 58)]
+-- NOFETCH --
+  #0 op=00 [00 14 0a] pc 8D72->0C16
+     huc_row=-1 can_row=7 (no fetch pair in window)
+  #1 op=00 [00 33 b2] pc 474B->1948
+     huc_row=-1 can_row=7 (no fetch pair in window)
+  #2 op=00 [00 96 59] pc 9AC5->D654
+     huc_row=-1 can_row=7 (no fetch pair in window)
+  #3 op=00 [00 f6 89] pc DC72->4730
+     huc_row=-1 can_row=7 (no fetch pair in window)
+  #4 op=00 [00 88 bf] pc 894A->B2E1
+     huc_row=-1 can_row=7 (no fetch pair in window)
+  #340 op=44 [44 17 bd] pc 6821->6823
+     huc_row=-1 can_row=3 (no fetch pair in window)
+
+=== canonical core vs WDC (sanity): 1077/1270 pass ===
+  #75 op=0f [0f 1701]
+     c3 addr 04AE!=00EB
+     c3 data 05!=E6
+     c4 addr 04AF!=04AE
+     c4 data 7B!=05
+  #76 op=0f [0f 4931]
+     c3 addr 083C!=0011
+     c3 data 56!=CD
+     c4 addr 083D!=083C
+     c4 data EE!=56
+  #77 op=0f [0f 7973]
+     c3 addr 5AEB!=004F
+     c3 data 74!=70
+     c4 addr 5AEC!=5AEB
+     c4 data 2E!=74
+  #78 op=0f [0f 8578]
+     c3 addr BD1B!=0063
+     c3 data 43!=08
+     c4 addr BD1C!=BD1B
+     c4 data AD!=43
+  #79 op=0f [0f 6578]
+     c3 addr EA48!=00C0
+     c3 data D7!=2A
+     c4 addr EA49!=EA48
+     c4 data 54!=D7
+  #85 op=11 [11 af ff]
+     c4 addr 9947!=7C5C
+     c4 data EE!=AF
+  #86 op=11 [11 fc bc]
+     c4 addr B547!=E506
+     c4 data EE!=FC
+  #88 op=11 [11 c8 07]
+     c4 addr 2C19!=BDFD
+     c4 data EE!=C8

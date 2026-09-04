@@ -9,6 +9,21 @@ Machine clock at writing: 2026-09-03 ~00:35 CST.
 Crashed session: `01a0601c-aa93-78d0-b6d0-742b9742d5a3` (last user request was
 exactly "save progress to .md file so we can handover" — this file is that).
 
+> **NOTE 2026-09-04 (path canonicalization):** the intended CPU core
+> versions now live at `rtl/cpu/nmos6502/` (copy of `rtl/new_6502/`, incl.
+> its README) and `rtl/cpu/wdc65c02/` (copy of `rtl/new_cpu_v2/`, the v2
+> core) — one version per core, canonical. The superseded dirs
+> (`rtl/new_cpu/`, `rtl/new_cpu_original/`, `rtl/new_cpu_v2/`,
+> `rtl/new_6502/`) were MOVED to untracked backup `rtl/old/cpu/`
+> (gitignored). All `rtl/new_cpu_v2/`-style paths in this document are
+> HISTORICAL/PINNED (they identify the exact sources the evidence was
+> built from — verFiles.dat manifests and provenance.json keep them on
+> purpose); the byte-identical copies now at `rtl/cpu/` are the working
+> sources (md5s recorded in the backup-move log). Live project sources
+> `rtl/cpu_65c02.sv`/`rtl/cpu_alu.sv` (v1) still await the B1 swap with
+> the canonical v2 content. Quartus compile for v2: see
+> `build/quartus_v2_prep.md` and handoff task B1.
+
 ---
 
 ## 1. What the user asked

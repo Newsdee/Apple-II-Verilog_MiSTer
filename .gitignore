@@ -44,3 +44,6 @@ imgui.ini
 *.nib
 *.hdv
 *.zip
+
+# cpu_65c02 campaign: superseded CPU core backups (untracked, per 2026-09-04 cleanup)
+rtl/old/cpu/

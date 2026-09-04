@@ -21,11 +21,24 @@ V_DEFINE = +define+debug=1 +define+SIMULATION=1 -CFLAGS "-I../sim/imgui -I../sim
 
 # SIM_FAST=1: stub the slot peripherals (mockingboard x2, mouse x2,
 # superserial, clock card, hdd) with tie-offs for faster interactive sim.
+# SIM_FAST_HDD=1: same as SIM_FAST=1 but keeps the HDD (e.g. Total Replay).
 # Default 0 = full machine. Switching requires a clean (handled by
 # build_verilator_manual.sh).
 SIM_FAST ?= 0
+SIM_FAST_HDD ?= 0
+ifeq ($(SIM_FAST_HDD),1)
+V_DEFINE += +define+SIM_FAST +define+SIM_FAST_HDD
+else
 ifeq ($(SIM_FAST),1)
 V_DEFINE += +define+SIM_FAST
+endif
+endif
+
+# JOY_TO_KEY: enable the joystick->keystroke feature (rtl/osk/joy_to_key.v).
+# 1 = on (default for testing), 0 = off (feature fully inert / bit-identical).
+JOY_TO_KEY ?= 1
+ifeq ($(JOY_TO_KEY),1)
+V_DEFINE += +define+JOY_TO_KEY
 endif
 
 V_DEFINE +=
@@ -81,7 +94,7 @@ V_SRC = \
 		$(RTL)/uart_6551.v \
 		$(RTL)/6551tx.v \
 		$(RTL)/6551rx.v \
-		$(RTL)/R65Cx2.sv \
+		$(RTL)/cpu_65c02.sv  $(RTL)/cpu_alu.sv \
 		$(RTL)/vga_controller.v  \
 		$(RTL)/apple2_font_rom.v  \
 		$(OSK_DIR)/virtual_keyboard_controller.sv  \
@@ -105,7 +118,8 @@ V_SRC = \
 		$(RTL)/no_slot_clock.sv  \
 		$(RTL)/apple2_top.v  \
 		$(RTL)/apple2.v  \
-		$(RTL)/keyboard.v 
+		$(RTL)/keyboard.v  \
+		$(RTL)/osk/joy_to_key.v 
 
 
 C_SRC = \

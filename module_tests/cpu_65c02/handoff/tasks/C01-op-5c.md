@@ -1,0 +1,75 @@
+# C01 - op $5c fix: SBC (abs,X) - real SBC; page-cross dummy cycle; next fetch at ncyc (suite model; netlist=suite 50/50 both seeds)
+
+- status: blocked
+- kind: thinking (RTL writer)
+- owner: (unset - assigned at B3)
+- created: 2026-09-04
+- updated: 2026-09-04
+- eta: 0.5-1 d (RTL + differential + sweep slice)
+- gate: B3 decision (fix list must include $5c) + one-writer rule: C tasks
+  on the same target RTL run SEQUENTIALLY or in separate worktrees
+- parallel-safe: no (RTL writer) - see gate
+
+## Goal
+Make the target RTL (default: rtl/cpu/wdc65c02/, per B3) reproduce the
+netlist=suite behaviour for op $5c, per the adjudication.
+
+## Expected silicon behaviour (from adjudication)
+SBC (abs,X) - real SBC; page-cross dummy cycle; next fetch at ncyc (suite model; netlist=suite 50/50 both seeds)
+Row-level evidence: build/new6502_netlist_adjudication.md (per-op
+section) + oracle/sweep_6502_oracle_results_custom.txt (seed-1 12-op
+sweep) + suite rows via select_tests (seed 1, 50 samples).
+
+## Current core behaviour (re-verify at start)
+- v2nmos: evidence/sweep_6502_v2nmos_results.txt rows for op $5c
+  (both-fail population in build/new6502_three_way_join.md section 5).
+- Capture the core's current 16-row trace for 3 sample idx values before
+  touching RTL (pre-fix baseline, retained under build/c01_pre/).
+
+## Procedure (thinking; verification steps are runner commands)
+1. Read the expected-behaviour rows; write a minimal failing sequence
+   (initial regs + program) that exposes the divergence.
+2. Smallest RTL edit in rtl/cpu/wdc65c02/ making the sequence match the
+   netlist/suite model (bus addr/R-W rows, cycle count, final PC; A per
+   the adjudication - cores preserve A; the suite's A is the outlier on
+   A-update ops, so do NOT chase the suite's A).
+3. RUN (runner): re-run the pre-fix sequences (must now pass); run the
+   op's 50-test slice through the SST TB and through the oracle (the
+   silicon check) - both must agree with the suite on bus/cycles/PC.
+4. RUN (runner): full Verilator smoke test (run_verilator.bat
+   --smoke-test) after the edit; confirm keyboard/vk mirrored files
+   untouched (not in this task's scope).
+5. Record: files changed, warning delta (new vs known), residual risk.
+
+## Acceptance
+- build/c01_post.md: pre/post traces for the sample idx, sweep-slice
+  results (50/50 on the bus/cycles/PC lines), smoke-test result, warning
+  delta, files changed.
+- NO full Quartus compile in this task (batched per B3 policy); done at
+  differential+smoke green.
+- Board updated (status=review when acceptance met).
+
+## May write
+- rtl/cpu/wdc65c02/ (the target RTL per B3)
+- build/c01_pre/, build/c01_post/ + build/c01_post.md
+- handoff/ this task file (status/log only)
+
+## Safety (RTL writer)
+- AGENTS.md HDL rules apply (widths, signedness, reset semantics, no
+  inferred latches, nonblocking in clocked logic).
+- One writer per RTL: do not start while another C task is editing the
+  same file; supervisor enforces via status=running.
+## Safety (all workers)
+- Read AGENTS.md at the workspace root first; it is the operating guide.
+- Touch ONLY the paths listed under "May write". No RTL edits (C tasks
+  excepted), no git commits, no unrelated cleanup, preserve line endings.
+- Windows: use `python3` (MSYS2 ucrt64), not `python`. Stop any running
+  Vemu.exe before Verilator rebuilds (Windows locks the linker output).
+- Use disposable media copies when writes must not alter originals.
+- Deterministic re-runs: every step must be reproducible from the listed
+  inputs; keep seeds fixed (record any seed used).
+- Report: update this task file's `updated:` field, append a dated line
+  to the progress log, list artifacts. Refresh the board with
+  `python3 handoff/board_status.py` when done. Do NOT hand-edit BOARD.md.
+
+## Progress log
