@@ -151,17 +151,32 @@ module apple2(
     wire [7:0]    D_IN;
     wire [7:0]    D_OUT;
     wire [15:0]   A;
-    wire [23:0]   T65_A;
-    wire [7:0]    T65_DI;
-    wire [7:0]    T65_DO;
-    wire          T65_WE_N;
-    // cpu_65c02 (new W65C02S-style core; replaced R65Cx2/RC65x02 on 2026-09-02,
-    // see PLAN.md). Source: rtl/cpu_65c02.sv (+ rtl/cpu_alu.sv), copied from
-    // rtl/new_cpu/. R65Cx2 remains in the tree as the differential-test golden.
+    // nmos6502 (NMOS 6502 core; replaced T65 on 2026-09-04). Source:
+    // rtl/cpu/nmos6502/. Same "one bus access per cycle" model as the wdc65c02
+    // core below; WDC_MODE=0 selects NMOS 6502 bus/flag behavior.
+    wire [15:0]   N6502_A;
+    wire [7:0]    N6502_DO;
+    wire          N6502_WE;       // active-high write cycle
+    // NMOS-specific / SoC outputs, unused on the Apple II (collected into
+    // nmos6502_unused_ok below so lint stays quiet)
+    wire          N6502_SYNC;
+    wire          N6502_VECTOR_PULL;
+    wire          N6502_ML_N;
+    wire          N6502_PHI1O;
+    wire          N6502_PHI2O;
+    wire          N6502_BUS_OE;
+    wire          N6502_DOUT_OE;
+    wire          N6502_INT_SEQ;
+    wire          N6502_RTI_DONE;
+    wire          N6502_IN_WAI;
+    wire          N6502_IN_STP;
+    // wdc65c02 (W65C02S-style 65C02 core; replaced the top-level cpu_65c02 on
+    // 2026-09-04). Source: rtl/cpu/wdc65c02/. R65Cx2 remains the
+    // differential-test golden.
     wire [15:0]   N65C02_A;
     wire [7:0]    N65C02_DO;
     wire          N65C02_WE;      // active-high write cycle
-    // GameKing-SoC-specific outputs, unused on the Apple II (collected into
+    // SoC-specific outputs, unused on the Apple II (collected into
     // n65c02_unused_ok below so lint stays quiet)
     wire          N65C02_SYNC;
     wire          N65C02_VECTOR_PULL;
@@ -560,11 +575,15 @@ module apple2(
         .VIDEO(VIDEO)
     );
 
-    assign we = (cpu == 1'b0) ? (~T65_WE_N) : N65C02_WE;
-    assign A = (cpu == 1'b0) ? (T65_A[15:0]) : N65C02_A;
-    assign D_OUT = (cpu == 1'b0) ? T65_DO : N65C02_DO;
-    assign T65_DI = (T65_WE_N == 1'b0) ? D_OUT : D_IN;
-    assign DBG_DI = T65_DI;
+    assign we = (cpu == 1'b0) ? N6502_WE : N65C02_WE;
+    assign A = (cpu == 1'b0) ? N6502_A : N65C02_A;
+    assign D_OUT = (cpu == 1'b0) ? N6502_DO : N65C02_DO;
+    // DBG_DI: data as seen by the NMOS CPU - dout during a write, din during a
+    // read. The nmos6502 core has no T65-style DI loopback, so derive it here.
+    assign DBG_DI = N6502_WE ? N6502_DO : D_IN;
+    // The nmos6502 core exposes a savestate bus, not a direct register-file
+    // port; tie the legacy T65 debug readout off (unused by the harness).
+    assign DBG_T65_REGS = 64'd0;
     assign DBG_ROM_ADDR = rom_addr;
     assign DBG_ROM_OUT = rom_out;
     //CPU_EN <= PHASE_ZERO_F; -- not sure why this isn't working??
@@ -575,29 +594,56 @@ module apple2(
         PHASE_ZERO_D <= PHASE_ZERO;
     end
 
-    wire CPU_PRINT;
-
-    T65 cpu6502(
-        .Mode(2'b00),
-        .Clk(CLK_14M),
-        .Enable(CPU_EN & ~CPU_WAIT),
-        .Res_n(~reset),
-
-        .Rdy(1'b1),
-        .Abort_n(1'b1),
-        .SO_n(1'b1),
-
-        .IRQ_n(IRQ_n),
-        .NMI_n(NMI_n),
-        .R_W_n(T65_WE_N),
-        .A(T65_A),
-        .DI(T65_DI),
-        .DO(T65_DO),
-        .Regs(DBG_T65_REGS),
-        .PRINT(CPU_PRINT)
+    // NMOS 6502: nmos6502 core (WDC_MODE=0, one bus access per cycle).
+    //   ce = CPU_EN, rdy = ~CPU_WAIT - the same edge model as the wdc65c02 core
+    //        below, so machine RAM/ROM timing is unchanged.
+    //   so_n tied high (no Set Overflow pin on the Apple II); be=1 (always drive
+    //        the core's address/data/write - the mux below selects the bus).
+    //   stp_nop=1: Apple II has no power switch, so STP ($DB) is a NOP.
+    //   ml_n/phi1o/phi2o/bus_oe/dout_oe are NMOS-specific pins unused here.
+    wire [63:0] nmos6502_ss_rdata_unused;
+    wire nmos6502_unused_ok = &{1'b0, N6502_SYNC, N6502_VECTOR_PULL,
+                                 N6502_ML_N, N6502_PHI1O, N6502_PHI2O,
+                                 N6502_BUS_OE, N6502_DOUT_OE,
+                                 N6502_INT_SEQ, N6502_RTI_DONE, N6502_IN_WAI,
+                                 N6502_IN_STP, nmos6502_ss_rdata_unused};
+    nmos6502 #(.WDC_MODE(1'b0)) cpu6502(
+        .clk(CLK_14M),
+        .ce(CPU_EN),
+        .ce_n(1'b0),
+        .reset(reset),
+        .stall(1'b0),
+        .irq_n(IRQ_n),
+        .nmi_n(NMI_n),
+        .rdy(~CPU_WAIT),
+        .so_n(1'b1),
+        .be(1'b1),
+        .stp_nop(1'b1),
+        .addr(N6502_A),
+        .dout(N6502_DO),
+        .din(D_IN),
+        .we(N6502_WE),
+        .sync(N6502_SYNC),
+        .vector_pull(N6502_VECTOR_PULL),
+        .ml_n(N6502_ML_N),
+        .phi1o(N6502_PHI1O),
+        .phi2o(N6502_PHI2O),
+        .bus_oe(N6502_BUS_OE),
+        .dout_oe(N6502_DOUT_OE),
+        .int_seq(N6502_INT_SEQ),
+        .rti_done(N6502_RTI_DONE),
+        .in_wai(N6502_IN_WAI),
+        .in_stp(N6502_IN_STP),
+        // Savestate register bus: tied off until the machine-wide savestate
+        // walker exists (PLAN.md section 6).
+        .ss_addr(10'd0),
+        .ss_wdata(64'd0),
+        .ss_wren(1'b0),
+        .ss_rdata(nmos6502_ss_rdata_unused)
     );
 
-    // 65C02: new cpu_65c02 core (W65C02S-style, one bus access per cycle).
+    // 65C02: wdc65c02 core (W65C02S-style, one bus access per cycle;
+    // source rtl/cpu/wdc65c02/).
     //   ce = CPU_EN: the PHASE_ZERO falling-edge pulse; on it the core samples
     //        din and launches the next cycle's address/write - the exact edge
     //        R65Cx2's enable used, so machine RAM/ROM timing is unchanged.
@@ -610,7 +656,7 @@ module apple2(
     wire n65c02_unused_ok = &{1'b0, N65C02_SYNC, N65C02_VECTOR_PULL,
                                N65C02_INT_SEQ, N65C02_RTI_DONE, N65C02_IN_WAI,
                                N65C02_IN_STP, n65c02_ss_rdata_unused};
-    cpu_65c02 cpu65c02(
+    wdc65c02 #(.WDC_MODE(1'b1)) cpu65c02(
         .clk(CLK_14M),
         .ce(CPU_EN),
         .ce_n(1'b0),

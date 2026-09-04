@@ -26,7 +26,7 @@
 // The ST2204 is a 65C02, so this core is instantiated with WDC_MODE=1;
 // the NMOS side exists to keep each choice explicit and reviewable.
 
-module cpu_65c02
+module wdc65c02
 #(
 	parameter [9:0] SS_BASE  = 10'd0,  // savestate word base address
 	parameter       WDC_MODE = 1'b1    // 1: W65C02S, 0: NMOS 6502
@@ -439,7 +439,7 @@ module cpu_65c02
 	wire [7:0] alu_result;
 	wire       alu_c, alu_vf, alu_nf, alu_zf;
 
-	cpu_alu alu (
+	wdc65c02_alu alu (
 		.op(alu_sel),
 		.a(alu_a),
 		.b(alu_b),

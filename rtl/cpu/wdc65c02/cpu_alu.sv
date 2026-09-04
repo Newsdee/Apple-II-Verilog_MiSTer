@@ -11,7 +11,7 @@
 // Flag outputs are "result flags"; the sequencer decides which flags each
 // opcode actually writes.
 
-module cpu_alu
+module wdc65c02_alu
 (
 	input  wire [3:0] op,        // ALU_* operation select
 	input  wire [7:0] a,         // primary operand (register side)
