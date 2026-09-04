@@ -26,11 +26,11 @@ build, right after the repo-root `PROGRESS.md` had been read).
 2. Read `unit_tests/PLAN.md` (design of record), then this file (state).
 3. Read `unit_tests/level_neg1/tb_cpu.sv` (the harness as written),
    `main.cpp`, and the `Makefile` in the same directory.
-4. **The git state is part of the handoff:** the 6-file CPU swap (§1a) is
-   **uncommitted** in the `Apple-II-Verilog_MiSTer` working tree — the
-   working tree *is* the current state; do not reset/discard it. The whole
-   `unit_tests/` tree is new/untracked. The repo also holds unrelated
-   pre-existing user changes (see `git status`) — leave them untouched.
+4. **Git state:** the CPU swap (§1a) and this `unit_tests/` tree are
+   **committed** (2026-09-04: `3c0c08b` = swap [its `verilator/Makefile`
+   half landed earlier in the user's `0876f19`], `755ecd6` = unit_tests).
+   The repo also holds unrelated pre-existing user changes (see
+   `git status`) — leave them untouched.
 5. Pick up at §3 step 1. Full history of the crashed session, if needed:
    `C:\Users\newsdee\.pi\agent\sessions\--E--MiSTer-Apple-II_FPGAdev--\
    2026-09-04T00-39-37-537Z_01a069db-5741-71fb-a761-3b8262cdc650.jsonl`
