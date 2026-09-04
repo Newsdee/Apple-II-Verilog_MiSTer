@@ -82,9 +82,12 @@ module tb_cpu;
 
   // ------------------------------------------- behavioral 64K memory -------
   // 1-ce-cycle delayed read (CPU_DL equivalent); write commits when we is high.
+  // The core drives addr at a ce edge and samples din at the NEXT ce edge, so
+  // mem_rdata must latch mid-ce at the negedge of phase_zero. Latching at
+  // posedge clk gated by `ce` lands one ce cycle late (2-ce read delay).
   reg [7:0] mem       [0:65535];
   reg [7:0] mem_rdata = '0;
-  always @(posedge clk) if (ce) mem_rdata <= mem[addr];
+  always @(negedge phase_zero) mem_rdata <= mem[addr];
   always @(posedge clk) if (we) mem[addr] <= dout;
   assign din = mem_rdata;
 
@@ -132,12 +135,32 @@ module tb_cpu;
     end
   endtask
 
-  // Advance n ce cycles (n rising edges of the ce pulse).
+  // Advance exactly n ce cycles: the core executes a pulse when it ends
+  // (ce fall) with stall low, so each counted pulse runs from its ce rise to
+  // its ce fall.  The count is phase-independent at entry:
+  //   * stall high  -> release at the NEXT ce rise (10 ns before the core's
+  //     advancing edge; race-free by construction) and count that pulse;
+  //   * stall low, mid-pulse -> the in-progress pulse will advance at its
+  //     fall, so count it;
+  //   * stall low, gap -> count full pulses from the next rise.
+  // (Deasserting stall on a ce-fall edge would race the core's advance at
+  // that same edge and slip the count by one.)
   task run_ce(input integer n);
+    integer nrem;
     begin
-      for (k = 0; k < n; k++) begin
-        if (ce) @(negedge ce);
+      nrem = n;
+      if (stall) begin
         @(posedge ce);
+        stall = 1'b0;
+        @(negedge ce);
+        nrem = nrem - 1;
+      end else if (ce) begin
+        @(negedge ce);
+        nrem = nrem - 1;
+      end
+      for (k = 0; k < nrem; k++) begin
+        @(posedge ce);
+        @(negedge ce);
       end
     end
   endtask
@@ -175,6 +198,8 @@ module tb_cpu;
   endtask
 
   // Save: hold the core stalled, capture the 3 savestate words + full RAM.
+  // Leaves the core STALLED; the next run_ce releases it on its first
+  // counted ce pulse (see run_ce), so the pulse count stays exact.
   task save_state;
     begin
       stall = 1'b1;
@@ -183,13 +208,13 @@ module tb_cpu;
       ss_addr = 10'd1; @(posedge clk); sav[1] = ss_rdata;
       ss_addr = 10'd2; @(posedge clk); sav[2] = ss_rdata;
       for (i = 0; i < 65536; i++) snap[i] = mem[i];
-      stall = 1'b0;
-      repeat (2) @(posedge clk);
     end
   endtask
 
-  // Restore: hold the core stalled, write the 3 words back (one clk pulse each,
-  // applied on the posedge), restore RAM, then release.
+  // Restore: hold the core stalled, write the 3 words back (one clk pulse
+  // each, applied on the posedge; the ss block is not ce/stall-gated),
+  // restore RAM.  Like save_state, leaves the core STALLED for the next
+  // run_ce to release (see run_ce).
   task restore_state;
     begin
       stall = 1'b1;
@@ -198,10 +223,16 @@ module tb_cpu;
       ss_addr = 10'd1; ss_wdata = sav[1]; ss_wren = 1'b1; @(posedge clk); ss_wren = 1'b0;
       ss_addr = 10'd2; ss_wdata = sav[2]; ss_wren = 1'b1; @(posedge clk); ss_wren = 1'b0;
       for (i = 0; i < 65536; i++) mem[i] = snap[i];
-      stall = 1'b0;
-      repeat (2) @(posedge clk);
     end
   endtask
+
+  // DEBUG: bus trace for the first few microseconds (temporary)
+  integer tf;
+  initial tf = $fopen("bus_trace.txt");
+  always @(posedge clk) if (ce && $time < 6000)
+    $fwrite(tf, "t=%0t addr=%h din=%h we=%b dout=%h PC=%h A=%h X=%h Y=%h S=%h\n",
+            $time, addr, din, we, dout,
+            ss_rdata[63:48], ss_a(ss_rdata), ss_x(ss_rdata), ss_y(ss_rdata), ss_s(ss_rdata));
 
   // Stomp all of RAM with a known garbage pattern (harness-side write).
   task stomp_ram;
@@ -217,13 +248,13 @@ module tb_cpu;
     begin
       mem[16'h0800] = 8'hA9; mem[16'h0801] = 8'h42;   // LDA #$42
       mem[16'h0802] = 8'h8D; mem[16'h0803] = 8'h00; mem[16'h0804] = 8'h02; // STA $0200
-      mem[16'h0805] = 8'hA0; mem[16'h0806] = 8'h34;   // LDX #$34
-      mem[16'h0807] = 8'hA2; mem[16'h0808] = 8'h28;   // LDY #$28
-      mem[16'h0809] = 8'h9D; mem[16'h080A] = 8'h00; mem[16'h080B] = 8'h04; // STA $0400,Y
+      mem[16'h0805] = 8'hA2; mem[16'h0806] = 8'h34;   // LDX #$34
+      mem[16'h0807] = 8'hA0; mem[16'h0808] = 8'h28;   // LDY #$28
+      mem[16'h0809] = 8'h99; mem[16'h080A] = 8'h00; mem[16'h080B] = 8'h04; // STA $0400,Y
       mem[16'h080C] = 8'h98;                        // TYA
       mem[16'h080D] = 8'hEA;                        // NOP
       mem[16'h080E] = 8'h4C; mem[16'h080F] = 8'h0D; mem[16'h0810] = 8'h08; // JMP $080D
-      mem[16'hFFFD] = 8'h00; mem[16'hFFFE] = 8'h08;  // reset vector -> 0x0800
+      mem[16'hFFFC] = 8'h00; mem[16'hFFFD] = 8'h08;  // reset vector -> 0x0800
     end
   endtask
 
@@ -238,7 +269,7 @@ module tb_cpu;
       mem[16'h0808] = 8'h8A;                         // TXA
       mem[16'h0809] = 8'h8D; mem[16'h080A] = 8'h01; mem[16'h080B] = 8'h02; // STA $0201
       mem[16'h080C] = 8'h4C; mem[16'h080D] = 8'h03; mem[16'h080E] = 8'h08; // JMP $0803
-      mem[16'hFFFD] = 8'h00; mem[16'hFFFE] = 8'h08;  // reset vector -> 0x0800
+      mem[16'hFFFC] = 8'h00; mem[16'hFFFD] = 8'h08;  // reset vector -> 0x0800
     end
   endtask
 
@@ -258,7 +289,10 @@ module tb_cpu;
     check(ss_a(cur_w0), 64'h28, "self A");
     check(ss_x(cur_w0), 64'h34, "self X");
     check(ss_y(cur_w0), 64'h28, "self Y");
-    check(ss_s(cur_w0), 64'hFF, "self S");
+    // S after reset: the core resets S to 00 and the 7-cycle reset sequence
+    // does three fake stack pushes (00 -> FF -> FE -> FD); verified against
+    // the core's documented reset sequence and the bus trace.
+    check(ss_s(cur_w0), 64'hFD, "self S");
     check({56'b0, ss_n(cur_w0)}, 64'h00, "self N");
     check({56'b0, ss_i(cur_w0)}, 64'h01, "self I");
     check({56'b0, ss_z(cur_w0)}, 64'h00, "self Z");

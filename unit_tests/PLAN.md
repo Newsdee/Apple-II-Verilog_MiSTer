@@ -104,8 +104,12 @@ positive self-check is mandatory so the harness can never pass empty):
    restore, verify every byte matches the snapshot.
 
 **Output:** `CPU_NEG1 PASS/FAIL cpu=<name>` + non-zero exit on failure.
-**Status:** TB + main.cpp + Makefile written; build blocked on the C++
-accessor issue (`PROGRESS.md` §2–§3). No run result exists yet.
+**Status: GREEN, both CPUs (2026-09-05).** `CPU_NEG1 PASS cpu=nmos6502`
+and `CPU_NEG1 PASS cpu=wdc65c02` (exit 0, `errors=0`). The build was
+unblocked with plain `-public`, then four TB-side bugs were found and
+fixed (2-`ce` read-latch bug, self-check opcode typos, S-after-reset
+expectation, 1-`ce` stall drift in save/restore) — details in
+`PROGRESS.md` §1d.
 
 ### 3.2 Level 0 (`level_0`) — CPU + memory + BIOS
 
@@ -200,17 +204,42 @@ increasing complexity / likelihood of being the suspect:
 
 | # | Item | Status |
 |---|---|---|
-| 1 | level_neg1: TB + main.cpp + Makefile (nmos) | written; build blocked (accessor issue, `PROGRESS.md` §3) |
-| 2 | level_neg1: unblock build, first `CPU_NEG1 PASS` (nmos) | next |
-| 3 | level_neg1: `CPU=wdc` variant green | — |
-| 4 | `run_unit_tests.ps1` runner (levels × CPUs summary) | — |
-| 5 | level_neg1: execution-equivalence killer test | already in the written TB (unvalidated until the build is unblocked) |
+| 1 | level_neg1: TB + main.cpp + Makefile (nmos) | done (plain `-public`; `PROGRESS.md` §1d) |
+| 2 | level_neg1: unblock build, first `CPU_NEG1 PASS` (nmos) | done 2026-09-05 |
+| 3 | level_neg1: `CPU=wdc` variant green | done 2026-09-05 |
+| 4 | `run_unit_tests.ps1` runner (levels × CPUs summary) | done 2026-09-05 (PASS/BUILD FAIL/RUN FAIL paths all exercised) |
+| 5 | level_neg1: execution-equivalence killer test | done — in the TB, green both CPUs |
 | 6 | Extract `unit_tests/common/` (memory, ce driver, ss tasks, checks) | with level_0 |
-| 7 | level_0: BIOS + memory map, direct injection (§3.2) | — |
+| 7 | level_0: BIOS + memory map, direct injection (§3.2) | **next** — first decide memory-map strategy (§3.2 / PROGRESS §3) |
 | 8 | level_1: first peripheral slice, ordering driven by next real bug | — |
 | 9 | Optional: `--trace`/VCD on demand for interactive debugging | — |
 
-## 8. Open questions
+## 8. Subagent (ninfer) usage notes
+
+A local subagent is available for **delegated one-shot tasks** on this project.
+
+- **Agent:** `custom.worker` (user agent; config at
+  `C:\Users\newsdee\.pi\agent\agents\custom.worker.md`).
+- **Model:** `ninfer/qwen3.8-27b` — local RTX 5090 server at
+  `http://localhost:9080/v1` (OpenAI-compatible API, 128k context window).
+  2026-09-04: the agent config's stale `llama-cpp/unsloth/...` model ID was
+  replaced with `ninfer/qwen3.8-27b` (the ID the server actually serves);
+  connectivity verified the same day (child replied `NINFER OK` to a
+  no-tools prompt).
+- **Usage profile:** good for bounded one-shot items with a small context
+  (128k). **Run at most one at a time** — no fan-out, no parallel children.
+- **Delegation policy:** the parent (strong model) owns core/base setup,
+  environment work, and anything subtle (MSYS2 quirks, Verilator flags,
+  HDL semantics). Once a task is confirmed clean and well-bounded, hand it
+  to the ninfer worker with: an explicit objective, the exact commands to
+  run, a crisp pass/fail criterion, and an authority boundary (which files
+  it may touch). Give it the full environment recipe (MSYS2 ucrt64 PATH,
+  TMP set *inside* bash, `VERILATOR_ROOT`) — do not expect it to discover
+  the quirks in §2.5/PROGRESS §1b.
+- **Verification:** treat its output as a claim, not authority — the parent
+  re-checks results (test output, `git diff`) before accepting.
+
+## 9. Open questions
 
 - **Level-0 injection details:** exact capture points for the cold/warm
   boot state (which words, which RAM ranges) — defined when level_0 is
