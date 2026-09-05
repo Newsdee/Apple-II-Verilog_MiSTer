@@ -23,9 +23,7 @@ reg [11:0] jsr_ua, jsr_ret, uaddr;
 // wire       md_shift;
 // wire       stop;
 
-// altera message_off 10030
 reg  [38:0] ucode_rom[0:2**12-1];
-// altera message_on 10030
 wire [38:0] ucode_data;
 
 initial begin

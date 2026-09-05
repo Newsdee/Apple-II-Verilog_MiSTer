@@ -31,6 +31,8 @@ module applemouse(
     STROBE,
     X,
     Y,
+    SCALE,
+    RATE,
     BUTTON
 );
     input         CLK_14M;
@@ -51,6 +53,8 @@ module applemouse(
     input         STROBE;
     input  [8:0]  X;
     input  [8:0]  Y;
+    input  [1:0]  SCALE;
+    input  [1:0]  RATE;
     input         BUTTON;
 
     wire [10:0]   rom_addr;
@@ -74,13 +78,19 @@ module applemouse(
 
     reg           clk_2m_d;
     reg           clk_2en;
+    reg           clk_14m_div2;
+    reg  [2:0]    rate_phase;
+    wire          mcu_cen = (RATE == 2'b00) ? clk_2en :
+                            (RATE == 2'b01) ? (CLK_2M ^ clk_2m_d) :
+                            (RATE == 2'b10) ? (rate_phase == 3'd0 || rate_phase == 3'd2 || rate_phase == 3'd4) :
+                                             clk_14m_div2;
 
     reg           pressed;
     reg  [8:0]    mx;
     reg  [8:0]    my;
-    reg  [1:0]    enc_x;
-    reg  [1:0]    enc_y;
-    reg  [10:0]   div_cnt;
+    wire          mcu_wr;
+    wire [12:0]   mcu_addr;
+    wire          mcu_pb_read = mcu_cen && !mcu_wr && mcu_addr == 13'd1;
 
     function automatic [8:0] stepped_backlog;
         input [8:0] value;
@@ -109,6 +119,23 @@ module applemouse(
         end
     endfunction
 
+    function automatic [8:0] saturating_add_scaled;
+        input [8:0] backlog;
+        input [8:0] delta;
+        input [1:0] scale;
+        reg signed [15:0] sum;
+        begin
+            sum = $signed({{7{backlog[8]}}, backlog})
+                + ($signed({{7{delta[8]}}, delta}) <<< (scale + 3'd3));
+            if (sum > 16'sd255)
+                saturating_add_scaled = 9'sd255;
+            else if (sum < -16'sd256)
+                saturating_add_scaled = 9'sh100;
+            else
+                saturating_add_scaled = sum[8:0];
+        end
+    endfunction
+
     always @(posedge CLK_14M)
     begin
         if (RESET == 1'b1)
@@ -116,56 +143,48 @@ module applemouse(
             pressed <= 1'b0;
             mx      <= 9'b0;
             my      <= 9'b0;
-            enc_x   <= 2'b0;
-            enc_y   <= 2'b0;
             mcu_pb_in[3:0] <= 4'b0;
-            div_cnt <= 11'b0;
         end
         else
         begin
-            div_cnt <= div_cnt + 1'b1;
-            if (div_cnt == 11'b0)
+            if (mcu_pb_read)
             begin
                 if (mx[8] == 1'b1)
                 begin
                     mx    <= mx + 1'b1;
-                    enc_x <= {enc_x[0], ~enc_x[1]};
-                    if (enc_x[0] == 1'b0 && enc_x[1] == 1'b0)		// ^x(0)
+                    mcu_pb_in[1] <= ~mcu_pb_in[1];
+                    if (mcu_pb_in[1] == 1'b0)
                         mcu_pb_in[0] <= 1'b0;
-                    mcu_pb_in[1] <= ~enc_x[1];
                 end
                 else if (mx != 9'b0)
                 begin
                     mx    <= mx - 1'b1;
-                    enc_x <= {~enc_x[0], enc_x[1]};
-                    if (enc_x[0] == 1'b0 && enc_x[1] == 1'b1)		// ^x(0)
+                    mcu_pb_in[1] <= ~mcu_pb_in[1];
+                    if (mcu_pb_in[1] == 1'b0)
                         mcu_pb_in[0] <= 1'b1;
-                    mcu_pb_in[1] <= enc_x[1];
                 end
 
                 if (my[8] == 1'b1)
                 begin
                     my    <= my + 1'b1;
-                    enc_y <= {enc_y[0], ~enc_y[1]};
-                    if (enc_y[0] == 1'b0 && enc_y[1] == 1'b0)		// ^y(0)
+                    mcu_pb_in[3] <= ~mcu_pb_in[3];
+                    if (mcu_pb_in[3] == 1'b0)
                         mcu_pb_in[2] <= 1'b1;
-                    mcu_pb_in[3] <= ~enc_y[1];
                 end
                 else if (my != 9'b0)
                 begin
                     my    <= my - 1'b1;
-                    enc_y <= {~enc_y[0], enc_y[1]};
-                    if (enc_y[0] == 1'b0 && enc_y[1] == 1'b1)		// ^y(0)
+                    mcu_pb_in[3] <= ~mcu_pb_in[3];
+                    if (mcu_pb_in[3] == 1'b0)
                         mcu_pb_in[2] <= 1'b0;
-                    mcu_pb_in[3] <= enc_y[1];
                 end
             end
 
             if (STROBE == 1'b1)
             begin
                 pressed <= BUTTON;
-                mx      <= saturating_add(div_cnt == 11'b0 ? stepped_backlog(mx) : mx, X);
-                my      <= saturating_add(div_cnt == 11'b0 ? stepped_backlog(my) : my, Y);
+                mx      <= saturating_add_scaled(mcu_pb_read ? stepped_backlog(mx) : mx, X, SCALE);
+                my      <= saturating_add_scaled(mcu_pb_read ? stepped_backlog(my) : my, Y, SCALE);
             end
         end
     end
@@ -202,19 +221,28 @@ module applemouse(
 
     always @(posedge CLK_14M)
     begin
-        clk_2m_d <= CLK_2M;
-        if (CLK_2M == 1'b1 && clk_2m_d == 1'b0)
-            clk_2en <= 1'b1;
+        if (RESET == 1'b1)
+        begin
+            clk_2m_d    <= CLK_2M;
+            clk_2en     <= 1'b0;
+            clk_14m_div2 <= 1'b0;
+            rate_phase  <= 3'd0;
+        end
         else
-            clk_2en <= 1'b0;
+        begin
+            clk_2m_d <= CLK_2M;
+            clk_2en <= CLK_2M & ~clk_2m_d;
+            clk_14m_div2 <= ~clk_14m_div2;
+            rate_phase <= (rate_phase == 3'd6) ? 3'd0 : rate_phase + 1'd1;
+        end
     end
 
     jtframe_6805mcu mcu(
         .rst(RESET),
         .clk(CLK_14M),
-        .cen(clk_2en),
-        .wr(),
-        .addr(),
+        .cen(mcu_cen),
+        .wr(mcu_wr),
+        .addr(mcu_addr),
         .dout(),
         .irq(1'b0),
         .timer(1'b1),

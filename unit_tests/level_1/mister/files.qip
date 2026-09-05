@@ -1,0 +1,23 @@
+# Level 1 MiSTer integration-test core sources (unit_tests/level_1/mister).
+# Paths are relative to this project directory.
+#
+# The DUT (machine core + CPUs) is referenced LIVE from the repo — that is
+# the point of the test.  Everything else is copied into the project so the
+# build works from any CWD (build.bat/build.sh refresh the copies, newer
+# files only):
+#   sys/            MiSTer infrastructure (sys.tcl's project-relative refs)
+#   jtag.cdf        board JTAG ID
+#   rtl/pll.qip     PLL QIP package (sys.tcl expects "rtl/pll.qip" in-project;
+#                   the package provides pll.v + pll/pll_0002.*)
+#   rtl/roms/*.hex  ROM data for the DUT's CWD-relative $readmemh paths
+set_global_assignment -name SYSTEMVERILOG_FILE Apple-II.sv
+set_global_assignment -name VERILOG_FILE ../../../rtl/rom.v
+set_global_assignment -name VERILOG_FILE ../../../rtl/ramcard.v
+set_global_assignment -name VERILOG_FILE ../../../rtl/timing_generator.v
+set_global_assignment -name VERILOG_FILE ../../../rtl/video_generator.v
+set_global_assignment -name VERILOG_FILE ../../../rtl/keyboard.v
+set_global_assignment -name VERILOG_FILE ../../../rtl/apple2.v
+set_global_assignment -name SYSTEMVERILOG_FILE ../../../rtl/cpu/nmos6502/cpu_65c02.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../../rtl/cpu/nmos6502/cpu_alu.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../../rtl/cpu/wdc65c02/cpu_65c02.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../../rtl/cpu/wdc65c02/cpu_alu.sv
