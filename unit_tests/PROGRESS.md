@@ -1,8 +1,9 @@
 # PROGRESS — `unit_tests` ladder / config −1 (isolated CPU + savestate)
 
 **Repo:** `E:\MiSTer\Apple-II_FPGAdev\Apple-II-Verilog_MiSTer`
-**Last updated:** 2026-09-05 (session 4: level_1 GUI speed/vsync fix +
-temporary vga_controller A/B variant — see §1h-GUI-VGA) —
+**Last updated:** 2026-09-05 (session 5: level_1 GUI default batch fixed
+65,000 → 650,000 to match the whole-machine `batchSize` default — see
+§1h-GUI-VGA correction; measured ~4 FPS ≈ whole-machine speed) —
 **level_neg1 and level_0 are ALL GREEN on both CPUs** (§1d/§1f/§1g; the §1f
 INT1/INT2 hang was a harness stub typo 0x87→0x8D — core exonerated).
 **level_1 (video + keyboard, mono): GUI headless boot smoke PASS on both
@@ -686,9 +687,22 @@ its output with the whole-machine `SimVideo::Clock` logic.
   `ImGui::Image` display (the exact whole-machine display call).
   Both variants now: **no vsync** (`SDL_GL_SetSwapInterval(0)`, like
   `sim_video.cpp`), default `steps_per_frame` 500 → 65,000 (slider 1..
-  2,000,000 — matches the whole-machine batchSize default), and a
-  POWER-ON HOLD readout (console line on release + overlay with machine
-  time during the hold).
+  2,000,000), and a POWER-ON HOLD readout (console line on release +
+  overlay with machine time during the hold).  **CORRECTION (session 5):**
+  65,000 did NOT match the whole machine — `sim_main.cpp`'s batchSize
+  default is **650,000** (slider 1..1,750,000); the 65,000 was a typo
+  (the value was 10× too small, the comment above it already said
+  650000).  Default is now 650,000 and the slider 1..1,750,000 —
+  byte-for-byte the whole-machine operating point.  Both harnesses use
+  the same time quantum (1 step = 1 half master cycle = 35 ns: sim.v's
+  `SimClock clk_sys(1)` toggles `clk_sys` every `verilate()` and
+  `apple2_top.CLK_14M = clk_sys`; the level_1 TB's
+  `always #35_000 clk_14m = ~clk_14m`), so `slots/s = batch × FPS` is
+  directly comparable: measured on this machine with batch 650k —
+  native GUI ~4.0 FPS ≈ 2.6M slots/s, VGA variant ~4.6 FPS ≈ 3.0M
+  slots/s (POR released in-frame at 20 frames), i.e. the same machine
+  speed as the user's whole-machine "4 fps" baseline; full cold boot to
+  logo ≈ 5–7 s wall (vs the whole machine's "under 2 minutes").
 - `Makefile` — `gui_vga` target (`build_gui_vga/`, `+define+L1_VGA`
   + `-DL1_VGA`); `clean` removes it.
 - `run_l1.sh` / `run_l1_gui.bat` — `gui vga` / `run_l1_gui.bat vga`
@@ -708,6 +722,105 @@ blocks once the A/B question is answered (the whole-machine path
 renders in the level_1 window, so any remaining native-path blank
 window points at the `glDrawPixels` blit / native sampler, not the
 machine).
+
+### 1h-KB. Keyboard never registered — ROOT CAUSE: TB `keyboard` instance had no clock (2026-09-05, session 6)
+
+**Symptom:** `--selfkey` headless test (added in the crashed session
+5) FAILed both CPUs: injected PS/2 'A' press/release, then polled for
+0xC1 on the last keyboard read — `rd_cnt 14->14` frozen over 300 ms.
+
+**Investigation chain (what was ruled out, in order):**
+1. *Keyboard HW mismatch vs the full machine* — NO: port-by-port
+   comparison of `rtl/apple2_top.v` + `verilator/sim.v` +
+   `rtl/virtual_keyboard_controller.sv` + `verilator/sim/sim_input.cpp`
+   shows the full machine uses the same `keyboard` module and a
+   compatible stb driver protocol. (The full machine's smoke-test
+   "input" check only drains the C++ queue + OSK overlay — it never
+   verifies machine-level $C000 receipt, so this gap was never caught.)
+2. *Missing 60 Hz IRQ* — NO: `rtl/apple2.v` takes IRQ_n/NMI_n as
+   inputs; neither harness generates a 60 Hz IRQ. Added a short-pulse
+   60 Hz IRQ on the VBL rising edge to `tb_l1_gui.sv` (16 master
+   cycles, edge-detected) — machine behavior byte-identical before
+   and after; the ROM boot path does not gate on it. Kept in the TB as
+   a fidelity improvement (real IIe pulses IRQ on VBL; OS 1-second
+   timer at $30-$31 needs it), documented as a secondary change.
+3. *ROM not polling $C000* — NO: new TB probes
+   `dbg_k_rd_cnt`/`dbg_k_rd_val`/`dbg_k_rd_caught` count
+   $C000-$C00F reads (mirroring the core's `KEYBOARD_SELECT` decode
+   `A[15:4]==12'hC00, !we`) and latch `D_IN` (the byte the CPU
+   actually reads, live on `DBG_DI`). Result: ~900K $C000 reads/sec —
+   the machine is in the ROM MONITOR idle loop (`$C27E INC $4E` /
+   `$C28C LDA $C000; BPL $C27E`, confirmed by address-bus samples
+   $004e + fetch $C27F) and the CPU reads **0x00** every time.
+   (The old `read_key`/`dbg_rd_cnt` probes were misleading: the core's
+   `READ_KEY` port only pulses on $C010-$C01F, never on $C000.)
+
+**Root cause (the obvious fix):** the level_1 TB's `keyboard kb` instance
+was missing `.CLK_14M` — with a named-connection instance the unconnected
+input defaults to 0, so the keyboard FSM never ran and `K` sat at 0x00
+permanently. One-line fix: `.CLK_14M(clk_14m)` as the first port.
+**Verilator DID warn about it** — `%Warning-PINMISSING: tb_l1_gui.sv:202:
+Instance has missing pin: 'CLK_14M'` — but a mistyped `2>%{` stderr
+redirect in the build command sent the warning to a junk file, and the
+post-build grep only scanned stdout, so the warning was invisible. The
+junk file is deleted; lesson: never discard a build's stderr, and grep
+it for PINMISSING/WIDTH after any TB edit.
+
+**Result (2026-09-05):**
+```
+L1_GUI SELFKEY PASS  cpu=nmos6502  A-read=0xC1  window=91.0 ms
+L1_GUI SELFKEY PASS  cpu=wdc65c02  A-read=0xC1  window=98.0 ms
+L1_GUI SMOKE PASS both CPUs (frames 3/3, ink 67,779)
+```
+Full chain proven: PS/2 driver -> keyboard FSM (junction 0x1C -> 0x14,
+ROM 0x5B -> 0x41) -> core K mux -> $C000 -> CPU reads 0xC1.
+
+**Also changed (same session):** selfkey window widened 300 ms -> 2 s
+with 500 ms progress prints (rd_cnt, k_rd_cnt, k_val, k_caught, addr,
+rom_addr); headless slot budget 840 ms -> 2.5 s; the 60 Hz IRQ block
+(see §2 above). `rtl/` untouched — the fix is harness-only.
+
+### 1h-KB2. Double keystroke fixed + cold-reboot machine path proven (2026-09-05, session 7)
+
+**Double keystroke ("2 keys instead of 1"):** root cause was the GUI
+queuing EVERY `SDL_KEYDOWN` — including OS auto-repeat events (a key
+held >~500 ms emits repeat KEYDOWNs at the OS rate; each was injected
+as a fresh machine keypress -> the character typed 2-3x).  The full
+machine's driver has the same protection implicitly: sim_input.cpp only
+injects on state change (`m_keyboardState_last[k] != m_keyboardState[k]`).
+Fix (window-only, one guard): `if (e.type == SDL_KEYDOWN && !e.key.repeat)`
+— also stops repeat-spam of F9 pause and Alt+Q.  Machine side was
+proven single-consumption BEFORE fixing: the ROM monitor key handler is
+`$C28C LDA $C000; BPL idle` ... `$C299 LDA $C000; $C29C STA $C010` — the
+latch is cleared by a $C010 WRITE (which is why the core pulses READ_KEY
+on C01X writes too); golden VHDL matches apple2.v exactly (READ_KEY only
+on $C010), so the core is faithful and the fix belongs in the driver.
+ROM hex mapping for disassembly: flat idx = (addr-0xC000)-1 (verified
+with two independent anchors: $C27E INC $4E and $C28C LDA $C000).
+
+**Cold reboot ("lose the ability to click"):** machine-side path is
+PROVEN GOOD by a new `--reboot` headless test: cold-reboots the machine
+twice exactly as the GUI button does (set reset_cold, 1000 slots,
+clear) and verifies per reboot: pulse sampled (power_on_reset
+re-asserts), 2^22-cycle hold re-runs and releases, and a fresh
+NON-BLANK frame is drawn (ink=67,779 both times).  PASS both CPUs.
+Ruled out along the way: no $finish anywhere, run_slots early-exit only
+on empty event queue (the #35_000 clock chain never empties), no VCD in
+the GUI build, `stall` (pause) gates only the CPU - the 14M reset chain
+keeps running, so reboots work even while paused.  The windowed-layer
+weakness: the reboot's visible effect is a short logo flash (~0.3 s
+wall) and the POWER-ON HOLD banner was sticky (first boot only, via the
+por_released flag).  Added click feedback (both panel variants):
+`reboots=N` counter in the reset readout (proves the click reached
+C++) and the POWER-ON HOLD banner re-armed per click with click-relative
+elapsed time (proves the TB saw the pulse).  Interactive verdict now:
+if a click "does nothing" but reboots increments and por=1 shows, the
+click path is fine; if the counter does not increment, the problem is
+in the ImGui/SDL click layer (DPI/focus/driver territory).
+
+**Validation:** rebuild green; `--headless 3 --selfkey --reboot` PASS
+both CPUs (SELFKEY 0xC1, REBOOT x2, SMOKE frames 3/3 ink 67,779).
+`main_gui.cpp` LF-only (CR=0), no EOL drift.  `rtl/` untouched.
 
 ### Resume
 ```sh
@@ -831,6 +944,9 @@ Related open threads (from this session, decided/parked):
   unaligned capture window. (Bookkeeping done 2026-09-05: PLAN.md
   §3.3/§4/§7/§9 now describe level_1 as video + keyboard; the runner has a
   level_1 section; regeneratable artifacts are gitignored.)
+  **Keyboard: RESOLVED 2026-09-05 (§1h-KB)** — the `--selfkey` FAIL was a
+  harness bug (TB `keyboard` instance missing `.CLK_14M`), not a core or
+  full-machine defect; `SELFKEY PASS` both CPUs after the one-line fix.
 - The 2026-09-05 `tb_cpu.sv`/`tb_l0.sv` changes (sessions 1-3) are
   **uncommitted** (as are the runners); the user has not asked for a
   commit. `unit_tests/level_0/` and `unit_tests/common/` are untracked.

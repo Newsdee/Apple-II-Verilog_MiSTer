@@ -158,6 +158,19 @@ transfers) → slot cards (HDD, Mockingboard, …) → audio. (Memory-map
 completeness is covered by level_0's BIOS and the level_1 DUT's full core
 decode.)
 
+**Display-harness speed standard (2026-09-05, after the level_1 GUI
+throughput bug):** a GUI level that shows the machine's video must not
+be gated by the display: `SDL_GL_SetSwapInterval(0)` (no vsync) and a
+per-frame sim batch at the whole-machine `batchSize` scale
+(650,000 slots; slider 1..1,750,000 — `sim_main.cpp`).  A vsync-locked
+GUI with a small batch caps machine speed at `fps × batch` (60 fps ×
+500 slots = 30k slots/s ≈ 1/100 of model throughput, which turns the
+machine's 294 ms power-on hold into minutes of blank wall time).
+Headless harnesses are unaffected: they run at model throughput and
+batch size only changes progress granularity.  level_neg1's GUI
+(isolated-CPU savestate debugger — no machine POR, short interactive
+runs) deliberately keeps vsync + small batches.
+
 - **Independent-build constraint:** each level has its own top module and
   Makefile. Levels pull in *unmodified* `rtl/` modules; they never
   `#undef` pieces of the machine build.
