@@ -17,7 +17,9 @@ module rom
 );
 //-------------------------------------------------------------------------------------------------
 
+// altera message_off 10030
 reg[DW-1:0] d[(2**AW)-1:0];
+// altera message_on 10030
 initial $readmemh(FN, d, 0);
 
 always @(posedge clock) if(ce) data_out<= d[a];

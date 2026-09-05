@@ -1,3 +1,14 @@
-# Generated Verilator build trees (each level's Makefile `clean` removes these)
+# Generated Verilator build trees (each level's Makefile `clean` removes these).
+# `build_*` = per-CPU dirs (neg1/level_0); `build` = level_1's single build dir:
 level_*/build_*/
+level_*/build/
 level_*/obj_dir/
+
+# Regeneratable run artifacts (recreated by building/running a level):
+# build/run logs, ce-by-ce/PC/boot traces, VCD waveforms, PBM screens,
+# and the level_1 out/ dir. Never needed in git.
+level_*/out/
+level_*/*.log
+level_*/*.txt
+level_*/*.vcd
+level_*/*.pbm

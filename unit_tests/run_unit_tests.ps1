@@ -13,6 +13,11 @@
     3. runs the resulting exe  build_<cpu>\obj_dir\*.exe  (exactly one per
        build) from the level directory, capturing stdout to run_out_<cpu>.log.
 
+  level_1 is special-cased (different build contract: ONE build covers both
+  CPUs, and the exe must run from the repo root): the runner delegates to
+  level_1\run_l1.sh and derives per-CPU status from the captured
+  "L1 PASS/FAIL cpu=..." lines.
+
   Exit-code contract (from the bash one-liner):
       0   exe ran and the test passed (exe exits non-zero on any CHECK FAIL)
     201   build (make) failed            -> see rebuild_<cpu>.log
@@ -79,6 +84,54 @@ foreach ($level in $Levels) {
     Write-Warning "skipping $level (no Makefile)"
     continue
   }
+
+  if ($level -eq 'level_1') {
+    # level_1 special case: ONE build covers both CPUs (the DUT muxes on
+    # its `cpu` input, selected at runtime with +cpu=0/1), and the exe must
+    # run from the REPO ROOT ($readmemh ROM paths are CWD-relative).
+    # Delegate to the level's own runner (it sets the MSYS2 env, cds to the
+    # repo root, and writes its outputs to level_1/out/); per-CPU status
+    # comes from its captured "L1 PASS/FAIL cpu=..." lines.
+    if ($Cpus.Count -eq 1) { $cpuSel = $Cpus[0] } else { $cpuSel = 'both' }
+    if ($KeepBuild) { $cleanArg = '' } else { $cleanArg = 'clean' }
+    $runLog = 'run_out_level1.log'
+    $cmd = @"
+export PATH=/c/msys64/usr/bin:/c/msys64/ucrt64/bin:`$PATH
+export TMP=/c/msys64/tmp TEMP=/c/msys64/tmp TMPDIR=/c/msys64/tmp
+export VERILATOR_ROOT=/c/msys64/ucrt64/share/verilator
+sh run_l1.sh $cleanArg $cpuSel > $runLog 2>&1
+exit `$?
+"@
+    Write-Host ("== {0} (one build, cpu={1}) ==" -f $level, $cpuSel)
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    Push-Location $levdir
+    try {
+      & $bash -c $cmd
+      $rc = $LASTEXITCODE
+    } finally {
+      $sw.Stop()
+      Pop-Location
+    }
+    if ($cpuSel -eq 'both') { $runCpus = @('nmos','wdc') } else { $runCpus = @($cpuSel) }
+    foreach ($cpu in $runCpus) {
+      $line = $null
+      if (Test-Path (Join-Path $levdir $runLog)) {
+        $hit = Select-String -Path (Join-Path $levdir $runLog) -Pattern ('L1 (PASS|FAIL) cpu=' + $cpu + ' ') | Select-Object -Last 1
+        if ($hit) { $line = $hit.Line }
+      }
+      if ($null -ne $line -and $line -match 'L1 PASS')        { $status = 'PASS' }
+      elseif ($null -ne $line -and $line -match 'L1 FAIL')    { $status = "RUN FAIL ($($line.Trim()))" }
+      elseif ($rc -eq 2)                                      { $status = 'NO EXE' }
+      else                                                    { $status = "RUN FAIL (exit $rc)" }
+      [void]$results.Add([pscustomobject]@{
+        Level = $level; Cpu = $cpu; Status = $status
+        ExitCode = $rc; Seconds = [int]$sw.Elapsed.TotalSeconds; Tail = $line
+      })
+      Write-Host ("  {0,-14} {1,-5}  ({2}s)  {3}" -f $status, $cpu, [int]$sw.Elapsed.TotalSeconds, $line)
+    }
+    continue
+  }
+
   foreach ($cpu in $Cpus) {
     $buildName = "build_$cpu"
     $rebLog    = "rebuild_$cpu.log"

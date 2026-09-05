@@ -220,6 +220,7 @@ parameter CONF_STR = {
 	"O78,Stereo mix,none,25%,50%,100%;",
 	"OM,PAL Mode,NTSC,PAL;",
 	"ON,Video Rom,US,LOCAL;",
+	"O1,Pause when OSD is open,Off,On;",
 	"-;",
 	"O6,Analog X/Y,Normal,Swapped;",
 	"OHI,Paddle as analog,No,X,Y;",
@@ -253,6 +254,11 @@ wire [15:0] joystick_a0;
 wire  [7:0] paddle_0;
 
 wire [10:0] ps2_key;
+
+// OSD pause: hold the CPU (both cores) while the OSD is open (mirrors the
+// newsdee core's P1oC option; this core's OSD is a single O page, so the
+// option lives at status[1] = O1).
+wire osd_pause = status[1] && OSD_STATUS;
 
 wire [31:0] sd_lba[3];
 reg   [2:0] sd_rd;
@@ -362,6 +368,7 @@ apple2_top apple2_top
 
 	.CPU_WAIT(cpu_wait_hdd /*| cpu_wait_fdd*/),
 	.cpu_type(~status[5]),
+	.cpu_stall(osd_pause),
 
 	.reset_cold(RESET | status[0]),
 	.reset_warm(buttons[1]),

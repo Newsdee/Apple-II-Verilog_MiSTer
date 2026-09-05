@@ -82,6 +82,33 @@ module applemouse(
     reg  [1:0]    enc_y;
     reg  [10:0]   div_cnt;
 
+    function automatic [8:0] stepped_backlog;
+        input [8:0] value;
+        begin
+            if (value[8] == 1'b1)
+                stepped_backlog = value + 9'd1;
+            else if (value != 9'b0)
+                stepped_backlog = value - 9'd1;
+            else
+                stepped_backlog = value;
+        end
+    endfunction
+
+    function automatic [8:0] saturating_add;
+        input [8:0] backlog;
+        input [8:0] delta;
+        reg signed [9:0] sum;
+        begin
+            sum = $signed({backlog[8], backlog}) + $signed({delta[8], delta});
+            if (sum > 10'sd255)
+                saturating_add = 9'sd255;
+            else if (sum < -10'sd256)
+                saturating_add = 9'sh100;
+            else
+                saturating_add = sum[8:0];
+        end
+    endfunction
+
     always @(posedge CLK_14M)
     begin
         if (RESET == 1'b1)
@@ -91,6 +118,7 @@ module applemouse(
             my      <= 9'b0;
             enc_x   <= 2'b0;
             enc_y   <= 2'b0;
+            mcu_pb_in[3:0] <= 4'b0;
             div_cnt <= 11'b0;
         end
         else
@@ -136,8 +164,8 @@ module applemouse(
             if (STROBE == 1'b1)
             begin
                 pressed <= BUTTON;
-                mx      <= X;
-                my      <= Y;
+                mx      <= saturating_add(div_cnt == 11'b0 ? stepped_backlog(mx) : mx, X);
+                my      <= saturating_add(div_cnt == 11'b0 ? stepped_backlog(my) : my, Y);
             end
         end
     end
@@ -208,13 +236,13 @@ module applemouse(
 
     assign mcu_pc_in = pia_pb_out[7:4];
     assign pia_pb_in[7:4] = mcu_pc_out;
+    assign pia_pb_in[3:1] = 3'b111;
     assign pia_pb_in[0] = D_IN[0];
 
-    // VHDL concurrent assignments to individual bits: combinational drivers
-    // (bit 6 is never driven in the original either)
     always @(*)
     begin
         mcu_pb_in[7]   = ~pressed;
+        mcu_pb_in[6]   = 1'b1;
         mcu_pb_in[5:4] = 2'b11;
     end
 

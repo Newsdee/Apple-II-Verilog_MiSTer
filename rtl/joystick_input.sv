@@ -1,4 +1,4 @@
-// 
+//
 // Apple ][ joystick input handler for MiSTer FPGA
 // Copyright (c) 2026 Newsdee
 //

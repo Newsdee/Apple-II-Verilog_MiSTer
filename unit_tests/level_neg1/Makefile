@@ -20,6 +20,7 @@ CPU      ?= nmos
 LEVELDIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 REPO     := $(abspath $(LEVELDIR)/../..)
 RTL      := $(REPO)/rtl
+COMMON   := $(REPO)/unit_tests/common
 V        ?= verilator_bin
 
 ifeq ($(CPU),wdc)
@@ -72,14 +73,18 @@ SDL_INC   ?= C:/msys64/ucrt64/include/SDL2
 GUI_CFLAGS  := -I$(LEVELDIR)/gui/imgui -I$(LEVELDIR)/gui/imgui/backends -I$(SDL_INC) -DGUI_CPU_NAME=$(CPU)
 GUI_LDFLAGS := -lSDL2 -lopengl32
 
+# Shared ladder infrastructure (unit_tests/common/): 2-phase ce generator,
+# 1-ce-delayed behavioral RAM, savestate field-extraction package.
+COMMON_SRC := $(COMMON)/tb_ce_gen.sv $(COMMON)/tb_ram_mem.sv $(COMMON)/tb_ss_pkg.sv
+
 .PHONY: all gui clean run
 all: $(EXE)
 gui: $(GUIEXE)
 
-$(EXE): tb_cpu.sv main.cpp $(CPU_SRC)
+$(EXE): tb_cpu.sv main.cpp $(COMMON_SRC) $(CPU_SRC)
 	@mkdir -p $(OUT)/obj_dir
 	VERILATOR_ROOT=$(VROOT) $(V) --cc --timing -exe $(V_OPT) $(V_DEF) --top-module tb_cpu \
-		-Mdir $(OUT)/obj_dir main.cpp tb_cpu.sv $(CPU_SRC)
+		-Mdir $(OUT)/obj_dir main.cpp tb_cpu.sv $(COMMON_SRC) $(CPU_SRC)
 	VERILATOR_ROOT=$(VROOT) $(MAKE) -C $(OUT)/obj_dir -f Vtb_cpu.mk
 	@echo "built $@"
 

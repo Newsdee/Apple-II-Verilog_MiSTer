@@ -449,7 +449,7 @@ use `shared/spram_sim.vhd` while the documented GHDL defect remains.
 | apple2_font_rom | apple2_font_rom.vhd + spram_const shim | apple2_font_rom.v + video2.hex | PASS 2026-08-29; rows=4228, fields=38052, writes=37 (36 divergent probes aligned write-first, 1 equal), 64/64 readbacks; candidate aligned per user decision (one-line glyph_data fix; pre-alignment FAIL profile in module_tests/apple2_font_rom/README.md) |
 | vga_controller | vga_controller.vhd | vga_controller.v | PASS 2026-08-30; rows=163248, fields=3226938, ignored_metavalues=38022, hs_edges=177, vs_high=2736, combos=16, p3_triples=9; candidate aligned per user decision (2 fixes in palette-download process: buffer write on all 4 beats with pre-cycle value, color_addr wrap after beat 3 not beat 2); pre-alignment DIVERGENCE profile and power-up artifact classification retained in module_tests/vga_controller/README.md |
 
-Verilog-to-Verilog synchronized files such as `ramcard.v`, `clock_card.v`, and
+Verilog-to-Verilog synchronized files such as `ramcard.v`, `no_slot_clock.sv`, and
 `floppy_track.sv` may be certified by a byte comparison when the requirement is
 exact source parity. Record the compared paths and hashes; use behavioral tests
 when the implementations are allowed to differ.

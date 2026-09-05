@@ -20,6 +20,7 @@ module apple2(
     FLASH_CLK,
     reset,
     cpu,
+    STALL,
     ADDR,
     ram_addr,
     D,
@@ -68,6 +69,7 @@ module apple2(
     input         FLASH_CLK;		// approx. 2 Hz flashing char clock
     input         reset;
     input         cpu;		// 0 - 6502, 1 - 65C02
+    input         STALL;		// 1: hold the CPU in place (OSD pause)
     output [15:0] ADDR;		// CPU address
     output [17:0] ram_addr;		// RAM address
     output [7:0]  D;		// Data to RAM
@@ -612,7 +614,7 @@ module apple2(
         .ce(CPU_EN),
         .ce_n(1'b0),
         .reset(reset),
-        .stall(1'b0),
+        .stall(STALL),
         .irq_n(IRQ_n),
         .nmi_n(NMI_n),
         .rdy(~CPU_WAIT),
@@ -650,8 +652,8 @@ module apple2(
     //   rdy = ~CPU_WAIT replaces the old enable-gating (CPU_EN & ~CPU_WAIT).
     //   reset is active-HIGH synchronous here (R65Cx2 was active-low).
     //   stp_nop=1: Apple II has no power switch, so STP ($DB) is a NOP.
-    //   stall + savestate bus are tied off for now; see PLAN.md section 6
-    //   (savestate support plan, not yet implemented).
+    //   STALL is a real port (OSD pause, wired by apple2_top); the
+    //   savestate bus is still tied off; see PLAN.md section 6.
     wire [63:0] n65c02_ss_rdata_unused;
     wire n65c02_unused_ok = &{1'b0, N65C02_SYNC, N65C02_VECTOR_PULL,
                                N65C02_INT_SEQ, N65C02_RTI_DONE, N65C02_IN_WAI,
@@ -661,7 +663,7 @@ module apple2(
         .ce(CPU_EN),
         .ce_n(1'b0),
         .reset(reset),
-        .stall(1'b0),
+        .stall(STALL),
         .irq_n(IRQ_n),
         .nmi_n(NMI_n),
         .rdy(~CPU_WAIT),

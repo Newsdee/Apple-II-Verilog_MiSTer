@@ -1,4 +1,4 @@
-// 
+//
 // Apple ][ floppy sound generator for MiSTer FPGA
 // Copyright (c) 2026 Newsdee
 //

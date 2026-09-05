@@ -25,6 +25,7 @@ module apple2_top(
     soft_reset,
     cpu_type,
     CPU_WAIT,
+    cpu_stall,
     ram_we,
     ram_di,
     ram_do,
@@ -124,6 +125,7 @@ module apple2_top(
     output        soft_reset;
     input         cpu_type;
     input         CPU_WAIT;
+    input         cpu_stall; // 1: hold the CPU in place (OSD pause)
 
     // main RAM
     output        ram_we;
@@ -405,6 +407,7 @@ module apple2_top(
         .FLASH_CLK(flash_clk[22]),
         .reset(reset),
         .cpu(cpu_type),
+        .STALL(cpu_stall),
         .ADDR(ADDR),
         .ram_addr(a_ram),
         .D(D),
