@@ -185,12 +185,18 @@ pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
-	.outclk_0(),      // 57.27 MHz - unused at this level (color pipeline)
+	.outclk_0(CLK_VIDEO), // 57.27 MHz MiSTer video clock
 	.outclk_1(clk_sys) // 14.318 MHz machine master
 );
 
-// Level 1 pixel master = the machine master (no 57.27 MHz color pipeline).
-assign CLK_VIDEO = clk_sys;
+// One native machine sample every four video clocks, matching the working
+// core's normal MiSTer presentation cadence.
+reg [1:0] video_div = 2'd0;
+reg       ce_pix = 1'b0;
+always @(posedge CLK_VIDEO) begin
+	video_div <= video_div + 1'd1;
+	ce_pix <= &video_div;
+end
 
 /////////////////  HPS  ///////////////////////////
 
@@ -430,7 +436,7 @@ apple2 d1 (
 );
 
 /////////////////  VIDEO OUT  /////////////////////
-// Native monochrome, 1 sample per master cycle (tb_l1_gui presentation).
+// Native monochrome source presented through MiSTer's standard video_mixer.
 // The machine core exposes blanking (HBL/VBL), not syncs.  The newsdee
 // core derives its syncs in vga_controller.v; we replicate that structure
 // here from the raw blanking so the display locks the same way:
@@ -470,13 +476,37 @@ always @(posedge clk_sys) begin
 	end
 end
 
-assign CE_PIXEL  = ~hbl;
-assign VGA_R     = {8{video}};
-assign VGA_G     = {8{video}};
-assign VGA_B     = {8{video}};
-assign VGA_HS    = hbl & (hblank_cnt >= HSYNC_FRONT_PORCH) & (hblank_cnt < HSYNC_FRONT_PORCH + HSYNC_WIDTH);
-assign VGA_VS    = vbl & (vblank_lines >= VSYNC_FRONT_PORCH) & (vblank_lines < VSYNC_FRONT_PORCH + VSYNC_LINES);
-assign VGA_DE    = ~hbl & ~vbl;
+wire native_hsync = hbl & (hblank_cnt >= HSYNC_FRONT_PORCH) &
+                    (hblank_cnt < HSYNC_FRONT_PORCH + HSYNC_WIDTH);
+wire native_vsync = vbl & (vblank_lines >= VSYNC_FRONT_PORCH) &
+                    (vblank_lines < VSYNC_FRONT_PORCH + VSYNC_LINES);
+wire [7:0] native_rgb = {8{video}};
+
+video_mixer #(.LINE_LENGTH(580), .GAMMA(1)) video_mixer
+(
+	.CLK_VIDEO (CLK_VIDEO),
+	.CE_PIXEL  (CE_PIXEL),
+	.ce_pix    (ce_pix),
+	.scandoubler(1'b0),
+	.hq2x      (1'b0),
+	.gamma_bus (gamma_bus),
+	.R         (native_rgb),
+	.G         (native_rgb),
+	.B         (native_rgb),
+	.HSync     (native_hsync),
+	.VSync     (native_vsync),
+	.HBlank    (hbl),
+	.VBlank    (vbl),
+	.HDMI_FREEZE(1'b0),
+	.freeze_sync(),
+	.VGA_R     (VGA_R),
+	.VGA_G     (VGA_G),
+	.VGA_B     (VGA_B),
+	.VGA_VS    (VGA_VS),
+	.VGA_HS    (VGA_HS),
+	.VGA_DE    (VGA_DE)
+);
+
 assign VIDEO_ARX = 13'd4;
 assign VIDEO_ARY = 13'd3;
 

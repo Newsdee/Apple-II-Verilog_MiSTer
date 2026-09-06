@@ -243,7 +243,7 @@ runs) deliberately keeps vsync + small batches.
 | 7 | level_0: BIOS + memory map, direct injection (§3.2) | done 2026-09-05 (T1–T5 green, both CPUs) |
 | 8 | level_1: video + keyboard (mono), first peripheral slice | in progress — build green; first-run fix list in PROGRESS §1h |
 | 9 | `--trace`/VCD on demand for interactive debugging | done (neg1 `--trace` + GUI, level_1 `--trace`) |
-| 10 | level_2: floppy (Disk II + drives) | next after level_1 is green |
+| 10 | level_2: floppy (Disk II + drives) | landed 2026-09-06 — headless boot + imgui GUI, `L2_GUI SMOKE PASS`; disk-read debug resolved (v4); see `level_2/PROGRESS.md` v5 |
 
 ## 8. Subagent (ninfer) usage notes
 

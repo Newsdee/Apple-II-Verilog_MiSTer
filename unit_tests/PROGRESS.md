@@ -950,3 +950,15 @@ Related open threads (from this session, decided/parked):
 - The 2026-09-05 `tb_cpu.sv`/`tb_l0.sv` changes (sessions 1-3) are
   **uncommitted** (as are the runners); the user has not asked for a
   commit. `unit_tests/level_0/` and `unit_tests/common/` are untracked.
+- **level_2 (disk-read debug resolved v4; imgui GUI landed v5, 2026-09-06):**
+  the Disk II read path works in the level_2 harness (deterministic DOS 3.3
+  boot — 1144 sectors, byte-perfect tracks, OS running in RAM; see
+  `level_2/PROGRESS.md` v4/v5). The imgui GUI + headless smoke are green
+  (`L2_GUI SMOKE PASS cpu=nmos6502` — boot ok, selfkey ok, reboot ok — fresh
+  run 2026-09-06). Direction reset (user): the user now watches the boot in
+  the GUI window (`level_2/run_l2_gui.bat`) to confirm it; level_1 is the
+  video bisection level if a video fault is suspected. Parked: the 12 s
+  mostly-blank text-page question and the pass-criterion rework (pending the
+  user's visual check); the crashed session's font/glyph forensics detour.
+  No `rtl/` files were changed by the level_2 work (harness-only).
+  `unit_tests/level_2/` is untracked.

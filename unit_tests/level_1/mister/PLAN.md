@@ -32,11 +32,13 @@ test harness logic in the FPGA image.
 
 Native monochrome, matching the `tb_l1_gui.sv` presentation:
 - `CLK_VIDEO` = 14.318 MHz (PLL `outclk_1`, same net as the machine clock)
-- `CE_PIXEL` = `~HBL` — one sample per master cycle
+- `CE_PIXEL` must remain asserted for every master cycle, including blanking.
+  `VGA_DE = ~(HBL | VBL)` identifies visible samples; it must not gate the
+  pixel cadence.
 - `VGA_R = VGA_G = VGA_B = {8{VIDEO}}`
 - Narrow sync pulses derived from the blanking edges (the machine core
-  exposes HBL/VBL blanking, not syncs): first 64 master cycles of HBL,
-  first 512 of VBL.
+  exposes HBL/VBL blanking, not syncs): 68-cycle HSYNC after a 130-cycle
+  front porch and 3-line VSYNC starting 33 lines into VBL.
 
 Correct for TEXT mode (boot logo, monitor, BASIC — what this level shows).
 Hires content (7.159 MHz pixel rate) is half-sampled and appears 2x
@@ -108,6 +110,77 @@ Deliberate differences:
 - In-project `sys/` copy (refreshed from the repo by the build scripts;
   see file layout above).
 - Quartus Prime 17.0.2 Lite on PATH (build script calls `quartus_sh`).
+
+## Corrupted-video repair plan
+
+The Sep 6 full Quartus flow, fitter, timing analysis, and assembler all
+succeeded, so this is a functional video-interface problem rather than a
+failed FPGA build. The earlier blanking-counter inversion has already been
+fixed: the current generated HSYNC is 68 master cycles and VSYNC is 3 lines.
+
+The remaining primary defect is `CE_PIXEL = ~hbl`. Both HSYNC transitions
+occur during HBL, when that expression holds `CE_PIXEL` low. MiSTer's
+`sys_top` passes `CE_PIXEL` into the scanline/capture path as `ce_in`, so it
+can miss the sync transitions and sees no pixel cadence at all during the
+blanking portion of each line.
+
+### Fix A: minimal native monochrome path (first choice)
+
+1. Keep `CLK_VIDEO = clk_sys` at 14.318 MHz so the machine and video output
+  remain in one clock domain.
+2. Change only `CE_PIXEL` to constant `1'b1`. Keep `VGA_DE = ~hbl & ~vbl`.
+3. Retain the corrected 68-cycle HSYNC and 3-line VSYNC logic.
+4. Extend the sync probe to count total enabled samples per line and assert:
+  - `CE_PIXEL` is high during active video, blanking, and both HSYNC edges;
+  - active width is approximately 560 samples;
+  - total line length is approximately 910 samples;
+  - HSYNC is 68 samples and VSYNC is 3 lines.
+5. Rebuild the RBF and test HDMI and analog VGA, with direct video both off
+  and on if the display path permits it.
+
+This is the smallest fix and matches the wrapper's claim of one output sample
+per 14 MHz master cycle. It does not add color or correct the documented
+hires horizontal stretching.
+
+### Fix B: use the working core's MiSTer presentation pipeline
+
+If Fix A does not produce stable output, copy the known-working clock and
+presentation boundary rather than adding more special-case sync logic:
+
+1. Restore PLL `outclk_0` as `CLK_VIDEO` (57.27 MHz) and keep `clk_sys` at
+  14.318 MHz.
+2. Generate `ce_pix` in the `CLK_VIDEO` domain at one pulse per four clocks,
+  matching the newsdee core's normal double-pixel mode.
+3. Feed monochrome RGB, HSync, VSync, HBlank, and VBlank through
+  `video_mixer`, which produces `CE_PIXEL`, VGA RGB, sync, and DE using the
+  same contract as the working core.
+4. Add `sys/video_mixer.sv` dependencies through the existing `sys/sys.qip`
+  path rather than duplicating modules in `files.qip`.
+5. Verify clock-domain sampling carefully: the 14 MHz source signals must be
+  stable when captured by the 57 MHz presentation pipeline, as they are in
+  the working design.
+
+This is higher confidence for MiSTer integration but widens the level-1 test
+surface and consumes the standard video infrastructure.
+
+### Fix C: restore the full Apple II video controller
+
+Only if native monochrome output itself is no longer an important level-1
+boundary, instantiate `vga_controller.v` (or advance the test to level 2) and
+use its RGB, blanking, and sync outputs with the working `video_mixer` path.
+This gives correct artifact color and mode-dependent pixel handling, but it
+tests substantially more than `apple2.v` and should not be the first repair.
+
+### Validation order
+
+1. Run the focused video timing probe after Fix A.
+2. Run the existing level-1 Verilator regression to ensure boot/reset/RAM are
+  unchanged.
+3. Run Quartus Analysis & Synthesis, then a full compile only after the narrow
+  checks pass.
+4. Confirm the new RBF timestamp and inspect timing slack.
+5. Test on hardware. Automated timing checks cannot prove monitor lock or
+  visually correct framing.
 
 ## Acceptance (on hardware)
 
