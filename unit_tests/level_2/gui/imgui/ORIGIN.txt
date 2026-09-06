@@ -1,0 +1,5 @@
+Vendored imgui v1.92.9b (latest stable at fetch time, 2026-09-05).
+Source: https://github.com/ocornut/imgui (tag v1.92.9b)
+License: MIT (copyright line at the top of imgui.h).
+Files: imgui core (5 .cpp + headers + imstb_*) and the SDL2 / OpenGL3
+backends (self-contained loader in imgui_impl_opengl3_loader.h).

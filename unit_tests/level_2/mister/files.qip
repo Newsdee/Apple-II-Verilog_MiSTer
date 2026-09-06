@@ -1,0 +1,40 @@
+# Level 2 MiSTer integration-test core sources (unit_tests/level_2/mister).
+# Paths are relative to this project directory.
+#
+# The DUT (machine core + CPUs + Disk II + floppy) is referenced LIVE from
+# the repo - that is the point of the test.  Everything else is copied into
+# the project so the build works from any CWD (build.bat/build.sh refresh
+# the copies, newer files only):
+#   sys/            MiSTer infrastructure (sys.tcl's project-relative refs)
+#   jtag.cdf        board JTAG ID
+#   rtl/pll.qip     PLL QIP package (sys.tcl expects "rtl/pll.qip" in-project;
+#                   the package provides pll.v + pll/pll_0002.*)
+#   rtl/roms/*.hex  ROM data for the DUT's CWD-relative $readmemh paths
+#                   (apple2e, keyboard, video2, diskii)
+set_global_assignment -name SYSTEMVERILOG_FILE Apple-II.sv
+set_global_assignment -name VERILOG_FILE ../../../rtl/rom.v
+set_global_assignment -name VERILOG_FILE ../../../rtl/ramcard.v
+set_global_assignment -name VERILOG_FILE ../../../rtl/timing_generator.v
+set_global_assignment -name VERILOG_FILE ../../../rtl/video_generator.v
+set_global_assignment -name VERILOG_FILE ../../../rtl/keyboard.v
+set_global_assignment -name VERILOG_FILE ../../../rtl/apple2.v
+set_global_assignment -name SYSTEMVERILOG_FILE ../../../rtl/cpu/nmos6502/cpu_65c02.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../../rtl/cpu/nmos6502/cpu_alu.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../../rtl/cpu/wdc65c02/cpu_65c02.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../../rtl/cpu/wdc65c02/cpu_alu.sv
+# Level 2 additions: the Disk II slot controller + the two floppy tracks
+# (floppy_track instantiates its own dpram track RAM).
+set_global_assignment -name VERILOG_FILE ../../../rtl/disk_ii.v
+set_global_assignment -name VERILOG_FILE ../../../rtl/drive_ii.v
+set_global_assignment -name SYSTEMVERILOG_FILE ../../../rtl/floppy_track.sv
+# dpram: use the VHDL altsyncram implementation (in-project copy of the
+# newsdee rtl/dpram.vhd). Quartus 17.0.2 does NOT infer the Verilog
+# behavioral model (../../../rtl/dpram.v) into block RAM for this design -
+# it becomes LUT-based distributed RAM and the fitter fails with
+# Error 170011 (267,479 combinational nodes vs 83,820; 0 RAM blocks).
+# Same trap hit by the newsdee project (dpram revert, AGENTS.md).
+# The VHDL entity's ports/generics match the Verilog instantiation in
+# floppy_track.sv (proven by the newsdee fit); dpram.v remains the
+# simulation/differential candidate in the repo.
+set_global_assignment -name VHDL_FILE rtl/dpram.vhd
+set_global_assignment -name VERILOG_FILE rtl/drive_status_overlay.sv
