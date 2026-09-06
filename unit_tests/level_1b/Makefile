@@ -9,7 +9,7 @@ EXE := $(OUT)/obj_dir/Vtb_cpu_ss.exe
 CPU_SRC := $(RTL)/cpu/nmos6502/cpu_65c02.sv $(RTL)/cpu/nmos6502/cpu_alu.sv \
            $(RTL)/cpu/wdc65c02/cpu_65c02.sv $(RTL)/cpu/wdc65c02/cpu_alu.sv
 MACH_SRC := $(RTL)/apple2.v $(RTL)/timing_generator.v $(RTL)/video_generator.v \
-            $(RTL)/rom.v $(RTL)/ramcard.v
+			$(RTL)/keyboard.v $(RTL)/rom.v $(RTL)/ramcard.v
 ROMS := $(RTL)/roms/apple2e.hex $(RTL)/roms/video2.hex
 
 .PHONY: all run coordinator ram gui clean
@@ -39,7 +39,7 @@ gui: $(GUIEXE)
 
 $(EXE): tb_cpu_ss.sv main_cpu_ss.cpp $(MACH_SRC) $(CPU_SRC) $(ROMS)
 	@mkdir -p $(OUT)/obj_dir
-	VERILATOR_ROOT=$(VROOT) $(V) --cc --timing -exe -O3 --x-assign fast --x-initial fast \
+	VERILATOR_ROOT=$(VROOT) $(V) --cc --timing -exe -O3 --x-assign fast --x-initial fast -public --trace \
 		-Wno-fatal -Wno-TIMESCALEMOD --top-module tb_cpu_ss \
 		-Mdir $(OUT)/obj_dir main_cpu_ss.cpp tb_cpu_ss.sv $(MACH_SRC) $(CPU_SRC)
 	VERILATOR_ROOT=$(VROOT) $(MAKE) -C $(OUT)/obj_dir -f Vtb_cpu_ss.mk
@@ -65,7 +65,7 @@ $(RAMEXE): tb_ss_ram.sv savestate_ram_l1b.sv
 
 $(GUIEXE): tb_l1b_gui.sv $(GUI_SRC) $(MACH_SRC) $(CPU_SRC)
 	@mkdir -p $(GUIOUT)
-	VERILATOR_ROOT=$(VROOT) $(V) --cc --timing -exe -O3 --x-assign fast --x-initial fast \
+	VERILATOR_ROOT=$(VROOT) $(V) --cc --timing -exe -O3 --x-assign fast --x-initial fast -public --trace \
 		-Wno-fatal -Wno-TIMESCALEMOD --top-module tb_l1b_gui \
 		-CFLAGS "$(GUI_CFLAGS)" -LDFLAGS "$(GUI_LDFLAGS)" \
 		-Mdir $(GUIOUT) $(GUI_SRC) tb_l1b_gui.sv $(MACH_SRC) $(CPU_SRC)
