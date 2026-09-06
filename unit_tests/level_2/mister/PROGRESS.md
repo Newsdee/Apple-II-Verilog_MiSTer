@@ -322,18 +322,24 @@ worked and listed the `*.,NIB` mount items, but the screen was black
   sectors=13, bytes=6656, mot1=1, ready=1, ink=580).
 - EOL: both edited files still 0 CR.
 
-### Latent instances of the same trap (not fixed here)
-- `unit_tests/level_1/mister/Apple-II.sv` also references `rtl/apple2.v`
-  live and does not wire `machine_ce` — the next level-1 rebuild hits the
-  same blackout.
-- `rtl/apple2_top.v` (repo) likewise does not wire the new ports — the
-  parallel session's responsibility.
+### Latent instances of the same trap (status 2026-09-06)
+- `unit_tests/level_1/mister/Apple-II.sv` — **FIXED** (same 4-line
+  connection; verified on the Verilator side via `tb_l1_gui.sv`
+  L1_GUI SMOKE PASS both CPUs; the FPGA build is the user's).
+  `tb_l1_gui.sv` fixed the same day; `tb_l1.sv` and the level-1b
+  `tb_cpu_ss.sv` were already wired by the parallel session.
+- `rtl/apple2_top.v` (repo) likewise does not wire the new ports —
+  the parallel session's in-flight file (uncommitted); left for that
+  session. **Full-machine Verilator sim is dead until it is wired**
+  (next `verilator` rebuild of the full machine hits the same trap).
 
 ### Result (hardware, user-confirmed)
 - Rebuilt + flashed with the `machine_ce` fix: video is back, and the
   **OSD drive mount works on hardware** — the `Drive 1 *.NIB` /
   `Drive 2 *.NIB` items appear in the MiSTer file browser and a `.nib`
   mounts through the HPS image channels (2026-09-06, user-confirmed).
-- Remaining hardware checks: with `DOS_3_3.nib` on drive 1, Cold Reset →
-  DOS 3.3 boots; drive-1 overlay LED lights dim on spin-up and flashes
-  bright during boot reads; `WP Drive 1/2` blocks writes.
+- **2026-09-06 (user): DOS 3.3 boots from a mounted `DOS_3_3.nib` on
+  hardware** (drive 1, Cold Reset) — the full HPS→core→Disk II→CPU
+  path is hardware-proven. Not yet explicitly verified on hardware:
+  physical PS/2 keyboard input, 65C02/6502 switch across cold reset,
+  OSD Pause freeze/resume, WP Drive 1/2 write refusal.

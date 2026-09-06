@@ -185,7 +185,19 @@ module tb_l1_gui;
     .DBG_T65_REGS(w_dbg_regs),
     .DBG_DI      (w_dbg_di),
     .DBG_ROM_ADDR(w_dbg_roma),
-    .DBG_ROM_OUT (w_dbg_romo)
+    .DBG_ROM_OUT (w_dbg_romo),
+    // Save-state WIP ports added to rtl/apple2.v by the parallel
+    // save-state work (commit f5b3c64 "wire save state to more
+    // components", 2026-09-06 18:03): level-1 has no save-state
+    // feature.  machine_ce MUST be driven 1 - the core gates ALL
+    // machine state on it; left unconnected it is 0 and the
+    // machine is completely dead (no sync, no video, no boot -
+    // the same trap that hit the level-2 2026-09-06 black-screen
+    // build).  Pause is already handled by STALL above.
+    .machine_ce  (1'b1),
+    .ss_wren     (1'b0),
+    .ss_addr     (10'd0),
+    .ss_wdata    (64'd0)
   );
 
   // ------------------------------------------------------------------

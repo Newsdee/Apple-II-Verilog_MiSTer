@@ -131,3 +131,33 @@
   VIDEO OUT block of `Apple-II.sv` (the FPGA-only core; not part of the
   Verilator sim path). EOL preserved (pure LF, 0 CR). **Pending:** user
   re-runs `build.bat` → new `level1.rbf` → hardware re-test.
+
+## 2026-09-06 (machine_ce blackout trap — fixed before the next rebuild)
+
+The parallel save-state work (commit f5b3c64, 2026-09-06 18:03) added
+input ports `machine_ce`, `ss_wren`, `ss_addr`, `ss_wdata` to
+`rtl/apple2.v` (+ `timing_generator.v`). The core gates ALL machine
+state on `machine_ce`; this wrapper left it unconnected, so Quartus
+would tie it to GND and the machine would be completely dead on the
+next rebuild (no sync, no video, no boot — the exact failure that hit
+the level-2 2026-09-06 18:09 build).
+
+**Fix:** the `apple2 d1` instance in `Apple-II.sv` now drives
+`.machine_ce(1'b1)` (machine always runs; OSD pause is the existing
+`STALL` path, not `machine_ce`) and ties off `.ss_wren(1'b0)`,
+`.ss_addr(10'd0)`, `.ss_wdata(64'd0)` — no save-state feature in
+level-1. Port names verified against `rtl/apple2.v`; the identical
+4-line pattern was hardware-verified in the level-2 mister build.
+EOL preserved (pure LF, 0 CR).
+
+**Verification:** the FPGA wrapper itself needs the user's
+`build.bat` (A&S will prove the port binding). The Verilator side of
+the same trap was verified: `tb_l1_gui.sv` had the same missing
+`machine_ce` (its CLI sibling `tb_l1.sv` and the level-1b
+save-state harness `tb_cpu_ss.sv` were already wired by the parallel
+session) and got the same 4 connections. `run_l1.sh nmos gui
+--headless 3` → **L1_GUI SMOKE PASS** for both CPUs
+(`+cpu=0` and `+cpu=1` from one build): 3/3 frames, ink=67779,
+video live. Note: a comment line starting with the word "Verilator"
+trips Verilator 5.050 BADVLTPRAGMA (treated as a bad inline
+pragma) — the fix comment was worded around that.

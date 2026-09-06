@@ -432,7 +432,21 @@ apple2 d1 (
 	.DBG_T65_REGS(),
 	.DBG_DI      (),
 	.DBG_ROM_ADDR(),
-	.DBG_ROM_OUT ()
+	.DBG_ROM_OUT (),
+	// Save-state WIP ports added to rtl/apple2.v by the parallel
+	// save-state work (commit f5b3c64 "wire save state to more
+	// components", 2026-09-06 18:03): level-1 has no save-state
+	// feature.  machine_ce MUST be driven 1 - the core gates ALL
+	// machine state on it (CPU register updates in apple2.v and the
+	// HBLANK/VBLANK outputs in timing_generator.v); left unconnected,
+	// Quartus ties it to GND and the machine is completely dead
+	// (no sync, no video, no boot - the same trap that hit the
+	// level-2 2026-09-06 black-screen build).  OSD pause is already
+	// handled by STALL above.
+	.machine_ce  (1'b1),
+	.ss_wren     (1'b0),
+	.ss_addr     (10'd0),
+	.ss_wdata    (64'd0)
 );
 
 /////////////////  VIDEO OUT  /////////////////////

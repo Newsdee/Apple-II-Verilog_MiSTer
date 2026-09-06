@@ -165,6 +165,11 @@ the SD image channel (2 hps_io channels), the 60 Hz IRQ, and the
 6. OSD Pause: machine freezes while the OSD is open, resumes on close.
 7. WP Drive 1/2: with WP on, a write to that drive is refused (optional).
 
+Status (2026-09-06): items 1-3 **hardware-confirmed** by the user
+(rbf loads with all OSD items + mount entries; no-disk logo; DOS 3.3
+boots from a mounted `DOS_3_3.nib` on drive 1). Items 4-7 still to be
+exercised on hardware (keyboard, CPU switch, pause, WP).
+
 ## Known risks
 
 - **`dpram.v` block-RAM inference.** `dpram.v` is the Verilog *behavioral*
