@@ -134,6 +134,7 @@ module tb_l1;
   wire [13:0] w_dbg_roma;
   wire [7:0]  w_dbg_romo;
   wire [63:0] w_ss_rdata;
+  wire        w_cpu_frozen;
   wire        w_clk_2m;
   wire        w_pz;
   wire        w_pzr;
@@ -150,6 +151,7 @@ module tb_l1;
   reg  [9:0]  ss_addr    = 10'd0;
   reg  [63:0] ss_wdata   = 64'd0;
   reg         ss_wren    = 1'b0;
+  reg         machine_ce = 1'b1;
 
   // ------------------------------------------------------------------
   // apple2: the machine core
@@ -206,7 +208,9 @@ module tb_l1;
     .ss_addr     (ss_addr),
     .ss_wdata    (ss_wdata),
     .ss_wren     (ss_wren),
-    .ss_rdata    (w_ss_rdata)
+    .ss_rdata    (w_ss_rdata),
+    .machine_ce  (machine_ce),
+    .cpu_frozen  (w_cpu_frozen)
   );
 
   // ------------------------------------------------------------------

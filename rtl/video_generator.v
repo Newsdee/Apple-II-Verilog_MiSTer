@@ -40,6 +40,7 @@ output wire       VIDEO,
 input wire [9:0]  ss_addr,
 input wire [63:0] ss_wdata,
 input wire        ss_wren,
+input wire        machine_ce,
 output wire [63:0] ss_rdata
 );
 
@@ -76,7 +77,7 @@ wire [12:0] video_rom_input_addr;
     if (ss_wren && (ss_addr == 10'd7)) begin
       video_rom_out <= ss_wdata[7:0];
     end
-    else if (ioctl_wr) begin
+    else if (machine_ce && ioctl_wr) begin
       video_rom[video_rom_input_addr] <= ioctl_data;
       video_rom_out                   <= ioctl_data;
     end else begin
@@ -88,7 +89,7 @@ wire [12:0] video_rom_input_addr;
     if (ss_wren && (ss_addr == 10'd7)) begin
       video_shiftreg <= ss_wdata[15:8];
     end
-    else if (CLK_7M == 1'b0) begin
+    else if (machine_ce && CLK_7M == 1'b0) begin
       if (LDPS_N == 1'b0) begin
         // load
         if (WNDW_N == 1'b1) begin

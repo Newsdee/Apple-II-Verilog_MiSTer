@@ -60,7 +60,9 @@ module apple2(
     ss_addr,
     ss_wdata,
     ss_wren,
-    ss_rdata
+    ss_rdata,
+    machine_ce,
+    cpu_frozen
 );
     input         CLK_14M;		// 14.31818 MHz master clock
     output        CLK_2M;
@@ -118,6 +120,8 @@ module apple2(
     input  [63:0] ss_wdata;        // selected CPU savestate write data
     input         ss_wren;         // selected CPU savestate write strobe
     output [63:0] ss_rdata;        // selected CPU savestate read data
+    input         machine_ce;      // normal machine state enable
+    output        cpu_frozen;      // STALL held at a CPU boundary
 
     // Clocks
     wire          CLK_7M;
@@ -248,7 +252,7 @@ module apple2(
 
     assign ram_addr = (PHASE_ZERO == 1'b1) ? CPU_RAM_ADDR :
                       {2'b00, VIDEO_ADDRESS};
-    assign ram_we = (PHASE_ZERO == 1'b1) ? ((we & RAM_SELECT) | (we & (HRAM_WRITE_EN | ram_card_write))) :
+    assign ram_we = machine_ce && (PHASE_ZERO == 1'b1) ? ((we & RAM_SELECT) | (we & (HRAM_WRITE_EN | ram_card_write))) :
                     1'b0;
     assign CPU_WE = we;
 
@@ -276,7 +280,7 @@ module apple2(
             CPU_DL         <= ss_wdata[7:0];
             VIDEO_DL_LATCH <= ss_wdata[23:8];
         end
-        else if (AX == 1'b1 & CAS_N == 1'b0 & RAS_N == 1'b1 & Q3 == 1'b0)
+        else if (machine_ce && AX == 1'b1 & CAS_N == 1'b0 & RAS_N == 1'b1 & Q3 == 1'b0)
         begin
             // Latch video data at Phase 1, CPU data at Phase 0
             if (PHASE_ZERO == 1'b0)
@@ -394,7 +398,7 @@ module apple2(
     begin: speaker_ctrl
         if (ss_wren && (ss_addr == 10'd3))
             speaker_sig <= ss_wdata[18];
-        else if (PHASE_ZERO_R == 1'b1 & SPEAKER_SELECT == 1'b1)
+        else if (machine_ce && PHASE_ZERO_R == 1'b1 & SPEAKER_SELECT == 1'b1)
             speaker_sig <= (~speaker_sig);
     end
 
@@ -402,7 +406,7 @@ module apple2(
     begin: softswitches
         if (ss_wren && (ss_addr == 10'd3))
             soft_switches <= ss_wdata[7:0];
-        else if (PHASE_ZERO_R == 1'b1 & SOFTSWITCH_SELECT == 1'b1)
+        else if (machine_ce && PHASE_ZERO_R == 1'b1 & SOFTSWITCH_SELECT == 1'b1)
             soft_switches[(A[3:1])] <= A[0];
     end
 
@@ -432,7 +436,7 @@ module apple2(
                 HRAM_WR_N   <= ss_wdata[21];
                 HRAM_BANK1  <= ss_wdata[22];
             end
-            else if (PHASE_ZERO_R == 1'b1 & HRAM_CONTROL == 1'b1)
+            else if (machine_ce && PHASE_ZERO_R == 1'b1 & HRAM_CONTROL == 1'b1)
             begin
                 HRAM_BANK1 <= A[3];
                 HRAM_PRE_WR <= A[0] & (~we);
@@ -484,7 +488,7 @@ module apple2(
             end
             else if (ss_wren && (ss_addr == 10'd4))
                 READ_KEY <= ss_wdata[25];
-            else begin
+            else if (machine_ce) begin
             READ_KEY <= 1'b0;
             if (A[15:8] == 8'hC3 & C3ROM == 1'b0)
                 C8ROM <= 1'b1;
@@ -600,6 +604,7 @@ module apple2(
         .ss_addr(ss_addr),
         .ss_wdata(ss_wdata),
         .ss_wren(ss_wren),
+        .machine_ce(machine_ce),
         .ss_rdata(timing_ss_rdata)
     );
 
@@ -625,6 +630,7 @@ module apple2(
         .ss_addr(ss_addr),
         .ss_wdata(ss_wdata),
         .ss_wren(ss_wren),
+        .machine_ce(machine_ce),
         .ss_rdata(video_ss_rdata)
     );
 
@@ -640,13 +646,15 @@ module apple2(
     assign DBG_ROM_ADDR = rom_addr;
     assign DBG_ROM_OUT = rom_out;
     //CPU_EN <= PHASE_ZERO_F; -- not sure why this isn't working??
-    assign CPU_EN = (PHASE_ZERO_D == 1'b1 & PHASE_ZERO == 1'b0) ? 1'b1 : 1'b0;
+    wire CPU_EN_RAW = (PHASE_ZERO_D == 1'b1 & PHASE_ZERO == 1'b0) ? 1'b1 : 1'b0;
+    assign CPU_EN = machine_ce && CPU_EN_RAW;
+    assign cpu_frozen = STALL && !CPU_EN_RAW;
 
     always @(posedge CLK_14M)
     begin: cpu_enable
         if (ss_wren && (ss_addr == 10'd4))
             PHASE_ZERO_D <= ss_wdata[24];
-        else
+        else if (machine_ce)
             PHASE_ZERO_D <= PHASE_ZERO;
     end
 

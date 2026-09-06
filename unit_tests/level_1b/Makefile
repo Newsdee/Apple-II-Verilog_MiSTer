@@ -12,8 +12,13 @@ MACH_SRC := $(RTL)/apple2.v $(RTL)/timing_generator.v $(RTL)/video_generator.v \
             $(RTL)/rom.v $(RTL)/ramcard.v
 ROMS := $(RTL)/roms/apple2e.hex $(RTL)/roms/video2.hex
 
-.PHONY: all run clean
+.PHONY: all run coordinator clean
 all: $(EXE)
+
+COORDOUT := $(OUT)/coord_obj_dir
+COORDEXE := $(COORDOUT)/Vtb_ss_regs.exe
+
+coordinator: $(COORDEXE)
 
 $(EXE): tb_cpu_ss.sv main_cpu_ss.cpp $(MACH_SRC) $(CPU_SRC) $(ROMS)
 	@mkdir -p $(OUT)/obj_dir
@@ -26,6 +31,13 @@ $(EXE): tb_cpu_ss.sv main_cpu_ss.cpp $(MACH_SRC) $(CPU_SRC) $(ROMS)
 run: all
 	$(EXE) +cpu=0
 	$(EXE) +cpu=1
+
+$(COORDEXE): tb_ss_regs.sv savestate_regs_l1b.sv
+	@mkdir -p $(COORDOUT)
+	VERILATOR_ROOT=$(VROOT) $(V) --binary --timing -O3 --x-assign fast --x-initial fast \
+		-Wno-fatal -Wno-TIMESCALEMOD --top-module tb_ss_regs \
+		-Mdir $(COORDOUT) tb_ss_regs.sv savestate_regs_l1b.sv
+	@echo "built $@"
 
 clean:
 	rm -rf $(OUT)

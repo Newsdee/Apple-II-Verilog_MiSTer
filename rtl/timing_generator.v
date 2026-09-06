@@ -46,6 +46,7 @@ output reg LDPS_N,
 input wire [9:0] ss_addr,
 input wire [63:0] ss_wdata,
 input wire ss_wren,
+input wire machine_ce,
 output wire [63:0] ss_rdata
 );
 
@@ -79,7 +80,7 @@ wire HBL; wire VBL;
       COLOR_REF <= ss_wdata[23];
       CLK_7M    <= ss_wdata[16];
     end
-    else begin
+    else if (machine_ce) begin
       COLOR_REF <= CLK_7M ^ COLOR_REF;
       CLK_7M <=  ~CLK_7M;
     end
@@ -105,7 +106,7 @@ wire HBL; wire VBL;
       PHI0   <= ss_wdata[22];
       VID7M  <= ss_wdata[17];
     end
-    else begin
+    else if (machine_ce) begin
       RAS_N <= RAS_N_PRE;
       AX <= AX_PRE;
       CAS_N <= CAS_N_PRE;
@@ -127,7 +128,7 @@ wire HBL; wire VBL;
       GR2 <= ss_wdata[4];
       GR1 <= ss_wdata[3];
     end
-    else if(RASRISE1 == 1'b1) begin
+    else if(machine_ce && RASRISE1 == 1'b1) begin
       HBLANK <= HBL;
       VBLANK <= VBL;
       WNDW_N <= HBL | VBL;
@@ -143,7 +144,7 @@ wire HBL; wire VBL;
       SEGB <= ss_wdata[1];
       SEGC <= ss_wdata[2];
     end
-    else if(RASRISE1 == 1'b1) begin
+    else if(machine_ce && RASRISE1 == 1'b1) begin
       if(GR1 == 1'b0) begin
         SEGA <= VA;
         SEGB <= VB;
@@ -165,7 +166,7 @@ wire HBL; wire VBL;
       H <= ss_wdata[6:0];
       V <= ss_wdata[15:7];
     end
-    else if(RASRISE1 == 1'b1) begin
+    else if(machine_ce && RASRISE1 == 1'b1) begin
       if(H[6] == 1'b0) begin
         H <= 7'b1000000;
       end
