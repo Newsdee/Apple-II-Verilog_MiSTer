@@ -128,6 +128,8 @@ module apple2(
     reg           PHASE_ZERO_D;
     wire          COLOR_REF;
     wire          CPU_EN;
+    wire [63:0]   timing_ss_rdata;
+    wire [63:0]   video_ss_rdata;
 
     // From the timing generator
     wire [15:0]   VIDEO_ADDRESS;
@@ -269,7 +271,12 @@ module apple2(
 
     always @(posedge CLK_14M)
     begin: RAM_data_latch
-        if (AX == 1'b1 & CAS_N == 1'b0 & RAS_N == 1'b1 & Q3 == 1'b0)
+        if (ss_wren && (ss_addr == 10'd4))
+        begin
+            CPU_DL         <= ss_wdata[7:0];
+            VIDEO_DL_LATCH <= ss_wdata[23:8];
+        end
+        else if (AX == 1'b1 & CAS_N == 1'b0 & RAS_N == 1'b1 & Q3 == 1'b0)
         begin
             // Latch video data at Phase 1, CPU data at Phase 0
             if (PHASE_ZERO == 1'b0)
@@ -385,13 +392,17 @@ module apple2(
 
     always @(posedge CLK_14M)
     begin: speaker_ctrl
-        if (PHASE_ZERO_R == 1'b1 & SPEAKER_SELECT == 1'b1)
+        if (ss_wren && (ss_addr == 10'd3))
+            speaker_sig <= ss_wdata[18];
+        else if (PHASE_ZERO_R == 1'b1 & SPEAKER_SELECT == 1'b1)
             speaker_sig <= (~speaker_sig);
     end
 
     always @(posedge CLK_14M)
     begin: softswitches
-        if (PHASE_ZERO_R == 1'b1 & SOFTSWITCH_SELECT == 1'b1)
+        if (ss_wren && (ss_addr == 10'd3))
+            soft_switches <= ss_wdata[7:0];
+        else if (PHASE_ZERO_R == 1'b1 & SOFTSWITCH_SELECT == 1'b1)
             soft_switches[(A[3:1])] <= A[0];
     end
 
@@ -414,7 +425,14 @@ module apple2(
         end
         else
         begin
-            if (PHASE_ZERO_R == 1'b1 & HRAM_CONTROL == 1'b1)
+            if (ss_wren && (ss_addr == 10'd3))
+            begin
+                HRAM_READ   <= ss_wdata[19];
+                HRAM_PRE_WR <= ss_wdata[20];
+                HRAM_WR_N   <= ss_wdata[21];
+                HRAM_BANK1  <= ss_wdata[22];
+            end
+            else if (PHASE_ZERO_R == 1'b1 & HRAM_CONTROL == 1'b1)
             begin
                 HRAM_BANK1 <= A[3];
                 HRAM_PRE_WR <= A[0] & (~we);
@@ -451,6 +469,22 @@ module apple2(
         end
         else
         begin
+            if (ss_wren && (ss_addr == 10'd3))
+            begin
+                STORE80 <= ss_wdata[11];
+                RAMRD   <= ss_wdata[8];
+                RAMWRT  <= ss_wdata[9];
+                CXROM   <= ss_wdata[10];
+                ALTZP   <= ss_wdata[14];
+                C3ROM   <= ss_wdata[12];
+                C8ROM   <= ss_wdata[13];
+                ALTCHAR <= ss_wdata[15];
+                COL80   <= ss_wdata[16];
+                SF_D    <= ss_wdata[17];
+            end
+            else if (ss_wren && (ss_addr == 10'd4))
+                READ_KEY <= ss_wdata[25];
+            else begin
             READ_KEY <= 1'b0;
             if (A[15:8] == 8'hC3 & C3ROM == 1'b0)
                 C8ROM <= 1'b1;
@@ -519,6 +553,7 @@ module apple2(
                 endcase
             else if (C01X_SELECT == 1'b1 & we == 1'b1)
                 READ_KEY <= 1'b1;
+            end
         end
     end
 
@@ -561,7 +596,11 @@ module apple2(
         .VBLANK(VBL),
         .HBLANK(HBL),
         .WNDW_N(WNDW_N),
-        .LDPS_N(LDPS_N)
+        .LDPS_N(LDPS_N),
+        .ss_addr(ss_addr),
+        .ss_wdata(ss_wdata),
+        .ss_wren(ss_wren),
+        .ss_rdata(timing_ss_rdata)
     );
 
     assign video_rom_select = (ioctl_download == 1'b1 & ioctl_wr == 1'b1 & ioctl_index == 8'h01) ? 1'b1 : 1'b0;
@@ -582,7 +621,11 @@ module apple2(
         .ioctl_addr(ioctl_addr),
         .ioctl_data(ioctl_data),
         .ioctl_wr(video_rom_select),
-        .VIDEO(VIDEO)
+        .VIDEO(VIDEO),
+        .ss_addr(ss_addr),
+        .ss_wdata(ss_wdata),
+        .ss_wren(ss_wren),
+        .ss_rdata(video_ss_rdata)
     );
 
     assign we = (cpu == 1'b0) ? N6502_WE : N65C02_WE;
@@ -601,7 +644,10 @@ module apple2(
 
     always @(posedge CLK_14M)
     begin: cpu_enable
-        PHASE_ZERO_D <= PHASE_ZERO;
+        if (ss_wren && (ss_addr == 10'd4))
+            PHASE_ZERO_D <= ss_wdata[24];
+        else
+            PHASE_ZERO_D <= PHASE_ZERO;
     end
 
     // NMOS 6502: nmos6502 core (WDC_MODE=0, one bus access per cycle).
@@ -699,5 +745,15 @@ module apple2(
         .data_out(rom_out)
     );
 
-    assign ss_rdata = cpu ? n65c02_ss_rdata : nmos6502_ss_rdata;
+    assign ss_rdata = (ss_addr == 10'd3) ?
+                      {41'd0, HRAM_BANK1, HRAM_WR_N, HRAM_PRE_WR,
+                       HRAM_READ, speaker_sig, SF_D, COL80, ALTCHAR,
+                       ALTZP, C8ROM, C3ROM, STORE80, CXROM, RAMWRT,
+                       RAMRD, soft_switches} :
+                      (ss_addr == 10'd4) ?
+                      {38'd0, READ_KEY, PHASE_ZERO_D, VIDEO_DL_LATCH, CPU_DL} :
+                      (ss_addr == 10'd5) ? timing_ss_rdata :
+                      (ss_addr == 10'd6) ? timing_ss_rdata :
+                      (ss_addr == 10'd7) ? video_ss_rdata :
+                      cpu ? n65c02_ss_rdata : nmos6502_ss_rdata;
 endmodule

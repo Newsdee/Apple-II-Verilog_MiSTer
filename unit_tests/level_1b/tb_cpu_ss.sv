@@ -28,7 +28,7 @@ module tb_cpu_ss;
   integer errors = 0;
   integer plus_cpu;
   integer index;
-  reg [63:0] expected [0:2];
+  reg [63:0] expected [0:7];
 
   initial begin
     if ($value$plusargs("cpu=%d", plus_cpu))
@@ -36,12 +36,17 @@ module tb_cpu_ss;
     expected[0] = 64'h2468_12A5_5A3C_309A;
     expected[1] = 64'h7E12_3456_0000_1200;
     expected[2] = 64'h0000_0000_0000_00C3;
+    expected[3] = 64'h0000_0000_0006_D5A5;
+    expected[4] = 64'h0000_0000_0312_345A;
+    expected[5] = 64'h0000_0000_0055_0955;
+    expected[6] = 64'h0000_0000_0000_00AD;
+    expected[7] = 64'h0000_0000_0000_5CA6;
 
     repeat (8) @(posedge clk);
     reset <= 1'b0;
     repeat (8) @(posedge clk);
 
-    for (index = 0; index < 3; index = index + 1) begin
+    for (index = 0; index < 8; index = index + 1) begin
       ss_addr <= index[9:0];
       #0;
       if (ss_rdata === 64'hxxxxxxxxxxxxxxxx) begin
@@ -50,7 +55,7 @@ module tb_cpu_ss;
       end
     end
 
-    for (index = 0; index < 3; index = index + 1) begin
+    for (index = 0; index < 8; index = index + 1) begin
       @(negedge clk);
       ss_addr <= index[9:0];
       ss_wdata <= expected[index];
@@ -68,7 +73,9 @@ module tb_cpu_ss;
     // The bus remains readable while the CPU is held. A second sample after
     // a full clock confirms the restored state is not immediately overwritten.
     repeat (2) @(posedge clk);
-    for (index = 0; index < 2; index = index + 1) begin
+    for (index = 0; index < 4; index = index + 1) begin
+      if ((index == 1) || (index == 2))
+        continue;
       ss_addr <= index[9:0];
       @(negedge clk);
       if (ss_rdata !== expected[index]) begin
@@ -79,7 +86,7 @@ module tb_cpu_ss;
     end
 
     if (errors == 0)
-      $display("L1B CPU SS PASS cpu=%0d words=3", cpu_sel);
+      $display("L1B CPU SS PASS cpu=%0d words=8", cpu_sel);
     else
       $display("L1B CPU SS FAIL cpu=%0d errors=%0d", cpu_sel, errors);
     $finish;

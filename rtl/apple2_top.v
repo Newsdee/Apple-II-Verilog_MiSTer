@@ -112,6 +112,8 @@ module apple2_top(
     mouse_x,
     mouse_y,
     mouse_button,
+    mouse_scale,
+    mouse_rate,
     mouse_4_inslot,
     mouse_5_inslot,
     mb_4_inslot,
@@ -228,6 +230,8 @@ module apple2_top(
     input  [8:0]  mouse_x;
     input  [8:0]  mouse_y;
     input         mouse_button;
+    input  [1:0]  mouse_scale;
+    input  [1:0]  mouse_rate;
 
     // slot status
     input         mouse_4_inslot;
@@ -718,6 +722,8 @@ module apple2_top(
         .STROBE(mouse_strobe),
         .X(mouse_x),
         .Y(mouse_y),
+        .SCALE(mouse_scale),
+        .RATE(mouse_rate),
         .BUTTON(mouse_button)
     );
 `endif
@@ -745,6 +751,8 @@ module apple2_top(
         .STROBE(mouse_strobe),
         .X(mouse_x),
         .Y(mouse_y),
+        .SCALE(mouse_scale),
+        .RATE(mouse_rate),
         .BUTTON(mouse_button)
     );
 `endif

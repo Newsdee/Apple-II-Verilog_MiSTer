@@ -42,7 +42,11 @@ output reg GR2,
 output reg HBLANK,
 output reg VBLANK,
 output reg WNDW_N,
-output reg LDPS_N
+output reg LDPS_N,
+input wire [9:0] ss_addr,
+input wire [63:0] ss_wdata,
+input wire ss_wren,
+output wire [63:0] ss_rdata
 );
 
 // 14.31818 MHz master clock
@@ -71,8 +75,14 @@ wire HBL; wire VBL;
   // The main clock signal generator
 
   always @(posedge CLK_14M) begin
-    COLOR_REF <= CLK_7M ^ COLOR_REF;
-    CLK_7M <=  ~CLK_7M;
+    if (ss_wren && (ss_addr == 10'd5)) begin
+      COLOR_REF <= ss_wdata[23];
+      CLK_7M    <= ss_wdata[16];
+    end
+    else begin
+      COLOR_REF <= CLK_7M ^ COLOR_REF;
+      CLK_7M <=  ~CLK_7M;
+    end
   end
 
   // The timing HAL equations
@@ -87,18 +97,37 @@ wire HBL; wire VBL;
   assign PHI0_EN_R = ~PHI0 & PHI0_PRE;
   assign PHI0_EN_F = PHI0 & ~PHI0_PRE;
   always @(posedge CLK_14M) begin
-    RAS_N <= RAS_N_PRE;
-    AX <= AX_PRE;
-    CAS_N <= CAS_N_PRE;
-    Q3 <= Q3_PRE;
-    PHI0 <= PHI0_PRE;
-    VID7M <= VID7M_PRE;
-    LDPS_N <= LDPS_N_PRE;
+    if (ss_wren && (ss_addr == 10'd5)) begin
+      RAS_N  <= ss_wdata[19];
+      AX     <= ss_wdata[21];
+      CAS_N  <= ss_wdata[20];
+      Q3     <= ss_wdata[18];
+      PHI0   <= ss_wdata[22];
+      VID7M  <= ss_wdata[17];
+    end
+    else begin
+      RAS_N <= RAS_N_PRE;
+      AX <= AX_PRE;
+      CAS_N <= CAS_N_PRE;
+      Q3 <= Q3_PRE;
+      PHI0 <= PHI0_PRE;
+      VID7M <= VID7M_PRE;
+      LDPS_N <= LDPS_N_PRE;
+    end
+    if (ss_wren && (ss_addr == 10'd6))
+      LDPS_N <= ss_wdata[8];
   end
 
   // various auxilary signals
   always @(posedge CLK_14M) begin
-    if(RASRISE1 == 1'b1) begin
+    if (ss_wren && (ss_addr == 10'd6)) begin
+      HBLANK <= ss_wdata[5];
+      VBLANK <= ss_wdata[6];
+      WNDW_N <= ss_wdata[7];
+      GR2 <= ss_wdata[4];
+      GR1 <= ss_wdata[3];
+    end
+    else if(RASRISE1 == 1'b1) begin
       HBLANK <= HBL;
       VBLANK <= VBL;
       WNDW_N <= HBL | VBL;
@@ -109,7 +138,12 @@ wire HBL; wire VBL;
 
   assign HIRES = HIRES_MODE & GR2;
   always @(posedge CLK_14M) begin
-    if(RASRISE1 == 1'b1) begin
+    if (ss_wren && (ss_addr == 10'd6)) begin
+      SEGA <= ss_wdata[0];
+      SEGB <= ss_wdata[1];
+      SEGC <= ss_wdata[2];
+    end
+    else if(RASRISE1 == 1'b1) begin
       if(GR1 == 1'b0) begin
         SEGA <= VA;
         SEGB <= VB;
@@ -127,7 +161,11 @@ wire HBL; wire VBL;
   assign V_RESET = PALMODE ? 9'b011001000 : 9'b011111010;
 
   always @(posedge CLK_14M) begin
-    if(RASRISE1 == 1'b1) begin
+    if (ss_wren && (ss_addr == 10'd5)) begin
+      H <= ss_wdata[6:0];
+      V <= ss_wdata[15:7];
+    end
+    else if(RASRISE1 == 1'b1) begin
       if(H[6] == 1'b0) begin
         H <= 7'b1000000;
       end
@@ -162,5 +200,12 @@ wire HBL; wire VBL;
   assign VIDEO_ADDRESS[9:7] = V[5:3];
   assign VIDEO_ADDRESS[14:10] = HIRES == 1'b0 ? {2'b00,HBL,PAGE2 &  ~STORE80, ~(PAGE2 &  ~STORE80)} : {PAGE2 &  ~STORE80, ~(PAGE2 &  ~STORE80),V[2:0]};
   assign VIDEO_ADDRESS[15] = 1'b0;
+
+  assign ss_rdata = (ss_addr == 10'd5) ?
+                    {40'd0, COLOR_REF, PHI0, AX, CAS_N, RAS_N, Q3,
+                     VID7M, CLK_7M, V, H} :
+                    (ss_addr == 10'd6) ?
+                    {55'd0, LDPS_N, WNDW_N, VBLANK, HBLANK, GR2, GR1,
+                     SEGC, SEGB, SEGA} : 64'd0;
 
 endmodule

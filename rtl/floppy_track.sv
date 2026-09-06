@@ -72,7 +72,13 @@ always @(posedge clk) begin
 
 	if(ready && ram_we) dirty <= 1;
 
-	if(~old_change & change) begin
+	//Media change edge (either polarity): resync and invalidate the
+	//track buffer.  A mount edge (change 0->1) asserts ready from the
+	//current mount state; an eject edge (change 1->0) clears ready and
+	//the pending dirty sector so a dirty track is never saved after its
+	//image is removed.  Both polarities update `ready`, so back-to-back
+	//mount/eject notifications both resync the drive.
+	if(old_change != change) begin
 		ready <= mount;
 		cur_track <= 'b111111;
 		busy  <= 0;
