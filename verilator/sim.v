@@ -367,6 +367,8 @@ apple2_top apple2_top
 	.mouse_x(virtual_keyboard_active ? 9'sd0 : {ps2_mouse[4],ps2_mouse[15:8]}),
 	.mouse_y(virtual_keyboard_active ? 9'sd0 : {ps2_mouse[5],ps2_mouse[23:16]}),
 	.mouse_button(virtual_keyboard_active ? 1'b0 : ps2_mouse[0]),
+	.mouse_scale(2'b00),
+	.mouse_rate(2'b00),
 
 
 	.TRACK1(TRACK1),
@@ -636,9 +638,11 @@ wire TRACK2_RAM_WE;
 wire [5:0] TRACK2;
 
 wire [1:0] DISK_READY;
-reg [1:0] DISK_CHANGE;
-reg [1:0]disk_mount;
-reg [1:0] disk_protect;
+// Deterministic power-on state (v6 media-change lockdown): the
+// wrapper registers start unmounted / no change / no protect.
+reg [1:0] DISK_CHANGE = 'b00;
+reg [1:0]disk_mount = 'b00;
+reg [1:0] disk_protect = 'b00;
 
 
 

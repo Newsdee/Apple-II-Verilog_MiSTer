@@ -234,7 +234,10 @@ int verilate() {
 
 		// Simulate both edges of system clock
 		if (clk_sys.clk != clk_sys.old) {
-			if (clk_sys.IsRising() && *bus.ioctl_download!=1	) blockdevice.BeforeEval(main_time);
+if (clk_sys.IsRising() && *bus.ioctl_download!=1	) {
+			blockdevice.ext_reset = (top->reset != 0);
+			blockdevice.BeforeEval(main_time);
+		}
 			if (clk_sys.clk) {
 				input.BeforeEval();
 				bus.BeforeEval();
