@@ -56,7 +56,11 @@ module apple2(
     DBG_T65_REGS,
     DBG_DI,
     DBG_ROM_ADDR,
-    DBG_ROM_OUT
+    DBG_ROM_OUT,
+    ss_addr,
+    ss_wdata,
+    ss_wren,
+    ss_rdata
 );
     input         CLK_14M;		// 14.31818 MHz master clock
     output        CLK_2M;
@@ -108,8 +112,12 @@ module apple2(
     output        speaker;		// One-bit speaker output
     output [63:0] DBG_T65_REGS;	// T65 debug: {PC,S,P,Y,X,A} (harness instrumentation)
     output [7:0]  DBG_DI;		// T65 data input as seen by the CPU (harness instrumentation)
-    output [13:0] DBG_ROM_ADDR;	// ROM address bus (harness instrumentation)
-    output [7:0]  DBG_ROM_OUT;	// ROM data out (harness instrumentation)
+    output [13:0] DBG_ROM_ADDR;    // ROM address bus (harness instrumentation)
+    output [7:0]  DBG_ROM_OUT;     // ROM data out (harness instrumentation)
+    input  [9:0]  ss_addr;         // selected CPU savestate word address
+    input  [63:0] ss_wdata;        // selected CPU savestate write data
+    input         ss_wren;         // selected CPU savestate write strobe
+    output [63:0] ss_rdata;        // selected CPU savestate read data
 
     // Clocks
     wire          CLK_7M;
@@ -603,12 +611,12 @@ module apple2(
     //        the core's address/data/write - the mux below selects the bus).
     //   stp_nop=1: Apple II has no power switch, so STP ($DB) is a NOP.
     //   ml_n/phi1o/phi2o/bus_oe/dout_oe are NMOS-specific pins unused here.
-    wire [63:0] nmos6502_ss_rdata_unused;
+    wire [63:0] nmos6502_ss_rdata;
     wire nmos6502_unused_ok = &{1'b0, N6502_SYNC, N6502_VECTOR_PULL,
                                  N6502_ML_N, N6502_PHI1O, N6502_PHI2O,
                                  N6502_BUS_OE, N6502_DOUT_OE,
                                  N6502_INT_SEQ, N6502_RTI_DONE, N6502_IN_WAI,
-                                 N6502_IN_STP, nmos6502_ss_rdata_unused};
+                                 N6502_IN_STP, nmos6502_ss_rdata};
     nmos6502 #(.WDC_MODE(1'b0)) cpu6502(
         .clk(CLK_14M),
         .ce(CPU_EN),
@@ -636,12 +644,10 @@ module apple2(
         .rti_done(N6502_RTI_DONE),
         .in_wai(N6502_IN_WAI),
         .in_stp(N6502_IN_STP),
-        // Savestate register bus: tied off until the machine-wide savestate
-        // walker exists (PLAN.md section 6).
-        .ss_addr(10'd0),
-        .ss_wdata(64'd0),
-        .ss_wren(1'b0),
-        .ss_rdata(nmos6502_ss_rdata_unused)
+        .ss_addr(ss_addr),
+        .ss_wdata(ss_wdata),
+        .ss_wren(ss_wren && !cpu),
+        .ss_rdata(nmos6502_ss_rdata)
     );
 
     // 65C02: wdc65c02 core (W65C02S-style, one bus access per cycle;
@@ -654,10 +660,10 @@ module apple2(
     //   stp_nop=1: Apple II has no power switch, so STP ($DB) is a NOP.
     //   STALL is a real port (OSD pause, wired by apple2_top); the
     //   savestate bus is still tied off; see PLAN.md section 6.
-    wire [63:0] n65c02_ss_rdata_unused;
+    wire [63:0] n65c02_ss_rdata;
     wire n65c02_unused_ok = &{1'b0, N65C02_SYNC, N65C02_VECTOR_PULL,
                                N65C02_INT_SEQ, N65C02_RTI_DONE, N65C02_IN_WAI,
-                               N65C02_IN_STP, n65c02_ss_rdata_unused};
+                               N65C02_IN_STP, n65c02_ss_rdata};
     wdc65c02 #(.WDC_MODE(1'b1)) cpu65c02(
         .clk(CLK_14M),
         .ce(CPU_EN),
@@ -678,12 +684,10 @@ module apple2(
         .rti_done(N65C02_RTI_DONE),
         .in_wai(N65C02_IN_WAI),
         .in_stp(N65C02_IN_STP),
-        // Savestate register bus: tied off until the machine-wide savestate
-        // walker exists (PLAN.md section 6).
-        .ss_addr(10'd0),
-        .ss_wdata(64'd0),
-        .ss_wren(1'b0),
-        .ss_rdata(n65c02_ss_rdata_unused)
+        .ss_addr(ss_addr),
+        .ss_wdata(ss_wdata),
+        .ss_wren(ss_wren && cpu),
+        .ss_rdata(n65c02_ss_rdata)
     );
 
     // Original Apple had asynchronous ROMs.  We use a synchronous ROM
@@ -694,4 +698,6 @@ module apple2(
         .a(rom_addr),
         .data_out(rom_out)
     );
+
+    assign ss_rdata = cpu ? n65c02_ss_rdata : nmos6502_ss_rdata;
 endmodule

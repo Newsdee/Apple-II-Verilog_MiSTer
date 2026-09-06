@@ -16,7 +16,10 @@
 //   keyboard kb <- the real PS/2 interface; PS2_Key is driven by this TB.
 //   TB RAM      <- 64K main + 64K aux, 1-ce latch (the verilator/sim.v
 //                  pattern).  The TB owns the RAM, so it can write text
-//                  screens directly and read $0030 etc.  While STALL=1 the
+  reg         cur_phase  = 1'b0;   // seen flash phase (T5)
+  reg  [9:0]  ss_addr    = 10'd0;
+  reg  [63:0] ss_wdata   = 64'd0;
+  reg         ss_wren    = 1'b0;
 //                  CPU is held (the OSD-pause port) so the TB's writes
 //                  race nothing; the video pipeline is not CPU-clocked and
 //                  keeps scanning.
@@ -68,7 +71,6 @@
 // video_generator.v / keyboard.v) resolve against the process CWD, so the
 // binary MUST run from the repo root (the runners cd there).  Output files
 // go to unit_tests/level_1/out/ (the runner creates the dir).
-//
 // Runs to $finish; module-scope `errors` is the status (0 = pass), read by
 // main.cpp.
 // ============================================================================
@@ -131,6 +133,7 @@ module tb_l1;
   wire [7:0]  w_dbg_di;
   wire [13:0] w_dbg_roma;
   wire [7:0]  w_dbg_romo;
+  wire [63:0] w_ss_rdata;
   wire        w_clk_2m;
   wire        w_pz;
   wire        w_pzr;
@@ -144,6 +147,9 @@ module tb_l1;
   reg         reset_cold = 1'b0;   // host "Cold Reset" button
   reg         reset_warm = 1'b0;   // host warm-reset button (left 0)
   reg         cur_phase  = 1'b0;   // seen flash phase (T5)
+  reg  [9:0]  ss_addr    = 10'd0;
+  reg  [63:0] ss_wdata   = 64'd0;
+  reg         ss_wren    = 1'b0;
 
   // ------------------------------------------------------------------
   // apple2: the machine core
@@ -196,7 +202,11 @@ module tb_l1;
     .DBG_T65_REGS(w_dbg_regs),
     .DBG_DI      (w_dbg_di),
     .DBG_ROM_ADDR(w_dbg_roma),
-    .DBG_ROM_OUT (w_dbg_romo)
+    .DBG_ROM_OUT (w_dbg_romo),
+    .ss_addr     (ss_addr),
+    .ss_wdata    (ss_wdata),
+    .ss_wren     (ss_wren),
+    .ss_rdata    (w_ss_rdata)
   );
 
   // ------------------------------------------------------------------
