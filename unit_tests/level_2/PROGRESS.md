@@ -434,3 +434,57 @@ edit). Headless smoke with the NEW binary, `--disk`:
 mot1=1, sim=0.44 s wall=8.1 s. The windowed 1-s window now closes
 correctly across minute boundaries; user re-run of the windowed GUI
 confirms the readout (~0.05x, i.e. ~20x slower than real time).
+
+## 2026-09-06 (~21:55): Save-state follow-on work — v2 disk map draft + DDR contract directed test (design-only)
+
+Triggered by the level_1b status check: level_1b is now at Phase 4/5
+(mister project exists, full Quartus compile green 21:46 — A&S/Fitter/
+STA/ASM, level1b.rbf built; all four Verilator TBs pass, including the
+new `tb_ss_arbiter` run ad-hoc). The DDR bridge address math remained
+the open hardware risk (session's own README flags the base).
+
+Two design-only deliverables added to this directory (no RTL touched,
+no level_1b file touched — the parallel session's WIP stays clean):
+
+1. `SAVESTATE_V2_DISK_MAP.md` — draft format-v2 state map for the disk
+   machine (PLAN risk #12: revision, not a port; major 1 -> 2).
+   Inventories every registered state in the disk path (disk_ii:
+   motor_phase/drive_on/drive_real_on/drive2_select/q6/q7/step pulses/
+   spindown_delay[23:0]/drive_on_old; drive_ii x2: phase,
+   track_byte_addr, data_reg, reset_data_reg, rel_phase, byte_delay,
+   TRACK_WE, CLK_2M_D; floppy_track x2: sd_rd/sd_wr/ready/busy/dirty/
+   saving/old_ack/old_change/rel_lba/cur_track/lba; wrapper
+   disk_mount/disk_change latches). Assigns v1-reserved register words
+   11-15 to disk_ii/drive_ii x2/floppy_track x2, the 4 wrapper latches
+   into word 10 [7:4] (keeps all v1 RAM byte offsets stable), a
+   disk-present feature bit in header word 1, and two new walker
+   regions (2 x 8,192 B track buffers, 1,024 64-bit words each).
+   v2 payload: 18,465 words with CRC (147,720 B). Documents the
+   derived-vs-serialized split, media-not-state rule (host .nib left
+   as found on load), restore ordering, load-validation additions, and
+   out-of-scope list. Also records: the whole disk path is single-clock
+   (CLK_14M = clk_sys; drive_ii registers all on CLK_14M, CLK_2M is an
+   edge-detected input) so the existing freeze covers it, and the
+   v1 PLAN's "approximately 256 KiB" payload comment is a 2x miscount
+   of its own table (128.2 KiB).
+
+2. `SAVESTATE_DDR_CONTRACT_CHECK.md` + `tb_ss_ddr.sv` — the directed
+   first/last-address test the PLAN risk #10 and Phase 4 exit demand.
+   The TB models the HPS DDRAM side per the PLAN frozen contract
+   (DWORD addresses, burst 2 per 64-bit xfer, window
+   0x03800000..+4x0x00080000 DWORD) and drives the UNMODIFIED bridge
+   through a full 16,417-word v1 save + readback. Measured result
+   against the current bridge: T1 region FAIL (all 32,834 tx outside
+   the window), T2 first/last FAIL (0x1F00000..0x1F20100 vs
+   0x3800000..0x3808040), T3 stride FAIL (x8 not x2), T4 burst FAIL
+   (1 not 2), T5 integrity FAIL (upper half of every word lost),
+   T6 handshake PASS (double=0). Exits non-zero until the bridge is
+   conformed; run command and fix guidance (stride x2, burst 2,
+   slot-base parameter from the HPS-verified window) are in the doc.
+   Items genuinely unverifiable from local sources (SS<base>:<size>
+   units, HPS window base, burst semantics, out-of-window behavior)
+   are listed as HPS-side verification with resolution paths.
+
+No commit (files untracked; user commits at discretion). EOL: all three
+new files pure LF. level_1b WIP untouched (verified: only tracked
+mod remains Apple-II.qsf).

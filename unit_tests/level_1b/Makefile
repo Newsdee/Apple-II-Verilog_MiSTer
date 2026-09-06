@@ -12,7 +12,7 @@ MACH_SRC := $(RTL)/apple2.v $(RTL)/timing_generator.v $(RTL)/video_generator.v \
             $(RTL)/rom.v $(RTL)/ramcard.v
 ROMS := $(RTL)/roms/apple2e.hex $(RTL)/roms/video2.hex
 
-.PHONY: all run coordinator ram clean
+.PHONY: all run coordinator ram gui clean
 all: $(EXE)
 
 COORDOUT := $(OUT)/coord_obj_dir
@@ -24,6 +24,18 @@ RAMOUT := $(OUT)/ram_obj_dir
 RAMEXE := $(RAMOUT)/Vtb_ss_ram.exe
 
 ram: $(RAMEXE)
+
+GUIOUT := $(OUT)/gui_obj_dir
+GUIEXE := $(GUIOUT)/Vtb_l1b_gui.exe
+GUI_SRC := gui/main_gui_l1b.cpp \
+	gui/imgui/imgui.cpp gui/imgui/imgui_draw.cpp gui/imgui/imgui_tables.cpp \
+	gui/imgui/imgui_widgets.cpp gui/imgui/backends/imgui_impl_sdl2.cpp \
+	gui/imgui/backends/imgui_impl_opengl3.cpp
+SDL_INC ?= C:/msys64/ucrt64/include/SDL2
+GUI_CFLAGS := -I$(LEVELDIR)/gui/imgui -I$(LEVELDIR)/gui/imgui/backends -I$(SDL_INC)
+GUI_LDFLAGS := -lSDL2 -lopengl32
+
+gui: $(GUIEXE)
 
 $(EXE): tb_cpu_ss.sv main_cpu_ss.cpp $(MACH_SRC) $(CPU_SRC) $(ROMS)
 	@mkdir -p $(OUT)/obj_dir
@@ -49,6 +61,15 @@ $(RAMEXE): tb_ss_ram.sv savestate_ram_l1b.sv
 	VERILATOR_ROOT=$(VROOT) $(V) --binary --timing -O3 --x-assign fast --x-initial fast \
 		-Wno-fatal -Wno-TIMESCALEMOD --top-module tb_ss_ram \
 		-Mdir $(RAMOUT) tb_ss_ram.sv savestate_ram_l1b.sv
+	@echo "built $@"
+
+$(GUIEXE): tb_l1b_gui.sv $(GUI_SRC) $(MACH_SRC) $(CPU_SRC)
+	@mkdir -p $(GUIOUT)
+	VERILATOR_ROOT=$(VROOT) $(V) --cc --timing -exe -O3 --x-assign fast --x-initial fast \
+		-Wno-fatal -Wno-TIMESCALEMOD --top-module tb_l1b_gui \
+		-CFLAGS "$(GUI_CFLAGS)" -LDFLAGS "$(GUI_LDFLAGS)" \
+		-Mdir $(GUIOUT) $(GUI_SRC) tb_l1b_gui.sv $(MACH_SRC) $(CPU_SRC)
+	VERILATOR_ROOT=$(VROOT) $(MAKE) -C $(GUIOUT) -f Vtb_l1b_gui.mk
 	@echo "built $@"
 
 clean:
