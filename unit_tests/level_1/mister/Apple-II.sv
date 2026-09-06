@@ -431,29 +431,51 @@ apple2 d1 (
 
 /////////////////  VIDEO OUT  /////////////////////
 // Native monochrome, 1 sample per master cycle (tb_l1_gui presentation).
-// The machine core exposes blanking (HBL/VBL), not syncs: narrow sync
-// pulses are the first 64 master cycles of HBL / 512 of VBL (saturating
-// counters - no wrap artifacts).
-reg [7:0]  hsync_cnt = 8'd0;
-reg [11:0] vsync_cnt = 12'd0;
+// The machine core exposes blanking (HBL/VBL), not syncs.  The newsdee
+// core derives its syncs in vga_controller.v; we replicate that structure
+// here from the raw blanking so the display locks the same way:
+//   HSYNC = 68 master cycles, starting 130 cycles after the HBL rise
+//           (vga_controller VGA_FRONT_PORCH=130, VGA_HSYNC=68)
+//   VSYNC = 3 lines, starting 33 lines after the VBL rise
+//           (vga_controller VBL_TO_VSYNC=33, VGA_VSYNC_LINES=3)
+// Count cycles/lines WITHIN the blanking interval (reset while active) so
+// the pulse is a narrow window inside the blanking, not the whole blanking.
+localparam integer HSYNC_FRONT_PORCH = 130;
+localparam integer HSYNC_WIDTH       = 68;
+localparam integer VSYNC_FRONT_PORCH = 33;
+localparam integer VSYNC_LINES       = 3;
 
+// Master cycles since the start of the horizontal blanking interval.
+// HBL is high ~350 cycles max, so 10 bits never overflows.
+reg [9:0] hblank_cnt = 10'd0;
 always @(posedge clk_sys) begin
-	if (!hbl && hsync_cnt < 8'd200)
-		hsync_cnt <= hsync_cnt + 1'd1;
-	else if (hbl)
-		hsync_cnt <= 8'd0;
-	if (!vbl && vsync_cnt < 12'd1024)
-		vsync_cnt <= vsync_cnt + 1'd1;
-	else if (vbl)
-		vsync_cnt <= 12'd0;
+	if (hbl)
+		hblank_cnt <= hblank_cnt + 10'd1;
+	else
+		hblank_cnt <= 10'd0;
+end
+
+// Lines since the start of the vertical blanking interval, counted by the
+// HBL rising edges that occur while VBL is high.
+reg         hbl_d      = 1'b0;
+wire        hbl_rise   = hbl & ~hbl_d;
+always @(posedge clk_sys) hbl_d <= hbl;
+reg [6:0]   vblank_lines = 7'd0;
+always @(posedge clk_sys) begin
+	if (vbl) begin
+		if (hbl_rise)
+			vblank_lines <= vblank_lines + 7'd1;
+	end else begin
+		vblank_lines <= 7'd0;
+	end
 end
 
 assign CE_PIXEL  = ~hbl;
 assign VGA_R     = {8{video}};
 assign VGA_G     = {8{video}};
 assign VGA_B     = {8{video}};
-assign VGA_HS    = hbl & (hsync_cnt < 8'd64);
-assign VGA_VS    = vbl & (vsync_cnt < 12'd512);
+assign VGA_HS    = hbl & (hblank_cnt >= HSYNC_FRONT_PORCH) & (hblank_cnt < HSYNC_FRONT_PORCH + HSYNC_WIDTH);
+assign VGA_VS    = vbl & (vblank_lines >= VSYNC_FRONT_PORCH) & (vblank_lines < VSYNC_FRONT_PORCH + VSYNC_LINES);
 assign VGA_DE    = ~hbl & ~vbl;
 assign VIDEO_ARX = 13'd4;
 assign VIDEO_ARY = 13'd3;

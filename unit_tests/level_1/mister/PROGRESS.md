@@ -107,3 +107,27 @@
 - **Pending:** Quartus Analysis & Synthesis (binding check) + full compile
   → `output_files/level1.rbf`, then hardware acceptance per `PLAN.md`.
   Now runnable from the project dir directly (or `build.bat`).
+- **Corrupted-video fix (2026-09-05, after first hardware run):** the core
+  loaded, the OSD showed, but the video was garbled. Compared against the
+  newsdee core (the model): newsdee derives its syncs in `vga_controller.v`
+  (68-cycle HSYNC after a 130-cycle front porch; 3-line VSYNC starting 33
+  lines into the vblank). The level-1 core derives its own narrow syncs from
+  the raw machine blanking (HBL/VBL), but the counter logic was **inverted**:
+  it counted cycles while the line was *active* (`!hbl`/`!vbl`) and reset
+  while *blanking*. Because the active region (≈560 cycles / 192 lines) far
+  exceeds the counter saturation (200 / 1024), the counter was always
+  saturated at the start of blanking, so `cnt < 64` / `cnt < 512` was false
+  on the first blanking cycle and true for the **rest** of the blanking.
+  Net effect: `VGA_HS` was high for the *entire* HBL (≈349–351 cycles =
+  24 µs, ~5× too wide) and `VGA_VS` for the *entire* VBL (≈70 lines =
+  4.4 ms, ~23× too wide) — a display cannot lock to that, hence the
+  corruption. Verified with a Verilator probe (`tb_sync_check.v`, real
+  `timing_generator` DUT): buggy logic → HS 349–351 / VS 5469–63839 cycles;
+  fixed logic → HS exactly 68 (ends 198 after the HBL rise) / VS exactly
+  2736 (3 lines). **Fix:** count cycles/lines *within* the blanking interval
+  (reset while active) and window the pulse to match the vga_controller
+  structure: HSYNC = cycles [130,198) of HBL; VSYNC = lines [33,36) of VBL
+  (VBL line count = HBL rising edges while VBL high). Changed only the
+  VIDEO OUT block of `Apple-II.sv` (the FPGA-only core; not part of the
+  Verilator sim path). EOL preserved (pure LF, 0 CR). **Pending:** user
+  re-runs `build.bat` → new `level1.rbf` → hardware re-test.
