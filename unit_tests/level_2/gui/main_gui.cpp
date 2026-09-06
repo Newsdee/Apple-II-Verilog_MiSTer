@@ -122,14 +122,24 @@
 // root, like the headless harness).
 static const char* DEFAULT_NIB = "unit_tests/level_2/DOS_3_3.nib";
 
-// Wall-clock milliseconds (same scheme as sim_video.cpp's stats
-// sampling: GetSystemTime on Windows, gettimeofday elsewhere).
+// Monotonic milliseconds since first call (NOT wall clock): FPS + sim-speed
+// windows use it for deltas only.  The old Windows body used GetSystemTime
+// (wSecond*1000 + wMilliseconds = ms WITHIN THE MINUTE) and wrapped every
+// 60 s; after a wrap the sim-speed window test (t_ms - anchor >= 1000) went
+// negative and never closed again, so the readout froze at a stale value.
+//  QPC is monotonic and immune to wall-clock changes.
 static long now_ms()
 {
 #ifdef _WIN32
-	SYSTEMTIME st;
-	GetSystemTime(&st);
-	return (long)(st.wSecond * 1000 + st.wMilliseconds);
+	static LARGE_INTEGER qpc_freq = { 0 }, qpc_t0 = { 0 };
+	LARGE_INTEGER qpc_t;
+	if (qpc_freq.QuadPart == 0) {
+		QueryPerformanceFrequency(&qpc_freq);
+		QueryPerformanceCounter(&qpc_t0);
+	}
+	QueryPerformanceCounter(&qpc_t);
+	return (long)(((qpc_t.QuadPart - qpc_t0.QuadPart) * 1000LL)
+			      / qpc_freq.QuadPart);
 #else
 	struct timeval tv;
 	gettimeofday(&tv, NULL);

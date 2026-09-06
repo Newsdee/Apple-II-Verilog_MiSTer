@@ -20,9 +20,12 @@ while landing the GUI are fixed (PROGRESS v5).
   confirm; level_1 is the video bisection level if a video fault is
   suspected. The v4 "blank text page at 12 s" question and the pass-
   criterion rework are PARKED pending that visual check.
-- Known cosmetic defect: `now_ms()` (seconds+milliseconds of the day,
-  non-monotonic) makes the RESULT `wall=` field go negative across a
-  minute/hour boundary (display only).
+- [FIXED 2026-09-06] Known cosmetic defect: `now_ms()` (seconds+
+  milliseconds of the day, non-monotonic) made the RESULT `wall=`
+  field go negative and, after a minute wrap, froze the GUI sim-speed
+  1-s window (display only). Windows branch now uses
+  QueryPerformanceCounter (monotonic ms since first call) — see the
+  PROGRESS.md entry at the end of that file.
 
 ## Ordered steps
 1. [DONE] Read final IO6 dump; interpret io6 counters; disassemble the ROM disk

@@ -318,6 +318,7 @@ Full record in PLAN.md v6 section; evidence summary here.
   structurally identical; add an L2 `--drive2` scenario if wanted.
 - Phase 5 full Quartus compile: for the user (A&S already green).
 - Cosmetic: `now_ms()` wall-time wrap in GUI RESULT line (display only).
+  [FIXED 2026-09-06 — QPC monotonic clock, see entry at end of file]
   > CLOSED in v7 (2026-09-06 ~16:05): the `--write-test` scenario above is
   > implemented and green on both CPUs — see v7 section below.
 
@@ -392,4 +393,44 @@ L2 WRITE-TEST PASS
   changes).
 - Cosmetic: `now_ms()` wall-time wrap in GUI RESULT line (display
   only; headless/CLI paths unaffected).
+  [FIXED 2026-09-06 — QPC monotonic clock, see entry at end of file]
 
+
+## 2026-09-06 (GUI sim-speed meter: `now_ms()` 60 s wrap — FIXED)
+
+User report: the windowed GUI displayed "sim speed 3109x real time",
+far from the true pump throughput. Root cause: `now_ms()`
+(gui/main_gui.cpp) was built from GetSystemTime's
+`wSecond*1000 + wMilliseconds` = ms *within the minute* — it wraps
+every 60 s (this defect was documented above as the RESULT-line
+`wall=-16.4s` cosmetic bug, with the note that "the windowed
+sim-speed window has the same latent glitch"). After a wrap the
+sim-speed window test `t_ms - speed_anchor_ms >= 1000` (signed) goes
+negative and can never be true again → the 1-s window stops closing →
+the readout freezes at a stale value (or never updates).
+
+The true pump rate on this machine is ~0.05x real time (measured:
+sim=0.44 s in 8-9 s wall, headless + CLI — 20x SLOWER than real time).
+What the user watches on disk load is machine-time Disk II boot I/O:
+the 294 ms (2^22-cycle) power-on hold, motor spin-up, step-to-track,
+and the DOS sector reads — all advancing at ~1/20 of real time. The
+`.nib` itself is never "loaded" as a step: `mountDrive()` opens the
+file at t=0 (instant) and bytes are served on demand through the real
+sd_ bus (one byte per 14.318 MHz cycle, host `tick()`).
+
+Fix (gui/main_gui.cpp only, no DUT/harness change): the Windows
+`now_ms()` branch now returns monotonic ms since first call via
+QueryPerformanceCounter (immune to wall-clock changes and minute
+wraps). The non-Windows gettimeofday branch (epoch ms, monotonic in
+practice) is unchanged. The `speed_anchor_ms == 0` first-sample
+sentinel is unaffected: the first windowed sample arrives ~0.4 s
+after process start, well clear of 0.
+
+Verification: GUI rebuilt 18:58 (main_gui.o + Vtb_l2.exe fresh; the
+first make run's "Error 1" was a post-link substep — the second run
+reports the tree up to date and the exe timestamp postdates the
+edit). Headless smoke with the NEW binary, `--disk`:
+`L2_GUI SMOKE PASS cpu=nmos6502 (boot ok)` — frames=25, sectors=13,
+mot1=1, sim=0.44 s wall=8.1 s. The windowed 1-s window now closes
+correctly across minute boundaries; user re-run of the windowed GUI
+confirms the readout (~0.05x, i.e. ~20x slower than real time).

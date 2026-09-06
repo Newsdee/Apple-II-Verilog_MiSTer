@@ -329,8 +329,11 @@ worked and listed the `*.,NIB` mount items, but the screen was black
 - `rtl/apple2_top.v` (repo) likewise does not wire the new ports — the
   parallel session's responsibility.
 
-### Pending (user)
-- Re-run `build.bat` → flash → video should be back (Apple logo at cold
-  reset), with the `Disk LED overlay` and `Drive 1/2 *.NIB` OSD items
-  present; then the disk-mount test: select `Drive 1 *.NIB`, pick
-  `DOS_3_3.nib`, Cold Reset → DOS 3.3 boots, drive-1 LED lights/flows.
+### Result (hardware, user-confirmed)
+- Rebuilt + flashed with the `machine_ce` fix: video is back, and the
+  **OSD drive mount works on hardware** — the `Drive 1 *.NIB` /
+  `Drive 2 *.NIB` items appear in the MiSTer file browser and a `.nib`
+  mounts through the HPS image channels (2026-09-06, user-confirmed).
+- Remaining hardware checks: with `DOS_3_3.nib` on drive 1, Cold Reset →
+  DOS 3.3 boots; drive-1 overlay LED lights dim on spin-up and flashes
+  bright during boot reads; `WP Drive 1/2` blocks writes.
