@@ -12,13 +12,18 @@ MACH_SRC := $(RTL)/apple2.v $(RTL)/timing_generator.v $(RTL)/video_generator.v \
 			$(RTL)/keyboard.v $(RTL)/rom.v $(RTL)/ramcard.v
 ROMS := $(RTL)/roms/apple2e.hex $(RTL)/roms/video2.hex
 
-.PHONY: all run coordinator ram gui clean
+.PHONY: all run coordinator manager ram gui clean
 all: $(EXE)
 
 COORDOUT := $(OUT)/coord_obj_dir
 COORDEXE := $(COORDOUT)/Vtb_ss_regs.exe
 
 coordinator: $(COORDEXE)
+
+MANAGEROUT := $(OUT)/manager_obj_dir
+MANAGEREXE := $(MANAGEROUT)/Vtb_ss_manager.exe
+
+manager: $(MANAGEREXE)
 
 RAMOUT := $(OUT)/ram_obj_dir
 RAMEXE := $(RAMOUT)/Vtb_ss_ram.exe
@@ -54,6 +59,14 @@ $(COORDEXE): tb_ss_regs.sv savestate_regs_l1b.sv
 	VERILATOR_ROOT=$(VROOT) $(V) --binary --timing -O3 --x-assign fast --x-initial fast \
 		-Wno-fatal -Wno-TIMESCALEMOD --top-module tb_ss_regs \
 		-Mdir $(COORDOUT) tb_ss_regs.sv savestate_regs_l1b.sv
+	@echo "built $@"
+
+$(MANAGEREXE): tb_ss_manager.sv savestate_manager_l1b.sv
+	@mkdir -p $(MANAGEROUT)
+	VERILATOR_ROOT=$(VROOT) $(V) --cc --timing --exe --main -O3 --x-assign fast --x-initial fast \
+		-Wno-fatal -Wno-TIMESCALEMOD --top-module tb_ss_manager \
+		-Mdir $(MANAGEROUT) tb_ss_manager.sv savestate_manager_l1b.sv
+	VERILATOR_ROOT=$(VROOT) $(MAKE) -C $(MANAGEROUT) -f Vtb_ss_manager.mk
 	@echo "built $@"
 
 $(RAMEXE): tb_ss_ram.sv savestate_ram_l1b.sv

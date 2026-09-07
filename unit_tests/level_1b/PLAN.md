@@ -66,18 +66,19 @@ advertises the region with:
 ```
 
 The `SS` declaration is a binary save-state DDR area, not an uploadable file
-format. Follow NES's address conversion exactly:
+format. The NES state manager's DWORD addresses pass through a separate
+conversion layer; this wrapper drives MiSTer's direct 64-bit DDR port:
 
 - framework DDR base: `0x3E000000`;
 - slot size: `0x00200000` bytes;
-- internal statemanager base: `0x03800000` DWORD addresses;
-- internal slot stride: `0x00080000` DWORD addresses;
-- the save engine's address is a 32-bit-word address;
-- a 64-bit transfer advances that address by two;
-- the DDR bridge performs the final conversion to the top-level DDR address.
+- direct DDR beat base: `0x07C00000` (`0x3E000000 / 8`);
+- direct slot stride: `0x00040000` 64-bit beats;
+- `DDRAM_ADDR` advances by one for each 64-bit state word;
+- `DDRAM_BURSTCNT` is one for each state-word transfer.
 
-Do not directly drive `DDRAM_ADDR` from byte offsets. Verify the bridge's
-address units with a directed first/last-address test before writing RAM.
+Do not copy NES's internal DWORD values onto the direct MiSTer port. Verify
+the bridge's address units with a directed first/last-address test before
+writing RAM.
 
 ### Slot payload
 
