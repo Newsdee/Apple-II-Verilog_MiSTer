@@ -293,5 +293,14 @@ set_global_assignment -name VERILOG_FILE ../../../rtl/drive_ii.v
 set_global_assignment -name SYSTEMVERILOG_FILE ../../../rtl/floppy_track.sv
 set_global_assignment -name VHDL_FILE rtl/dpram.vhd
 set_global_assignment -name VERILOG_FILE rtl/drive_status_overlay.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../level_1b/savestate_manager_l1b.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../level_1b/savestate_ddr_l1b.sv
+# Composite video (2026-09-08): the encoder lives in the repo (same live
+# reference pattern as the machine core); the mixer-plus and the vendored
+# decoder sit next to Apple-II.sv in this project directory.  The
+# duplicate rtl/video_mixer_plus.sv (byte-identical) is NOT registered.
+set_global_assignment -name SYSTEMVERILOG_FILE ../../../rtl/apple_composite.sv
+set_global_assignment -name SYSTEMVERILOG_FILE video_mixer_plus.sv
+set_global_assignment -name SYSTEMVERILOG_FILE composite_decoder.sv
 
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

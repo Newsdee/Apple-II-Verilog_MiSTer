@@ -43,6 +43,20 @@
 //                      the source image is untouched.  With no explicit
 //                      --disk the default unit_tests/level_2/DOS_3_3.nib
 //                      is used.  Default sim timeout: 10 s.
+//   --savestate        directed save-state test (level_1b port, 2026-09-08):
+//                      cold-boot from the --disk image, wait for the drive
+//                      to go quiescent, SAVE (the savestate_manager_l1b
+//                      freezes the machine and serializes CPU words 0-10
+//                      + both 64 KiB RAM banks into the TB DDRAM model),
+//                      snapshot the live state, run the machine (drift),
+//                      perturb ONE byte of the STORED state in the DDRAM
+//                      model, LOAD (machine stalled), and verify the full
+//                      64 KiB main-RAM image matches the saved image with
+//                      exactly that one byte changed, the CPU PC and the
+//                      register shadow match, and the machine keeps
+//                      running after the stall releases.  Pass: all of the
+//                      above, no ss_error.  Requires --disk.  Default sim
+//                      timeout: 10 s.
 //
 // +cpu=0 -> nmos6502, +cpu=1 -> wdc65c02.  --trace / --vcd=FILE for VCD.
 //
@@ -96,7 +110,7 @@ double sc_time_stamp()
 static void dumpTextPage(Vtb_l2* top)
 {
 	auto* r = top->rootp;
-	const auto& ram0 = r->tb_l2__DOT__ram0;
+	const auto& ram0 = r->tb_l2__DOT__main_ram__DOT__mem;
 	printf("L2 TEXT PAGE $0400-$07BF (24x40):\n");
 	for (int row = 0; row < 24; row++) {
 		printf("  ");
@@ -107,6 +121,31 @@ static void dumpTextPage(Vtb_l2* top)
 		}
 		printf("\n");
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Save-state helpers (2026-09-08, level_1b port).
+//
+// The directed test: cold-boot + quiesce -> SAVE -> snapshot (full ram0
+// image + PC + the manager's register shadow) -> run the machine (drift)
+// -> perturb ONE byte of the stored state in the TB DDRAM model (slot
+// word 0xA0 = main RAM byte $0400, lane 0) -> LOAD (with the machine
+// stalled) -> verify the full 64 KiB main-RAM image matches the saved
+// image with exactly that one byte changed, the CPU PC equals the saved
+// PC, and the register shadow equals the saved shadow -> release the
+// stall and confirm the machine keeps running.
+// ---------------------------------------------------------------------------
+static const uint32_t SS_PERTURB_ADDR = 0x0400;  // main RAM byte (text page)
+// slot word = 32 + (byte >> 3) (the manager's RAM region base is word 32)
+static const uint32_t SS_PERTURB_WORD = 32 + (SS_PERTURB_ADDR >> 3);  // 0xA0
+static const uint64_t SS_PERTURB_MASK = 0x5A;    // byte lane 0 of that word
+
+static uint16_t ssReadPC(Vtb_l2* top)
+{
+	auto* r = top->rootp;
+	if (r->tb_l2__DOT__cpu_sel)
+		return (uint16_t)r->tb_l2__DOT__d1__DOT__cpu65c02__DOT__reg_pc;
+	return (uint16_t)r->tb_l2__DOT__d1__DOT__cpu6502__DOT__reg_pc;
 }
 
 // ---------------------------------------------------------------------------
@@ -137,6 +176,12 @@ int main(int argc, char** argv)
 	bool  do_empty  = false;
 	bool  do_disk   = false;
 	bool  do_write  = false; // --write-test: directed dirty-track flush
+	bool  do_ss     = false; // --savestate: directed save/perturb/load test
+	bool  do_composite = false; // --composite: decoded composite video smoke
+	uint8_t comp_sat = 0;       // --csat=N (decoder saturation, 128 = unity)
+	uint8_t comp_hue = 0;       // --chue=N (decoder hue)
+	int    comp_sat_idx = -1;   // --csatidx=N (0..15, FPGA OSD "OCD" step map)
+	int    comp_hue_idx = -1;   // --chueidx=N (0..15, FPGA OSD "OHI" step map)
 	bool  no_pass   = false;  // skip the early pass/break; run to full timeout
 	bool  ro_mount  = false;  // --readonly: explicit read-only open
 	bool  scratch   = false;  // --scratch: copy the image, mount the copy RW
@@ -168,6 +213,18 @@ int main(int argc, char** argv)
 			scratch = true;
 		} else if (strcmp(argv[i], "--write-test") == 0) {
 			do_write = true;
+		} else if (strcmp(argv[i], "--savestate") == 0) {
+			do_ss = true;  // --savestate: directed save/perturb/load test
+		} else if (strcmp(argv[i], "--composite") == 0) {
+			do_composite = true;
+		} else if (strncmp(argv[i], "--csat=", 7) == 0) {
+			comp_sat = (uint8_t)atoi(argv[i] + 7);
+		} else if (strncmp(argv[i], "--chue=", 7) == 0) {
+			comp_hue = (uint8_t)atoi(argv[i] + 7);
+		} else if (strncmp(argv[i], "--csatidx=", 10) == 0) {
+			comp_sat_idx = atoi(argv[i] + 10);
+		} else if (strncmp(argv[i], "--chueidx=", 10) == 0) {
+			comp_hue_idx = atoi(argv[i] + 10);
 		}
 	}
 	if (do_write) {
@@ -243,6 +300,28 @@ int main(int argc, char** argv)
 
 	// Prime: run initial blocks at t=0.
 	top->eval();
+
+	// Composite video path (2026-09-07): static select + decoder knobs,
+	// set once before the clock starts.  use_composite=0 (default) leaves
+	// the composite cone frozen (ce=0) and its stats un-updated: the
+	// default run is unchanged.
+	top->use_composite = do_composite ? 1 : 0;
+	// FPGA OSD knob parity (mister/Apple-II.sv "OCD"/"OHI"): state index ->
+	// sat = idx*17 over 0..255, hue = idx*16.  --csatidx/--chueidx take
+	// precedence over raw --csat/--chue when given.
+	if (comp_sat_idx >= 0 && comp_sat_idx <= 15)
+		comp_sat = (uint8_t)(comp_sat_idx * 17);
+	if (comp_hue_idx >= 0 && comp_hue_idx <= 15)
+		comp_hue = (uint8_t)(comp_hue_idx * 16);
+	top->comp_sat      = comp_sat;
+	top->comp_hue      = comp_hue;
+	if (do_composite)
+		printf("L2 composite path enabled sat=%u hue=%u\n", comp_sat, comp_hue);
+	// Save-state request pulses: low until the phase machine arms one.
+	top->ss_save_req = 0;
+	top->ss_load_req = 0;
+	if (do_ss)
+		printf("L2 save-state test enabled (--savestate)\n");
 	const auto wall0 = std::chrono::steady_clock::now();
 
 	// C++-driven 14.3 MHz master clock: one toggle per 35 ns.  Legacy
@@ -283,6 +362,30 @@ int main(int argc, char** argv)
 	                                                     // post-boot garbage OS keeps
 	                                                     // reading sectors for ~4.3 s)
 	const uint64_t WT_FLUSH_BUDGET   = 2000000000000ull;   // 2.0 s sim
+
+	// ---- save-state phase machine (do_ss only) ----
+	enum { SS_BOOT = 0, SS_QUIESCE, SS_SAVE, SS_DRIFT, SS_LOAD,
+	       SS_VERIFY, SS_RUN, SS_DONE };
+	int          ss_phase      = SS_BOOT;
+	uint64_t     ss_phase_ps   = 0;       // sim time in the current phase
+	uint32_t     ss_qrun       = 0;       // consecutive quiescent posedge ticks
+	bool         ss_pend_save  = false;   // arm the save request next posedge
+	bool         ss_pend_load  = false;   // arm the load request next posedge
+	bool         ss_busy_hi    = false;   // saw ss_busy go high (tx started)
+	bool         ss_busy_prev_was_hi = false;  // previous posedge's ss_busy
+	bool         ss_err_seen   = false;   // ss_error observed at any point
+	bool         ss_drift      = false;   // machine state changed during drift
+	bool         ss_verify_ok  = false;
+	bool         ss_resume_ok  = false;
+	const char*  ss_fail       = nullptr;
+	std::vector<uint8_t> ss_ram_saved;    // full 64 KiB main-RAM snapshot
+	int          ss_frames_at_run = 0;   // frame_count when SS_RUN starts
+	uint16_t     ss_pc_saved   = 0;
+	uint64_t     ss_shadow_saved[11];     // manager register shadow at save
+	const uint64_t SS_QUIESCE_BUDGET = 6000000000000ull;  // 6.0 s sim
+	const uint64_t SS_TX_BUDGET      = 10000000000000ull; // 10.0 s sim
+	const uint64_t SS_DRIFT_TIME     = 100000000000ull;   // 100 ms sim
+	const uint64_t SS_RUN_TIME       = 50000000000ull;    // 50 ms sim
 	while (!context.gotFinish()) {
 		sim_ps += half_ps;
 		clk_high = !clk_high;
@@ -302,6 +405,13 @@ int main(int argc, char** argv)
 				wt_inj_i++;
 			} else {
 				top->dbg_ft_wr_en = 0;
+			}
+			// save-state request pulses: exactly one posedge high.
+			if (do_ss) {
+				top->ss_save_req = ss_pend_save ? 1 : 0;
+				top->ss_load_req = ss_pend_load ? 1 : 0;
+				ss_pend_save = false;
+				ss_pend_load = false;
 			}
 			host.tick(top);
 		}
@@ -372,7 +482,7 @@ int main(int argc, char** argv)
 			// a real number of sectors), the drive spun up, and the
 			// machine drew non-blank frames.  (write-test drives its
 			// own phase machine with the same boot criterion.)
-			if (!no_pass && !do_write
+			if (!no_pass && !do_write && !do_ss
 			    && host.engine().readSectors() >= 10 && frames >= 3 && ink > 0
 			    && r->tb_l2__DOT__dbg_motor1_cnt > 0) {
 				pass = true;
@@ -466,6 +576,169 @@ int main(int argc, char** argv)
 				break;
 			}
 			if (wt_phase == WT_DONE)
+				break;   // end the main loop; the verdict is computed below
+		}
+
+		// ---- save-state phase machine (poses only, do_ss) ----
+		if (do_ss && clk_high) {
+			ss_phase_ps += 2 * half_ps;  // one full 14.3 MHz period per posedge
+			const bool idle = ((r->tb_l2__DOT__h_sd_rd |
+					    r->tb_l2__DOT__h_sd_wr) == 0)
+				&& !host.engine().active()
+				&& !r->tb_l2__DOT__h_d1_active
+				&& !r->tb_l2__DOT__h_t1_busy
+				&& (r->tb_l2__DOT__h_disk_ready & 0x1);
+			const bool ss_busy_now = (bool)r->tb_l2__DOT__ss_busy;
+			if (r->tb_l2__DOT__ss_error)
+				ss_err_seen = true;
+			if (ss_busy_now && !ss_busy_hi)
+				ss_busy_hi = true;
+			switch (ss_phase) {
+			case SS_BOOT:
+				if (host.engine().readSectors() >= 10
+				    && frames >= 3 && ink > 0
+				    && r->tb_l2__DOT__dbg_motor1_cnt > 0) {
+					printf("L2 SAVE-TEST: boot reached (sectors=%llu t=%.3fs) "
+					       "- waiting for the drive to go quiescent\n",
+					       (unsigned long long)host.engine().readSectors(),
+					       now_ps / 1e12);
+					ss_phase    = SS_QUIESCE;
+					ss_phase_ps = 0;
+					ss_qrun     = 0;
+				} else if (ss_phase_ps >= WT_BOOT_BUDGET) {
+					ss_fail  = "boot: no sector-read boot state within budget";
+					ss_phase = SS_DONE;
+				}
+				break;
+			case SS_QUIESCE:
+				ss_qrun = idle ? ss_qrun + 1 : 0;
+				if (ss_qrun >= WT_QUIESCE_TICKS) {
+					// snapshot the live main-RAM image (64 KiB)
+					const auto& ram0 = r->tb_l2__DOT__main_ram__DOT__mem;
+					ss_ram_saved.resize(65536);
+					for (uint32_t i = 0; i < 65536; i++)
+						ss_ram_saved[i] = ram0[i];
+					ss_pc_saved = ssReadPC(top);
+					printf("L2 SAVE-TEST: drive quiescent (t=%.3fs pc=$%04X) "
+					       "- saving\n", now_ps / 1e12, ss_pc_saved);
+					ss_phase     = SS_SAVE;
+					ss_phase_ps  = 0;
+					ss_busy_hi   = false;
+					ss_pend_save = true;
+				} else if (ss_phase_ps >= SS_QUIESCE_BUDGET) {
+					ss_fail  = "quiesce: drive never went idle within budget";
+					ss_phase = SS_DONE;
+				}
+				break;
+			case SS_SAVE:
+				if (ss_busy_hi && ss_busy_prev_was_hi && !ss_busy_now) {
+					const auto& shadow =
+					    r->tb_l2__DOT__state_manager__DOT__register_shadow;
+					for (int i = 0; i < 11; i++)
+						ss_shadow_saved[i] = shadow[i];
+					printf("L2 SAVE-TEST: save complete (t=%.3fs pc=$%04X) "
+					       "- running the machine (drift)\n",
+					       now_ps / 1e12, ss_pc_saved);
+					ss_phase    = SS_DRIFT;
+					ss_phase_ps = 0;
+				} else if (ss_phase_ps >= SS_TX_BUDGET) {
+					ss_fail  = ss_busy_hi
+					    ? "save: transaction never completed within budget"
+					    : "save: transaction never started";
+					ss_phase = SS_DONE;
+				}
+				break;
+			case SS_DRIFT:
+				if (ss_phase_ps >= SS_DRIFT_TIME) {
+					const auto& ram0 = r->tb_l2__DOT__main_ram__DOT__mem;
+					uint32_t diff = 0;
+					for (uint32_t i = 0; i < 65536; i++)
+						if (ram0[i] != ss_ram_saved[i]) diff++;
+					ss_drift = (diff > 0) || (ssReadPC(top) != ss_pc_saved);
+					// Perturb ONE byte of the STORED state in the TB
+					// DDRAM model: slot word 0xA0, lane 0 = main RAM $0400.
+					auto& mem = r->tb_l2__DOT__ddram_mem;
+					mem[SS_PERTURB_WORD] ^= SS_PERTURB_MASK;
+					// Stall the machine for the load + verify window
+					// (ss_busy also stalls during the transaction).
+					// `stall` is a module-scope reg, not a port: write it
+					// through the rootp path.
+					r->tb_l2__DOT__stall = 1;
+					printf("L2 SAVE-TEST: drift done (t=%.3fs ram_diff=%u "
+					       "pc_drift=%d) - state perturbed @word 0x%X, loading\n",
+					       now_ps / 1e12, diff, !ss_drift ? 0 : 1,
+					       SS_PERTURB_WORD);
+					ss_phase     = SS_LOAD;
+					ss_phase_ps  = 0;
+					ss_busy_hi   = false;
+					ss_pend_load = true;
+				}
+				break;
+			case SS_LOAD:
+				if (ss_busy_hi && ss_busy_prev_was_hi && !ss_busy_now) {
+					printf("L2 SAVE-TEST: load complete (t=%.3fs) - verifying\n",
+					       now_ps / 1e12);
+					ss_phase    = SS_VERIFY;
+					ss_phase_ps = 0;
+				} else if (ss_phase_ps >= SS_TX_BUDGET) {
+					ss_fail  = ss_busy_hi
+					    ? "load: transaction never completed within budget"
+					    : "load: transaction never started";
+					ss_phase = SS_DONE;
+				}
+				break;
+			case SS_VERIFY:
+				if (ss_phase_ps >= 20 * 2 * half_ps) {  // a few settle ticks
+					const auto& ram0 = r->tb_l2__DOT__main_ram__DOT__mem;
+					uint32_t mm = 0, first_mm = 0;
+					for (uint32_t i = 0; i < 65536; i++) {
+						const uint8_t want = ss_ram_saved[i]
+						    ^ (i == SS_PERTURB_ADDR ? (uint8_t)SS_PERTURB_MASK : 0);
+						if (ram0[i] != want) {
+							if (mm == 0) first_mm = i;
+							mm++;
+						}
+					}
+					const uint16_t pc_now = ssReadPC(top);
+					bool shadow_ok = true;
+					const auto& shadow =
+					    r->tb_l2__DOT__state_manager__DOT__register_shadow;
+					for (int i = 0; i < 11; i++)
+						if (shadow[i] != ss_shadow_saved[i]) shadow_ok = false;
+					ss_verify_ok = (mm == 0) && (pc_now == ss_pc_saved)
+					    && shadow_ok && !ss_err_seen;
+					printf("L2 SAVE-TEST: verify ram_mm=%u (first $%04X) "
+					       "pc=$%04X (saved $%04X) shadow=%d err=%d drift=%d %s\n",
+					       mm, first_mm, pc_now, ss_pc_saved,
+					       shadow_ok ? 1 : 0, ss_err_seen ? 1 : 0,
+					       ss_drift ? 1 : 0,
+					       ss_verify_ok ? "OK" : "FAIL");
+					if (!ss_verify_ok && ss_fail == nullptr)
+						ss_fail = "verify: post-load state mismatch";
+					// Release the stall; confirm the machine resumes.
+					r->tb_l2__DOT__stall = 0;
+					ss_frames_at_run = (int)r->tb_l2__DOT__frame_count;
+					ss_phase    = SS_RUN;
+					ss_phase_ps = 0;
+				}
+				break;
+			case SS_RUN: {
+				if (ss_phase_ps >= SS_RUN_TIME) {
+					ss_resume_ok = (r->tb_l2__DOT__frame_count >= ss_frames_at_run);
+					printf("L2 SAVE-TEST: resume frames=%d (was %d) %s\n",
+					       (int)r->tb_l2__DOT__frame_count, ss_frames_at_run,
+					       ss_resume_ok ? "OK" : "FAIL");
+					if (!ss_resume_ok && ss_fail == nullptr)
+						ss_fail = "resume: machine did not continue after load";
+					ss_phase = SS_DONE;
+				}
+				break;
+			}
+			case SS_DONE:
+				break;
+			}
+			ss_busy_prev_was_hi = ss_busy_now;
+			if (ss_phase == SS_DONE)
 				break;   // end the main loop; the verdict is computed below
 		}
 
@@ -578,11 +851,11 @@ int main(int argc, char** argv)
 				printf("  $08%02X: ", row);
 				for (int i = 0; i < 16; i++)
 					printf("%02X ",
-					       (unsigned)r->tb_l2__DOT__ram0[0x0800 + row * 16 + i]);
+					       (unsigned)r->tb_l2__DOT__main_ram__DOT__mem[0x0800 + row * 16 + i]);
 				printf(" |");
 				for (int i = 0; i < 16; i++) {
 					unsigned c =
-					    (unsigned)r->tb_l2__DOT__ram0[0x0800 + row * 16 + i];
+					    (unsigned)r->tb_l2__DOT__main_ram__DOT__mem[0x0800 + row * 16 + i];
 					if (c < 32)
 						printf("%c", 'A' + c);
 					else if (c < 127)
@@ -594,7 +867,7 @@ int main(int argc, char** argv)
 			}
 			printf("L2 DUMP RAM $0300-$035F (ROM table region): ");
 			for (int i = 0; i < 96; i++)
-				printf("%02X", (unsigned)r->tb_l2__DOT__ram0[0x0300 + i]);
+				printf("%02X", (unsigned)r->tb_l2__DOT__main_ram__DOT__mem[0x0300 + i]);
 			printf("\n");
 		}
 	}
@@ -708,10 +981,57 @@ int main(int argc, char** argv)
 			pass = true;
 	}
 
+	// ----------------------------------------------------------------
+	// Composite smoke (--composite): the decoded composite frame over the
+	// last completed frame must (a) show the screen's bright content
+	// (gmax high, ink > 0), (b) not mass-brighten the background (ink
+	// within 4x the mono 1-bit ink of the last frame), and (c) at sat=0
+	// be pure gray (no chroma); at sat>0 the 1-bit dither content must
+	// show colour (nongray > 0).
+	// ----------------------------------------------------------------
+	if (do_composite) {
+		const uint32_t ci  = r->tb_l2__DOT__comp_ink;
+		const uint32_t cn  = r->tb_l2__DOT__comp_nongray;
+		const uint32_t gmn = r->tb_l2__DOT__comp_gmin;
+		const uint32_t gmx = r->tb_l2__DOT__comp_gmax;
+		// Mono reference: ink of the last COMPLETED frame (latched at the same
+		// VBL falling edge as comp_ink/comp_nongray).  Reading frame[] here
+		// would give the NEXT frame's content, which is a different screen.
+		uint32_t mono_ink = (uint32_t)r->tb_l2__DOT__mono_ink_frame_l;
+		bool comp_pass = (ci > 0) && (gmx >= 160)
+		    && (mono_ink > 0) && (ci <= 4u * mono_ink)
+		    && ((comp_sat == 0) ? (cn == 0) : (cn > 0));
+		printf("L2 COMPOSITE: ink=%u mono_ink=%u nongray=%u gmin=%u gmax=%u "
+		       "sat=%u hue=%u %s\n",
+		       (unsigned)ci, (unsigned)mono_ink, (unsigned)cn,
+		       (unsigned)gmn, (unsigned)gmx, comp_sat, comp_hue,
+		       comp_pass ? "OK" : "FAIL");
+		if (!comp_pass) pass = false;
+	}
+
+	// ----------------------------------------------------------------
+	// Save-state verdict (--savestate): the directed save/perturb/load
+	// test passes when the post-load machine state equals the saved
+	// state with exactly the one perturbed byte applied, the CPU PC and
+	// register shadow match, no ss_error fired, and the machine keeps
+	// running after the stall releases.
+	// ----------------------------------------------------------------
+	if (do_ss) {
+		bool ss_pass = (ss_phase == SS_DONE)
+		    && ss_verify_ok && ss_resume_ok && !ss_err_seen;
+		if (ss_fail == nullptr && ss_phase != SS_DONE)
+			ss_fail = "phase machine did not complete (loop exited early)";
+		if (ss_fail)
+			printf("L2 SAVE-TEST: reason: %s\n", ss_fail);
+		if (ss_pass) { if (!do_write && !do_composite) pass = true; }
+		else pass = false;
+	}
+
 	printf("\nL2 RESULT scenario=%s  frames=%d  ink=%u  sectors=%llu  "
 	       "maxlba=%u  bytes=%llu  mot1=%u  ready=%d  addr=%04X  "
 	       "sim=%.1fms wall=%.1fms\n",
-	       do_write ? "write-test" : (do_disk ? "preloaded" : "empty"),
+	       do_write ? "write-test" : (do_ss ? "save-test"
+	                                        : (do_disk ? "preloaded" : "empty")),
 	       (int)r->tb_l2__DOT__frame_count,
 	       (unsigned)r->tb_l2__DOT__screen_ink,
 	       (unsigned long long)host.engine().readSectors(),
@@ -727,7 +1047,8 @@ int main(int argc, char** argv)
 		pass = false;
 
 	int status = pass ? 0 : 1;
-	const char* scen = do_write ? "WRITE-TEST" : (do_disk ? "PRELOADED" : "EMPTY");
+	const char* scen = do_write ? "WRITE-TEST"
+	    : (do_ss ? "SAVE-TEST" : (do_disk ? "PRELOADED" : "EMPTY"));
 	if (!pass)
 		printf("L2 %s FAIL%s\n", scen, ran_to_timeout ? " (timeout)" : "");
 	else

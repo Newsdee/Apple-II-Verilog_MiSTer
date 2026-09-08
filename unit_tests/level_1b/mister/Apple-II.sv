@@ -186,7 +186,7 @@ module emu
   savestate_manager_l1b state_manager (
     .clk(clk_sys), .reset(ss_reset),
     .request_save(save_request), .request_load(load_request),
-    .cpu_type(current_cpu), .cpu_frozen(cpu_frozen),
+    .allow_save_state(1'b1), .cpu_type(current_cpu), .cpu_frozen(cpu_frozen),
     .stall(), .machine_ce(machine_ce), .busy(ss_busy), .done(ss_done),
     .error(ss_error), .locked_cpu_type(ss_locked_cpu),
     .ss_addr(ss_addr), .ss_wdata(ss_wdata), .ss_wren(ss_wren), .ss_rdata(ss_rdata),

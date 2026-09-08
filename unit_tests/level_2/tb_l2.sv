@@ -38,7 +38,10 @@
 //                      sd_buff_wr, disk_mount[1:0], disk_change[1:0],
 //                      disk_protect[1:0], stall, reset_cold, ps2_key[10:0],
 //                      flash_div[22:0], romsw,
-//                      dbg_ft_wr_en/addr/data (write-test injection)
+//                      dbg_ft_wr_en/addr/data (write-test injection),
+//                      use_composite, comp_sat[7:0], comp_hue[7:0]
+//                      (composite video path, 2026-09-07),
+//                      ss_save_req, ss_load_req (save-state, 2026-09-08)
 //   out (C++ reads):   sd_rd[1:0], sd_wr[1:0], sd_lba_a/b[31:0],
 //                      sd_buff_din_a/b[7:0], disk_ready[1:0], d1_active,
 //                      d1_motor_on, d1_io_active, d1_step_active,
@@ -46,7 +49,10 @@
 //                      frame[512], frame_count, screen_ink, dbg_addr,
 //                      dbg_motor1_cnt, dbg_track1_cnt, dbg_sdwr_cnt,
 //                      phzf_cnt, dbg_2m_*, dbg_t1a_*, dbg_wra/wrb_cnt,
-//                      dbg_wri_cnt, h_t1_busy, errors
+//                      dbg_wri_cnt, h_t1_busy, errors,
+//                      comp_ink/comp_nongray[15:0], comp_gmin/comp_gmax[7:0]
+//                      (per-frame composite-decoder stats, use_composite=1),
+//                      ss_busy, ss_done, ss_error (save-state, 2026-09-08)
 //
 // The binary MUST run with the process CWD at the REPO ROOT: the DUT's
 // $readmemh ROM paths (rtl/roms/*.hex, incl. diskii.hex) are CWD-relative.
@@ -76,7 +82,19 @@ module tb_l2 (
     // Purely a testbench input: low (default) = zero effect on the DUT.
     input logic        dbg_ft_wr_en,
     input logic [12:0] dbg_ft_wr_addr,
-    input logic [7:0]  dbg_ft_wr_data
+    input logic [7:0]  dbg_ft_wr_data,
+    // Composite video path (2026-09-07): C++ selects the decoded composite
+    // display and its decoder knobs.  use_composite=0 (default) freezes the
+    // composite DUT (ce=0) and gates its stat sampling: the default mono
+    // run is byte-identical to before this change.
+    input logic        use_composite,
+    input logic [7:0]  comp_sat,
+    input logic [7:0]  comp_hue,
+    // Save-state requests (level_1b port, 2026-09-08): C++-driven
+    // one-shot pulses into the savestate_manager_l1b coordinator -
+    // the same manager + DDR bridge the level_2 mister build uses.
+    input logic        ss_save_req,
+    input logic        ss_load_req
 );
 
   // ------------------------------------------------------------------
@@ -211,7 +229,8 @@ module tb_l2 (
     .FLASH_CLK   (flash_clk),
     .reset       (reset_sync),
     .cpu         (cpu_sel),
-    .STALL       (stall),
+    // OSD-style pause (C++ `stall`) + save-state freeze (ss_busy).
+    .STALL       (stall || ss_busy),
     .ADDR        (w_addr),
     .ram_addr    (w_ram_addr),
     .D           (w_ram_di),
@@ -248,15 +267,18 @@ module tb_l2 (
     .DBG_DI      (w_dbg_di),
     .DBG_ROM_ADDR(w_dbg_roma),
     .DBG_ROM_OUT (w_dbg_romo),
-    // Save-state WIP ports added to rtl/apple2.v by the parallel
-    // save-state work (2026-09-06): no save-state feature in this
-    // harness.  machine_ce MUST be 1 - the core gates ALL machine
-    // state on it (CPU + HBLANK/VBLANK); an unconnected input is 0
-    // in two-state Verilator and the machine would be dead.
-    .machine_ce  (1'b1),
-    .ss_wren     (1'b0),
-    .ss_addr     (10'd0),
-    .ss_wdata    (64'd0)
+    // Save-state (level_1b port, 2026-09-08): machine_ce is the
+    // manager's freeze - 1 only in IDLE/FREEZE, 0 during the
+    // register/RAM walk (unconnected it is 0 in two-state Verilator
+    // and the machine would be dead).  The ss_* bus carries the
+    // per-word register capture/apply; the wrapper mux below owns
+    // words 8/9/10 (reset/flash state, spare, CPU select).
+    .machine_ce  (machine_ce),
+    .ss_wren     (ss_wren),
+    .ss_addr     (ss_addr),
+    .ss_wdata    (ss_wdata),
+    .ss_rdata    (core_ss_rdata),
+    .cpu_frozen  (cpu_frozen)
   );
 
   // ------------------------------------------------------------------
@@ -397,7 +419,14 @@ module tb_l2 (
   reg reset_sync;
   always @(posedge clk_14m) begin: reset_chain
     reset_sync <= reset_warm | power_on_reset;
-    if (reset_cold == 1'b1 || soft_reset == 1'b1) begin
+    // Save-state restore (level_1b pattern): register word 8 carries
+    // the wrapper reset/flash state so a load reproduces the exact
+    // power-on phase.
+    if (ss_wren && (ss_addr == 10'd8)) begin
+      flash_div      <= ss_wdata[22:0];
+      power_on_reset <= ss_wdata[23];
+      reset_sync     <= ss_wdata[24];
+    end else if (reset_cold == 1'b1 || soft_reset == 1'b1) begin
       power_on_reset <= 1'b1;
       flash_div      <= 23'b0;
     end else begin
@@ -419,22 +448,153 @@ module tb_l2 (
   // ------------------------------------------------------------------
   // TB RAM - the verilator/sim.v pattern: 1-ce latch, main + aux
   // ------------------------------------------------------------------
-  reg [7:0] ram0 [0:65535];
-  reg [7:0] ram1 [0:65535];
-  always @(posedge clk_14m) begin: tb_ram
-    if (ram_we_eff & ~w_ram_aux) begin
-      ram0[ram_addr_eff[15:0]] <= ram_di_eff;
-      ram_do[7:0]              <= ram_di_eff;
+  // Save-state RAM client port (savestate_manager_l1b).  Mirrors the
+  // mister wrapper EXACTLY (2026-09-08): two explicit dpram instances
+  // (the Verilog behavioral model of the altsyncram dpram.vhd - the
+  // same module the FPGA build instantiates), port A = the machine,
+  // port B = the save-state walker, raw q_b for the ss read (port B's
+  // registered address provides the manager's one-cycle read latency),
+  // and one register stage on q_a to keep the original registered-read
+  // machine timing.  Quartus 17 cannot infer the dual-client arrays
+  // (Error 276003: "asynchronous read logic" / "unsupported
+  // read-during-write behavior"), hence the explicit instances.
+  wire        ram_ss_bank;
+  wire [15:0] ram_ss_addr;
+  wire        ram_ss_rd, ram_ss_wr;
+  wire [7:0]  ram_ss_wdata, ram_ss_rdata;
+  wire        ram_we_mach  = ram_we_eff && !ss_busy;
+
+  wire [7:0] main_ram_q_a, main_ram_q_b;
+  wire [7:0] aux_ram_q_a,  aux_ram_q_b;
+
+  dpram #(16,8) main_ram (
+    .address_a(ram_addr_eff[15:0]), .address_b(ram_ss_addr),
+    .clock_a(clk_14m), .clock_b(clk_14m),
+    .data_a(ram_di_eff), .data_b(ram_ss_wdata),
+    .enable_a(1'b1), .enable_b(1'b1),
+    .wren_a(ram_we_mach && !w_ram_aux),
+    .wren_b(ram_ss_wr && !ram_ss_bank && !ss_reset),
+    .q_a(main_ram_q_a), .q_b(main_ram_q_b)
+  );
+
+  dpram #(16,8) aux_ram (
+    .address_a(ram_addr_eff[15:0]), .address_b(ram_ss_addr),
+    .clock_a(clk_14m), .clock_b(clk_14m),
+    .data_a(ram_di_eff), .data_b(ram_ss_wdata),
+    .enable_a(1'b1), .enable_b(1'b1),
+    .wren_a(ram_we_mach && w_ram_aux),
+    .wren_b(ram_ss_wr && ram_ss_bank && !ss_reset),
+    .q_a(aux_ram_q_a), .q_b(aux_ram_q_b)
+  );
+
+  // One register stage on the combinational NEW_DATA q_a: byte-identical
+  // timing to the previously verified inferred RAM (write-through kept).
+  always @(posedge clk_14m) begin: ram_do_reg
+    ram_do[7:0]  <= main_ram_q_a;
+    ram_do[15:8] <= aux_ram_q_a;
+  end
+
+  // Raw q_b: port B's registered address makes q_b in cycle N+1 hold
+  // the byte at the address presented in cycle N (the manager's
+  // protocol: ram_rd in N, ram_rdata sampled in N+1).
+  assign ram_ss_rdata = ram_ss_bank ? aux_ram_q_b : main_ram_q_b;
+
+  // ------------------------------------------------------------------
+  // Save state (level_1b port, 2026-09-08): the same coordinator +
+  // direct 64-bit DDRAM bridge the level_2 mister build instantiates.
+  // The TB models the HPS DDRAM port: 64-bit beats, one acknowledged
+  // transaction at a time, 4-cycle latency (the corrected level_1b
+  // contract: beat base, stride 1, burst 1).  V1 scope: CPU +
+  // main/aux RAM + machine latches + timing/video phase; the disk
+  // path is NOT in the state (see SAVESTATE_V2_DISK_MAP.md).
+  // ------------------------------------------------------------------
+  wire [9:0]  ss_addr;
+  wire [63:0] ss_wdata, ss_rdata, core_ss_rdata;
+  wire        ss_wren;
+  wire        machine_ce;
+  wire        cpu_frozen;
+  wire        ss_busy, ss_done, ss_error, ss_locked_cpu;
+  wire        slot_rd, slot_wr, slot_ready;
+  wire [14:0] slot_addr;
+  wire [63:0] slot_wdata, slot_rdata;
+
+  // Wrapper-owned register words (level_1b pattern): 8 = reset/flash
+  // chain, 9 = spare, 10 = selected CPU.  Everything else is the core's.
+  assign ss_rdata = (ss_addr == 10'd8) ?
+                    {39'd0, reset_sync, power_on_reset, flash_div} :
+                    (ss_addr == 10'd9) ? 64'd0 :
+                    (ss_addr == 10'd10) ? {63'd0, cpu_sel} : core_ss_rdata;
+
+  savestate_manager_l1b state_manager (
+    .clk(clk_14m), .reset(reset_cold || reset_warm || soft_reset),
+    .request_save(ss_save_req), .request_load(ss_load_req),
+    .allow_save_state(1'b1), .cpu_type(cpu_sel), .cpu_frozen(cpu_frozen),
+    .stall(), .machine_ce(machine_ce), .busy(ss_busy), .done(ss_done),
+    .error(ss_error), .locked_cpu_type(ss_locked_cpu),
+    .ss_addr(ss_addr), .ss_wdata(ss_wdata), .ss_wren(ss_wren), .ss_rdata(ss_rdata),
+    .ram_bank(ram_ss_bank), .ram_addr(ram_ss_addr), .ram_rd(ram_ss_rd),
+    .ram_wr(ram_ss_wr), .ram_wdata(ram_ss_wdata), .ram_rdata(ram_ss_rdata),
+    .slot_addr(slot_addr), .slot_rd(slot_rd), .slot_wr(slot_wr),
+    .slot_wdata(slot_wdata), .slot_rdata(slot_rdata), .slot_ready(slot_ready)
+  );
+
+  savestate_ddr_l1b #(.BASE_ADDR(29'd0)) ddr_ss (
+    .clk(clk_14m), .reset(reset_cold || reset_warm || soft_reset),
+    .slot_addr(slot_addr), .slot_rd(slot_rd), .slot_wr(slot_wr),
+    .slot_wdata(slot_wdata), .slot_rdata(slot_rdata), .slot_ready(slot_ready),
+    .ddram_clk(ddram_clk), .ddram_busy(ddram_busy), .ddram_burstcnt(ddram_burstcnt),
+    .ddram_addr(ddram_addr), .ddram_dout(ddram_dout),
+    .ddram_dout_ready(ddram_dout_ready), .ddram_rd(ddram_rd),
+    .ddram_din(ddram_din), .ddram_be(ddram_be), .ddram_we(ddram_we)
+  );
+
+  // TB model of the HPS DDRAM port (64-bit beats, one acknowledged
+  // transaction at a time).  The bridge only pulses ddram_rd/ddram_we
+  // while !ddram_busy, so a 1-cycle pulse is never lost.
+  wire        ddram_clk;
+  wire        ddram_busy;
+  wire [7:0]  ddram_burstcnt;
+  wire [28:0] ddram_addr;
+  wire [63:0] ddram_dout;
+  wire        ddram_dout_ready;
+  wire        ddram_rd;
+  wire [63:0] ddram_din;
+  wire [7:0]  ddram_be;
+  wire        ddram_we;
+  reg  [63:0] ddram_mem [0:32767];
+  reg         ddram_busy_r = 1'b0;
+  reg  [2:0]  ddram_lat_r  = 3'd0;
+  reg         ddram_rd_r;
+  reg  [14:0] ddram_addr_r;
+  reg  [63:0] ddram_dout_r = 64'd0;
+  reg         ddram_dout_ready_r = 1'b0;
+  always @(posedge clk_14m) begin: tb_ddram
+    ddram_dout_ready_r <= 1'b0;
+    if (ddram_busy_r) begin
+      if (ddram_lat_r == 3'd3) begin
+        ddram_busy_r <= 1'b0;
+        if (ddram_rd_r) begin
+          ddram_dout_r       <= ddram_mem[ddram_addr_r];
+          ddram_dout_ready_r <= 1'b1;
+        end
+      end else begin
+        ddram_lat_r <= ddram_lat_r + 1'b1;
+      end
     end else begin
-      ram_do[7:0]              <= ram0[ram_addr_eff[15:0]];
-    end
-    if (ram_we_eff & w_ram_aux) begin
-      ram1[ram_addr_eff[15:0]] <= ram_di_eff;
-      ram_do[15:8]             <= ram_di_eff;
-    end else begin
-      ram_do[15:8]             <= ram1[ram_addr_eff[15:0]];
+      ddram_lat_r <= 3'd0;
+      if (ddram_we) begin
+        ddram_mem[ddram_addr[14:0]] <= ddram_din;
+        ddram_busy_r <= 1'b1;
+      end else if (ddram_rd) begin
+        ddram_rd_r   <= 1'b1;
+        ddram_addr_r <= ddram_addr[14:0];
+        ddram_busy_r <= 1'b1;
+      end
     end
   end
+  assign ddram_busy       = ddram_busy_r;
+  assign ddram_dout       = ddram_dout_r;
+  assign ddram_dout_ready = ddram_dout_ready_r;
 
   // ------------------------------------------------------------------
   // Video sampler + frame pack (mirrors level_1): 1 sample per master
@@ -502,6 +662,126 @@ module tb_l2 (
   end
 
   // ------------------------------------------------------------------
+  // Composite video path (2026-09-07): rtl/apple_composite.sv (encoder +
+  // SPC=4 decoder) fed from the REAL machine 1-bit VIDEO + blanking.
+  // The core exposes blanking, not syncs, so the syncs are derived exactly
+  // as the level-2 MiSTer wrapper does (mister/Apple-II.sv): HSYNC = 68
+  // master cycles starting 130 cycles into HBL, VSYNC = 3 lines starting
+  // 33 lines into VBL.  use_composite gates the DUT's ce (frozen idle
+  // cone when 0, so the default mono run is unchanged) and the per-frame
+  // stat accumulation below; the stats (last completed frame, latched at
+  // the VBL falling edge) are read through tb_l2__DOT__comp_*.
+  // ------------------------------------------------------------------
+  localparam integer COMP_HSYNC_FRONT_PORCH = 130;
+  localparam integer COMP_HSYNC_WIDTH       = 68;
+  localparam integer COMP_VSYNC_FRONT_PORCH = 33;
+  localparam integer COMP_VSYNC_LINES       = 3;
+
+  // Master cycles since the start of the horizontal blanking interval.
+  // HBL is ~352 cycles max, so 10 bits never overflows.
+  reg [9:0] comp_hblank_cnt = 10'd0;
+  always @(posedge clk_14m) begin
+    if (w_hbl)
+      comp_hblank_cnt <= comp_hblank_cnt + 10'd1;
+    else
+      comp_hblank_cnt <= 10'd0;
+  end
+  reg  comp_hbl_d    = 1'b0;
+  wire comp_hbl_rise = w_hbl & ~comp_hbl_d;
+  always @(posedge clk_14m) comp_hbl_d <= w_hbl;
+  // Lines since the start of the vertical blanking interval, counted by
+  // the HBL rising edges that occur while VBL is high.
+  reg [6:0] comp_vblank_lines = 7'd0;
+  always @(posedge clk_14m) begin
+    if (w_vbl) begin
+      if (comp_hbl_rise)
+        comp_vblank_lines <= comp_vblank_lines + 7'd1;
+    end else begin
+      comp_vblank_lines <= 7'd0;
+    end
+  end
+  wire comp_hsync = w_hbl &
+                    (comp_hblank_cnt >= COMP_HSYNC_FRONT_PORCH) &
+                    (comp_hblank_cnt < COMP_HSYNC_FRONT_PORCH + COMP_HSYNC_WIDTH);
+  wire comp_vsync = w_vbl &
+                    (comp_vblank_lines >= COMP_VSYNC_FRONT_PORCH) &
+                    (comp_vblank_lines < COMP_VSYNC_FRONT_PORCH + COMP_VSYNC_LINES);
+
+  wire [7:0] comp_r, comp_g, comp_b;
+  apple_composite comp_dut (
+    .clk    (clk_14m),
+    .ce     (use_composite),
+    .video  (w_video),
+    .hs     (comp_hsync),
+    .vs     (comp_vsync),
+    .hb     (w_hbl),
+    .vb     (w_vbl),
+    .sat    (comp_sat),
+    .hue    (comp_hue),
+    .r      (comp_r),
+    .g      (comp_g),
+    .b      (comp_b),
+    .ce_out (),
+    .hs_out (),
+    .vs_out (),
+    .hb_out (),
+    .vb_out ()
+  );
+
+  // Mono ink of the last COMPLETED frame, latched at the same VBL falling
+  // edge as the composite stats (frame[] is already being refilled with the
+  // next frame by the time $finish reads it, so it must not be used as the
+  // same-frame mono reference).  hbl_s/hbl_p are the negedge-domain blank
+  // delays shared with the video sampler; hbl_p==0 && hbl_s==1 is the HBL
+  // rising edge, where lines[] holds the just-finished line.
+  reg [19:0] mono_ink_acc = 20'd0;
+  reg [19:0] mono_ink_frame_l = 20'd0;
+  always @(negedge clk_14m) begin
+    if (hbl_p == 1'b0 && hbl_s == 1'b1)
+      mono_ink_acc <= mono_ink_acc + $countones(lines[line_cnt & 511]);
+    if (vbl_p == 1'b1 && vbl_s == 1'b0) begin
+      mono_ink_frame_l <= mono_ink_acc;
+      mono_ink_acc     <= 20'd0;
+    end
+  end
+
+  // Per-frame composite stats over the active samples (negedge, like the
+  // video sampler): comp_ink = samples with g >= 128, comp_nongray =
+  // samples with |r-g| > 16 or |g-b| > 16, comp_gmin/gmax = g range.
+  // Latched from the accumulators at the VBL falling edge (the same frame
+  // anchor as frame_pack); only when use_composite=1.
+  reg [19:0] comp_ink     = 20'd0;
+  reg [19:0] comp_nongray = 20'd0;
+  reg [7:0]  comp_gmin    = 8'hFF;
+  reg [7:0]  comp_gmax    = 8'h00;
+  reg [19:0] comp_ci      = 20'd0;
+  reg [19:0] comp_cn      = 20'd0;
+  reg [7:0]  comp_gmin_a  = 8'hFF;
+  reg [7:0]  comp_gmax_a  = 8'h00;
+  wire signed [8:0] comp_drg = $signed({1'b0, comp_r}) - $signed({1'b0, comp_g});
+  wire signed [8:0] comp_dgb = $signed({1'b0, comp_g}) - $signed({1'b0, comp_b});
+  always @(negedge clk_14m) begin: comp_stats
+    if (vbl_p == 1'b1 && vbl_s == 1'b0) begin
+      if (use_composite) begin
+        comp_ink     <= comp_ci;
+        comp_nongray <= comp_cn;
+        comp_gmin    <= comp_gmin_a;
+        comp_gmax    <= comp_gmax_a;
+      end
+      comp_ci     <= 20'd0;
+      comp_cn     <= 20'd0;
+      comp_gmin_a <= 8'hFF;
+      comp_gmax_a <= 8'h00;
+    end else if (use_composite && w_hbl == 1'b0) begin
+      if (comp_g >= 8'd128) comp_ci <= comp_ci + 20'd1;
+      if (comp_g <  comp_gmin_a) comp_gmin_a <= comp_g;
+      if (comp_g >  comp_gmax_a) comp_gmax_a <= comp_g;
+      if (comp_drg >  9'sd16 || comp_drg < -9'sd16 ||
+          comp_dgb >  9'sd16 || comp_dgb < -9'sd16) comp_cn <= comp_cn + 20'd1;
+    end
+  end
+
+  // ------------------------------------------------------------------
   // Diagnostics
   // ------------------------------------------------------------------
   reg      pzf_p2   = 1'b0;
@@ -520,7 +800,7 @@ module tb_l2 (
       integer n;
       n = 0;
       for (si = 0; si < 1024; si = si + 1)
-        if (ram0[16'h0400 + si] !== 8'h00) n = n + 1;
+        if (main_ram.mem[16'h0400 + si] !== 8'h00) n = n + 1;
       screen_ink <= n;
     end
   end
@@ -605,8 +885,8 @@ module tb_l2 (
     dbg_boot_sum = 32'd0;
     dbg_boot_nz  = 16'd0;
     for (bi = 0; bi < 1024; bi = bi + 1) begin
-      if (ram0[16'h0800 + bi] !== 8'h00) begin
-        dbg_boot_sum = dbg_boot_sum + {24'd0, ram0[16'h0800 + bi]};
+      if (main_ram.mem[16'h0800 + bi] !== 8'h00) begin
+        dbg_boot_sum = dbg_boot_sum + {24'd0, main_ram.mem[16'h0800 + bi]};
         dbg_boot_nz  = dbg_boot_nz + 16'd1;
       end
     end

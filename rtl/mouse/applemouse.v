@@ -32,7 +32,6 @@ module applemouse(
     X,
     Y,
     SCALE,
-    RATE,
     BUTTON
 );
     input         CLK_14M;
@@ -54,7 +53,6 @@ module applemouse(
     input  [8:0]  X;
     input  [8:0]  Y;
     input  [1:0]  SCALE;
-    input  [1:0]  RATE;
     input         BUTTON;
 
     wire [10:0]   rom_addr;
@@ -78,19 +76,13 @@ module applemouse(
 
     reg           clk_2m_d;
     reg           clk_2en;
-    reg           clk_14m_div2;
-    reg  [2:0]    rate_phase;
-    wire          mcu_cen = (RATE == 2'b00) ? clk_2en :
-                            (RATE == 2'b01) ? (CLK_2M ^ clk_2m_d) :
-                            (RATE == 2'b10) ? (rate_phase == 3'd0 || rate_phase == 3'd2 || rate_phase == 3'd4) :
-                                             clk_14m_div2;
 
     reg           pressed;
     reg  [8:0]    mx;
     reg  [8:0]    my;
     wire          mcu_wr;
     wire [12:0]   mcu_addr;
-    wire          mcu_pb_read = mcu_cen && !mcu_wr && mcu_addr == 13'd1;
+    wire          mcu_pb_read = clk_2en && !mcu_wr && mcu_addr == 13'd1;
 
     function automatic [8:0] stepped_backlog;
         input [8:0] value;
@@ -221,26 +213,17 @@ module applemouse(
 
     always @(posedge CLK_14M)
     begin
-        if (RESET == 1'b1)
-        begin
-            clk_2m_d    <= CLK_2M;
-            clk_2en     <= 1'b0;
-            clk_14m_div2 <= 1'b0;
-            rate_phase  <= 3'd0;
-        end
+        clk_2m_d <= CLK_2M;
+        if (CLK_2M == 1'b1 && clk_2m_d == 1'b0)
+            clk_2en <= 1'b1;
         else
-        begin
-            clk_2m_d <= CLK_2M;
-            clk_2en <= CLK_2M & ~clk_2m_d;
-            clk_14m_div2 <= ~clk_14m_div2;
-            rate_phase <= (rate_phase == 3'd6) ? 3'd0 : rate_phase + 1'd1;
-        end
+            clk_2en <= 1'b0;
     end
 
     jtframe_6805mcu mcu(
         .rst(RESET),
         .clk(CLK_14M),
-        .cen(mcu_cen),
+        .cen(clk_2en),
         .wr(mcu_wr),
         .addr(mcu_addr),
         .dout(),

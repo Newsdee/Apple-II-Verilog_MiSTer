@@ -217,7 +217,10 @@ wire  [10:0] ps2_key;
 wire [21:0]  gamma_bus;
 
 parameter CONF_STR = {
-	"Apple-II_L2;",
+	// SS3E000000:200000 = the MiSTer binary save-state DDR region (4 x
+	// 2 MiB slots at framework byte base 0x3E000000 - the level_1b
+	// convention; the direct 64-bit DDR beat base is 29'h07C00000).
+	"Apple-II_L2;SS3E000000:200000;",
 	"-;",
 	// OSD image-mount items (HPS convention, S<d>,<exts>[,<label>]): the HPS
 	// generates one "Mount" menu entry per item; <d> = hps_io image channel
@@ -227,9 +230,18 @@ parameter CONF_STR = {
 	"S1,NIB,Drive 2;",
 	"O5,CPU,65C02,6502;",
 	"O1,OSD Pause,Off,On;",
+	"O2,Save State,Off,Save;",
+	"O3,Load State,Off,Load;",
 	"O6,WP Drive 1,Off,On;",
 	"O7,WP Drive 2,Off,On;",
 	"O8,Disk LED overlay,Yes,No;",
+	"O9,Composite video,Off,On;",
+	// Composite knobs (16 states each; see COMPOSITE_ARTIFACT_COLOR_PLAN.md
+	// 5.3): the framework writes each option's state index into the 4-bit
+	// field at the first ID char's value ("OCD" C=12 -> [15:12], "OHI"
+	// H=17 -> [20:17]).  sat step = idx*17 (0..255), hue step = idx*16.
+	"OCD,Comp sat,Off,17,34,51,68,85,102,119,136,153,170,187,204,221,238,255;",
+	"OHI,Comp hue,0,16,32,48,64,80,96,112,128,144,160,176,192,208,224,240;",
 	"R0,Cold Reset;",
 	"-;"
 };
@@ -237,6 +249,33 @@ parameter CONF_STR = {
 // OSD pause: hold the CPU (both cores) while the OSD is open (the root
 // core's pattern) so the frozen screen can be inspected behind the OSD.
 wire osd_pause = status[1] && OSD_STATUS;
+
+// OSD "Composite video" (O9): select the video_mixer_plus composite branch
+// (encoded + decoded 1-bit composite) instead of the native monochrome path.
+wire use_composite = status[9];
+
+// OSD composite knobs (CONF_STR "OCD"/"OHI" above; 16 states each).  The
+// framework writes the option's state index into the 4-bit field at the
+// first ID char's value: C=12 -> [15:12], H=17 -> [20:17].  comp_sat_v =
+// idx*17 over 0..255 (state 0 = Off/gray, 8 -> 136 ~ unity, 15 -> 255
+// over-saturated); comp_hue_v = idx*16 over the 256-step burst phase.
+// Decoder-side only: the encoder below keeps unity sat / zero hue.
+wire [3:0] comp_sat_idx = status[15:12];
+wire [3:0] comp_hue_idx = status[20:17];
+wire [7:0] comp_sat_v   = comp_sat_idx * 8'd17;
+wire [7:0] comp_hue_v   = {comp_hue_idx, 4'b0000};
+
+// Save-state requests (level_1b pattern): the OSD "Save State"/"Load
+// State" options are one-shot - edge-detect the option being armed while
+// the OSD is open.
+reg save_request_d = 1'b0;
+reg load_request_d = 1'b0;
+always @(posedge clk_sys) begin
+	save_request_d <= status[2] && OSD_STATUS;
+	load_request_d <= status[3] && OSD_STATUS;
+end
+wire save_request = (status[2] && OSD_STATUS) && !save_request_d;
+wire load_request = (status[3] && OSD_STATUS) && !load_request_d;
 
 // SD image channel: 2 channels -> the 2 floppy drives (channel 0 -> drive
 // 1, channel 1 -> drive 2).  hps_io drives the *_ack/addr/dout/wr side;
@@ -333,7 +372,14 @@ reg         reset_sync;
 
 always @(posedge clk_sys) begin: reset_chain
 	reset_sync <= reset_warm | power_on_reset;
-	if (reset_cold == 1'b1 || soft_reset == 1'b1) begin
+	// Save-state restore (level_1b pattern): register word 8 carries the
+	// wrapper's own reset/flash state so a load reproduces the exact
+	// power-on phase.
+	if (ss_wren && (ss_addr == 10'd8)) begin
+		flash_div      <= ss_wdata[22:0];
+		power_on_reset <= ss_wdata[23];
+		reset_sync     <= ss_wdata[24];
+	end else if (reset_cold == 1'b1 || soft_reset == 1'b1) begin
 		power_on_reset <= 1'b1;
 		flash_div      <= 23'b0;
 	end else begin
@@ -372,23 +418,60 @@ wire        ram_we_eff   = reset_cold ? 1'b1   : ram_we;
 wire [17:0] ram_addr_eff = reset_cold ? 18'h03F4 : ram_addr;
 wire [7:0]  ram_di_eff   = reset_cold ? 8'b0    : ram_di;
 
-reg [7:0] ram0 [0:65535];
-reg [7:0] ram1 [0:65535];
+// Save-state RAM client port (savestate_manager_l1b).  The main RAM is
+// two EXPLICIT dpram (altsyncram) instances - the level_1b mister
+// pattern, hardware-verified there - because Quartus 17 refuses to
+// infer the dual-client inferred arrays: first "asynchronous read
+// logic" (a cross-array ternary read), then "unsupported read-during-
+// write behavior" (write-through port A + conditional port B in one
+// array).  Port A = the machine, port B = the save-state walker.  The
+// two write ports are never enabled in the same cycle (machine write
+// implies !ss_busy, ss write implies ss_busy).  ss_busy=0 in normal
+// operation, so the machine path is unchanged.
+wire        ram_ss_bank;
+wire [15:0] ram_ss_addr;
+wire        ram_ss_rd, ram_ss_wr;
+wire [7:0]  ram_ss_wdata, ram_ss_rdata;
+wire        ram_we_mach  = ram_we_eff && !ss_busy;
 
-always @(posedge clk_sys) begin: core_ram
-	if (ram_we_eff & ~ram_aux) begin
-		ram0[ram_addr_eff[15:0]] <= ram_di_eff;
-		ram_do[7:0]              <= ram_di_eff;
-	end else begin
-		ram_do[7:0]              <= ram0[ram_addr_eff[15:0]];
-	end
-	if (ram_we_eff & ram_aux) begin
-		ram1[ram_addr_eff[15:0]] <= ram_di_eff;
-		ram_do[15:8]             <= ram_di_eff;
-	end else begin
-		ram_do[15:8]             <= ram1[ram_addr_eff[15:0]];
-	end
+wire [7:0] main_ram_q_a, main_ram_q_b;
+wire [7:0] aux_ram_q_a,  aux_ram_q_b;
+
+dpram #(16,8) main_ram (
+	.address_a(ram_addr_eff[15:0]), .address_b(ram_ss_addr),
+	.clock_a(clk_sys), .clock_b(clk_sys),
+	.data_a(ram_di_eff), .data_b(ram_ss_wdata),
+	.enable_a(1'b1), .enable_b(1'b1),
+	.wren_a(ram_we_mach && !ram_aux),
+	.wren_b(ram_ss_wr && !ram_ss_bank && !ss_reset),
+	.q_a(main_ram_q_a), .q_b(main_ram_q_b)
+);
+
+dpram #(16,8) aux_ram (
+	.address_a(ram_addr_eff[15:0]), .address_b(ram_ss_addr),
+	.clock_a(clk_sys), .clock_b(clk_sys),
+	.data_a(ram_di_eff), .data_b(ram_ss_wdata),
+	.enable_a(1'b1), .enable_b(1'b1),
+	.wren_a(ram_we_mach && ram_aux),
+	.wren_b(ram_ss_wr && ram_ss_bank && !ss_reset),
+	.q_a(aux_ram_q_a), .q_b(aux_ram_q_b)
+);
+
+// dpram q_a is a combinational NEW_DATA read; one register stage keeps
+// the EXACT registered-read timing of the previously verified inferred
+// RAM (on a write cycle q_a = the new data, so the write-through
+// behavior is preserved byte-for-byte).
+always @(posedge clk_sys) begin: ram_do_reg
+	ram_do[7:0]  <= main_ram_q_a;
+	ram_do[15:8] <= aux_ram_q_a;
 end
+
+// Save-state read: the RAW q_b (same wiring as the level_1b mister).
+// Port B's address is registered (address_reg_b=CLOCK1), so q_b during
+// cycle N+1 holds the byte at the address presented during cycle N -
+// exactly the one-cycle latency the manager's protocol samples (ram_rd
+// in cycle N, ram_rdata sampled in N+1).
+assign ram_ss_rdata = ram_ss_bank ? aux_ram_q_b : main_ram_q_b;
 
 // Keyboard: real PS/2 interface; the HPS forwards the physical keyboard
 // via hps_io.ps2_key.  CLK_14M clocks the PS/2 decode state machine
@@ -480,8 +563,9 @@ apple2 d1 (
 	.PHASE_ZERO_F(w_pzf),
 	.FLASH_CLK   (flash_clk),
 	.reset       (reset_sync),
-	.cpu         (~status[5]),
-	.STALL       (osd_pause),
+	.cpu         (active_cpu),
+	// OSD pause + save-state freeze (level_1b pattern).
+	.STALL       (osd_pause || ss_busy),
 	.ADDR        (w_addr),
 	.ram_addr    (ram_addr),
 	.D           (ram_di),
@@ -518,19 +602,72 @@ apple2 d1 (
 	.DBG_DI      (),
 	.DBG_ROM_ADDR(),
 	.DBG_ROM_OUT (),
-	// Save-state WIP ports added to rtl/apple2.v by the parallel
-	// save-state work (commit f5b3c64 "wire save state to more
-	// components", 2026-09-06 18:03): level-2 has no save-state
-	// feature.  machine_ce MUST be driven 1 - the core gates ALL
-	// machine state on it (CPU register updates in apple2.v and the
-	// HBLANK/VBLANK outputs in timing_generator.v); left unconnected,
-	// Quartus ties it to GND and the machine is completely dead
-	// (no sync, no video, no boot - the 2026-09-06 black-screen
-	// build).  OSD pause is already handled by STALL above.
-	.machine_ce  (1'b1),
-	.ss_wren     (1'b0),
-	.ss_addr     (10'd0),
-	.ss_wdata    (64'd0)
+	// Save-state (level_1b port, 2026-09-08): machine_ce is the
+	// manager's freeze - 1 only in IDLE/FREEZE, 0 during the
+	// register/RAM walk (the core gates ALL machine state on it;
+	// unconnected it ties to GND and the machine is dead - the
+	// 2026-09-06 black-screen build).  The ss_* bus carries the
+	// per-word register capture/apply; the wrapper mux below owns
+	// words 8/9/10 (reset/flash state, spare, CPU select).
+	.machine_ce  (machine_ce),
+	.ss_addr     (ss_addr),
+	.ss_wdata    (ss_wdata),
+	.ss_wren     (ss_wren),
+	.ss_rdata    (core_ss_rdata),
+	.cpu_frozen  (cpu_frozen)
+);
+
+/////////////////  SAVE STATE (level_1b port)  /////////////////////
+// One atomic coordinator (savestate_manager_l1b) freezes the machine,
+// captures/serializes register words 0-10 and both 64 KiB RAM banks,
+// and restores them in the order RAM -> machine words 3-10 -> CPU
+// words 0-2.  The direct 64-bit DDRAM bridge (savestate_ddr_l1b,
+// corrected 2026-09-07: beat base 29'h07C00000, stride 1, burst 1) does
+// one acknowledged 64-bit transaction at a time.  V1 scope (level_1b
+// map): CPU + main/aux RAM + machine latches + timing/video phase.
+// The Disk II path (disk_ii/drive_ii/floppy_track) is NOT in the v1
+// state - see SAVESTATE_V2_DISK_MAP.md for the planned v2 extension.
+wire [9:0]  ss_addr;
+wire [63:0] ss_wdata, ss_rdata, core_ss_rdata;
+wire        ss_wren;
+wire        machine_ce;
+wire        cpu_frozen;
+wire        ss_busy, ss_done, ss_error, ss_locked_cpu;
+wire        slot_rd, slot_wr, slot_ready;
+wire [14:0] slot_addr;
+wire [63:0] slot_wdata, slot_rdata;
+wire        current_cpu  = ~status[5];
+wire        active_cpu   = ss_busy ? ss_locked_cpu : current_cpu;
+wire        ss_reset     = reset_cold || reset_warm || soft_reset;
+
+// Wrapper-owned register words (level_1b pattern): 8 = reset/flash
+// chain, 9 = spare, 10 = selected CPU.  Everything else is the core's.
+assign ss_rdata = (ss_addr == 10'd8) ?
+                  {39'd0, reset_sync, power_on_reset, flash_div} :
+                  (ss_addr == 10'd9) ? 64'd0 :
+                  (ss_addr == 10'd10) ? {63'd0, active_cpu} : core_ss_rdata;
+
+savestate_manager_l1b state_manager (
+	.clk(clk_sys), .reset(ss_reset),
+	.request_save(save_request), .request_load(load_request),
+	.allow_save_state(1'b1), .cpu_type(current_cpu), .cpu_frozen(cpu_frozen),
+	.stall(), .machine_ce(machine_ce), .busy(ss_busy), .done(ss_done),
+	.error(ss_error), .locked_cpu_type(ss_locked_cpu),
+	.ss_addr(ss_addr), .ss_wdata(ss_wdata), .ss_wren(ss_wren), .ss_rdata(ss_rdata),
+	.ram_bank(ram_ss_bank), .ram_addr(ram_ss_addr), .ram_rd(ram_ss_rd),
+	.ram_wr(ram_ss_wr), .ram_wdata(ram_ss_wdata), .ram_rdata(ram_ss_rdata),
+	.slot_addr(slot_addr), .slot_rd(slot_rd), .slot_wr(slot_wr),
+	.slot_wdata(slot_wdata), .slot_rdata(slot_rdata), .slot_ready(slot_ready)
+);
+
+savestate_ddr_l1b #(.BASE_ADDR(29'h07C00000)) ddr_ss (
+	.clk(clk_sys), .reset(ss_reset),
+	.slot_addr(slot_addr), .slot_rd(slot_rd), .slot_wr(slot_wr),
+	.slot_wdata(slot_wdata), .slot_rdata(slot_rdata), .slot_ready(slot_ready),
+	.ddram_clk(DDRAM_CLK), .ddram_busy(DDRAM_BUSY), .ddram_burstcnt(DDRAM_BURSTCNT),
+	.ddram_addr(DDRAM_ADDR), .ddram_dout(DDRAM_DOUT),
+	.ddram_dout_ready(DDRAM_DOUT_READY), .ddram_rd(DDRAM_RD),
+	.ddram_din(DDRAM_DIN), .ddram_be(DDRAM_BE), .ddram_we(DDRAM_WE)
 );
 
 // Disk II slot controller (slot 6) - mirrors apple2_top.v:528 / tb_l2.sv.
@@ -670,6 +807,89 @@ wire native_vsync = vbl & (vblank_lines >= VSYNC_FRONT_PORCH) &
                     (vblank_lines < VSYNC_FRONT_PORCH + VSYNC_LINES);
 wire [7:0] native_rgb = {8{video}};
 
+/////////////////  COMPOSITE VIDEO  /////////////////////
+// video_mixer_plus' composite branch decodes the composite stream in the
+// CLK_VIDEO (57.27 MHz) domain, so the encoder must run there too.  The
+// machine clock (14.318 MHz) is CLK_VIDEO/4 via ce_pix: every machine
+// signal changes at most once per 4 CLK_VIDEO-cycle window, so a 2-FF
+// synchronizer is safe for video/blanking, and ce_pix strobes exactly one
+// composite sample per machine cycle (the encoder is clock-domain
+// agnostic - it sequences one sample per ce pulse).
+reg video_s1, video_s2;
+always @(posedge CLK_VIDEO) begin
+	video_s1 <= video;
+	video_s2 <= video_s1;
+end
+wire video_c = video_s2;
+reg hbl_s1, hbl_s2;
+always @(posedge CLK_VIDEO) begin
+	hbl_s1 <= hbl;
+	hbl_s2 <= hbl_s1;
+end
+wire hbl_c = hbl_s2;
+reg vbl_s1, vbl_s2;
+always @(posedge CLK_VIDEO) begin
+	vbl_s1 <= vbl;
+	vbl_s2 <= vbl_s1;
+end
+wire vbl_c = vbl_s2;
+
+// Sync derivation in the CLK_VIDEO domain - same structure as the native
+// path above, but cycle/line counts tick on ce_pix (machine cycles) and
+// the edges are of the synchronized blanking, so the encoder and the
+// mixer's decoder see one coherent, mutually aligned signal set.
+reg [9:0] hblank_cnt_c = 10'd0;
+always @(posedge CLK_VIDEO) begin
+	if (ce_pix && hbl_c)
+		hblank_cnt_c <= hblank_cnt_c + 10'd1;
+	else
+		hblank_cnt_c <= 10'd0;
+end
+reg         hbl_c_d    = 1'b0;
+wire        hbl_c_rise = hbl_c & ~hbl_c_d;
+always @(posedge CLK_VIDEO) hbl_c_d <= hbl_c;
+reg [6:0]   vblank_lines_c = 7'd0;
+always @(posedge CLK_VIDEO) begin
+	if (vbl_c) begin
+		if (hbl_c_rise)
+			vblank_lines_c <= vblank_lines_c + 7'd1;
+	end else begin
+		vblank_lines_c <= 7'd0;
+	end
+end
+wire comp_hsync_c = hbl_c & (hblank_cnt_c >= HSYNC_FRONT_PORCH) &
+                    (hblank_cnt_c < HSYNC_FRONT_PORCH + HSYNC_WIDTH);
+wire comp_vsync_c = vbl_c & (vblank_lines_c >= VSYNC_FRONT_PORCH) &
+                    (vblank_lines_c < VSYNC_FRONT_PORCH + VSYNC_LINES);
+
+// Encoder (unity saturation, zero hue): modulated sample stream out.
+// The internal loopback decoder's r/g/b are unconnected here and are
+// pruned at synthesis.
+wire signed [23:0] comp_sample;
+apple_composite #(
+	.BURST_START(8),
+	.BURST_LEN  (64)
+) comp_enc (
+	.clk         (CLK_VIDEO),
+	.ce          (ce_pix),
+	.video       (video_c),
+	.hs          (comp_hsync_c),
+	.vs          (comp_vsync_c),
+	.hb          (hbl_c),
+	.vb          (vbl_c),
+	.sat         (8'd128),
+	.hue         (8'd0),
+	.r           (),
+	.g           (),
+	.b           (),
+	.ce_out      (),
+	.hs_out      (),
+	.vs_out      (),
+	.hb_out      (),
+	.vb_out      (),
+	.comp_sample (comp_sample)
+);
+
 // Drive status LED overlay (byte-identical copy of the newsdee core's
 // rtl/drive_status_overlay.sv): 2x2 LEDs near the bottom-right of the
 // active area, one per drive.  Dim while the selected drive's motor is on;
@@ -693,13 +913,29 @@ drive_status_overlay drive_status_overlay
 	.rgb_out(drive_overlay_rgb)
 );
 
-video_mixer #(.LINE_LENGTH(580), .GAMMA(1)) video_mixer
+video_mixer_plus #(.LINE_LENGTH(580), .GAMMA(1), .COMP_SPC(4)) video_mixer_plus
 (
 	.CLK_VIDEO (CLK_VIDEO),
 	.CE_PIXEL  (CE_PIXEL),
 	.ce_pix    (ce_pix),
 	.scandoubler(1'b0),
 	.hq2x      (1'b0),
+	.use_composite(use_composite),
+	.ce_comp   (ce_pix),
+	.composite (comp_sample),
+	.comp_hs   (comp_hsync_c),
+	.comp_vs   (comp_vsync_c),
+	.comp_hb   (hbl_c),
+	.comp_vb   (vbl_c),
+	.comp_burst_start(10'd8),
+	.comp_burst_len  (10'd64),
+	.comp_sat    (comp_sat_v),
+	.comp_hue    (comp_hue_v),
+	.comp_smear  (4'd0),
+	.comp_luma_delay(4'd0),
+	.comp_setup  (16'sd0),
+	.comp_luma_gain(16'sd2857),
+	.comp_agc    (1'b1),
 	.gamma_bus (gamma_bus),
 	.R         (drive_overlay_rgb[23:16]),
 	.G         (drive_overlay_rgb[15:8]),
@@ -728,8 +964,7 @@ assign USER_OUT  = '1;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML,
          SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
-assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE,
-         DDRAM_RD, DDRAM_WE} = 0;
+// DDRAM_* is driven by the save-state bridge (ddr_ss above).
 
 assign LED_USER  = 1'b1;
 assign LED_POWER = 2'b00;
@@ -739,7 +974,9 @@ assign VGA_F1    = 1'b0;
 assign VGA_SL    = 2'b00;
 assign VGA_SCALER  = 1'b0;
 assign VGA_DISABLE = 1'b0;
-assign HDMI_FREEZE = 1'b0;
+// Freeze the HDMI output while a save/load transaction is in flight
+// (level_1b pattern).
+assign HDMI_FREEZE = ss_busy;
 
 assign ADC_BUS   = 4'bz;
 assign UART_RTS  = 1'b0;

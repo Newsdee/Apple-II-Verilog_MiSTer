@@ -1,9 +1,14 @@
-# Save-state DDR contract cross-check (DRAFT, design-only)
+# Save-state DDR contract cross-check
 
-Status: **DRAFT** — written 2026-09-06. Audits `../level_1b/savestate_ddr_l1b.sv`
-and `../level_1b/mister/Apple-II.sv` against the DDR contract that the
-level_1b PLAN freezes. No RTL touched. Companion test: `tb_ss_ddr.sv`
-(same directory).
+Status: **RESOLVED** — written 2026-09-06, corrected 2026-09-07. Companion
+test: `tb_ss_ddr.sv` (same directory).
+
+**2026-09-07 CORRECTION:** the initial audit copied NES state-manager DWORD
+units onto MiSTer's direct 64-bit DDR port. The direct port uses one address
+per 64-bit beat and `DDRAM_BURSTCNT=1`. The corrected bridge uses base
+`29'h07C00000`, stride one, and burst one. `tb_ss_ddr` reports **T1-T6 all
+PASS**. Sections 1-5 below preserve the original investigation and failed
+hypothesis as historical context; they are not the current contract.
 
 ## 1. Sources of the contract
 

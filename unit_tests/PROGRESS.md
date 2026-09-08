@@ -962,3 +962,32 @@ Related open threads (from this session, decided/parked):
   user's visual check); the crashed session's font/glyph forensics detour.
   No `rtl/` files were changed by the level_2 work (harness-only).
   `unit_tests/level_2/` is untracked.
+- **level_2 composite video path (2026-09-07/08):** `rtl/apple_composite.sv`
+  (encoder + vendored SPC=4 decoder) is integrated into the level_2
+  harness behind `--composite` (`tb_l2.sv` derives syncs exactly like the
+  MiSTer wrapper; `main_l2.cpp` options `--composite --csat=N --chue=N`).
+  The unit test (`make composite`, separate obj dir, `--binary --timing`)
+  and all four level_2 smoke tests pass; the default run is unchanged
+  (DUT frozen on `ce`). The one scary FAIL along the way (ink ~33x the
+  mono reference) was a **testbench frame-mismatch bug**, not the video
+  path: the C++ mono reference must be latched at the same VBL edge as
+  the composite stats, not read from the rolling `frame[]` buffer at
+  $finish. Measured frame geometry: **262 lines** x 911-912 samples
+  (351 blank + 560 active), VBL = 69 lines. Details + environment
+  hazards (Windows Defender killing fresh Verilator PEs with exit 127
+  after a grace window) in `level_2/COMPOSITE_PROGRESS.md`.
+  **FPGA wiring (2026-09-08, level2 MiSTer project):** the composite path
+  is now integrated into `unit_tests/level_2/mister/Apple-II.sv` behind a
+  new OSD option `O9,Composite video,Off,On` (default Off -> byte-identical
+  to the Sep 6 baseline). The wrapper syncs video/blanking into CLK_VIDEO
+  (2-FF, safe at 4x rate), derives syncs there, runs `apple_composite` on
+  CLK_VIDEO/ce_pix (new `comp_sample` port carries the Q2.21 stream), and
+  selects the native vs composite branch in `video_mixer_plus`
+  (replaces `video_mixer`; its non-composite branch is the framework
+  mixer). Sources registered in level2.qsf + files.qip; `mister/rtl/
+  video_mixer_plus.sv` is an untracked duplicate, deliberately not
+  registered. Verified by `verilator --lint-only` (clean) + `tb_mixplus.sv`
+  harness (`make mixplus`) — functional run pending a host-level AV
+  regression that kills all freshly linked C++ PEs (0xC0000061). User-run
+  Quartus: `quartus_sh --flow compile level2` from the mister dir. See
+  `level_2/COMPOSITE_PROGRESS.md` session log.

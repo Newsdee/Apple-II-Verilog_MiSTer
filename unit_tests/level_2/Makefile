@@ -39,6 +39,26 @@ REPO     := $(abspath $(LEVELDIR)/../..)
 RTL      := $(REPO)/rtl
 V        ?= verilator_bin
 
+# ---------------------------------------------------------------------------
+# MSYS2 make env quirk (2026-09-07, lesson learned, root-caused the same day):
+# the canonical build path is NATIVE mingw32-make (see run_l2.sh and
+# unit_tests/PROGRESS.md 1b.1/1b.6). Two traps for the TMP the link stage
+# needs, both verified with probe makefiles on this host:
+#  1. MSYS /usr/bin/make does NOT propagate the outer shell's TMP/TEMP/TMPDIR
+#     into recipe child envs (they arrive empty), so g++ falls back to
+#     C:\WINDOWS, which this host denies writes to -> "Cannot create temporary
+#     file in C:\WINDOWS: Permission denied" / Error 127.
+#  2. The `export` directives below fix (1), but the value MUST be a Windows
+#     drive path (C:/msys64/tmp). A POSIX-style /c/msys64/tmp is re-converted
+#     by native g++ relative to the current drive -> E:\c\msys64\tmp (absent)
+#     -> g++ fast-fails -> "Error -1073740791" (0xC0000409) at the link.
+#     Windows-form TMP links fine under native make; MSYS make also accepts it.
+# Harmless under mingw32-make when the outer shell already exports a good TMP.
+# ---------------------------------------------------------------------------
+export TMP    := C:/msys64/tmp
+export TEMP   := C:/msys64/tmp
+export TMPDIR := C:/msys64/tmp
+
 # apple2.v instantiates BOTH cores unconditionally
 CPU_SRC  := $(RTL)/cpu/nmos6502/cpu_65c02.sv $(RTL)/cpu/nmos6502/cpu_alu.sv \
             $(RTL)/cpu/wdc65c02/cpu_65c02.sv $(RTL)/cpu/wdc65c02/cpu_alu.sv
@@ -48,6 +68,12 @@ MACH_SRC := $(RTL)/apple2.v $(RTL)/keyboard.v $(RTL)/timing_generator.v \
 # Disk II slot controller + per-drive MFM + track buffer (level_2 addition)
 DISK_SRC := $(RTL)/disk_ii.v $(RTL)/drive_ii.v $(RTL)/floppy_track.sv \
             $(RTL)/dpram.v
+# Composite video path (encoder + SPC=4 decoder, 2026-09-07)
+COMP_SRC := $(RTL)/apple_composite.sv mister/composite_decoder.sv
+# Save-state (level_1b port, 2026-09-08): coordinator + direct 64-bit
+# DDRAM bridge, referenced LIVE from unit_tests/level_1b/ (the same
+# modules the level_2 mister build uses).
+SS_SRC   := ../level_1b/savestate_manager_l1b.sv ../level_1b/savestate_ddr_l1b.sv
 # ROMs read by the DUT ($readmemh, CWD-relative) and by the TB oracle
 ROMS     := $(RTL)/roms/apple2e.hex $(RTL)/roms/keyboard.hex \
             $(RTL)/roms/video2.hex $(RTL)/roms/video.hex \
@@ -91,28 +117,85 @@ HOSTINC   := -I$(REPO)/verilator/sim -I$(LEVELDIR)
 GUI_CFLAGS  := -I$(LEVELDIR)/gui/imgui -I$(LEVELDIR)/gui/imgui/backends -I$(SDL_INC) $(HOSTINC)
 GUI_LDFLAGS := -lSDL2 -lopengl32
 
-.PHONY: all gui clean run
+# Composite video unit tests (2026-09-07, see COMPOSITE_PROGRESS.md):
+# encoder + SPC=4 decoder against a synthetic NTSC line stream, no machine.
+# Separate obj dirs so the l2 build/clean never clobbers them (the level_2
+# Makefile has been shared with other work in the same dir - keep it that
+# way; do not build the composite unit exes into build/).
+COMPOUT   := $(LEVELDIR)/build_comp
+COMPEXE   := $(COMPOUT)/obj_dir/Vtb_composite.exe
+COMPDBG   := $(LEVELDIR)/build_comp_dbg
+COMPDBGE  := $(COMPDBG)/obj_dir/Vtb_composite_dbg.exe
+MIXOUT    := $(LEVELDIR)/build_mixplus
+MIXEXE    := $(MIXOUT)/obj_dir/Vtb_mixplus.exe
+# --binary (not --exe): a pure self-driving TB has no C++ main, so
+# Verilator's auto main is required - it also provides the sc_time_stamp()
+# stub that --timing links need (a bare --exe link fails with undefined
+# sc_time_stamp + WinMain on this toolchain; level_1b uses --binary the
+# same way).  Verified 2026-09-07.
+COMP_VFLAGS := --cc --binary -O2 -Wno-fatal -Wno-WIDTH --timing
+# hq2x.sv (framework, Quartus-compiled) procedurally assigns a wire
+# (Result) - a Verilator strict-mode error, harmless here: hq2x is
+# instantiated but never selected (hq2x=0).
+MIX_VFLAGS := $(COMP_VFLAGS) -Wno-PROCASSWIRE
+
+.PHONY: all gui clean run composite composite_dbg
 all: $(EXE)
 gui: $(GUIEXE)
+composite: $(COMPEXE)
+composite_dbg: $(COMPDBGE)
+# Composite wrapper-block harness (2026-09-08): drives the Apple-II.sv
+# COMPOSITE VIDEO section (2-FF sync + CLK_VIDEO-domain sync derivation +
+# encoder + video_mixer_plus A/B) from a 4x clock with a ce_pix divider.
+mixplus: $(MIXEXE)
 
-$(EXE): tb_l2.sv main_l2.cpp l2_disk_host.h $(MACH_SRC) $(CPU_SRC) $(DISK_SRC) $(ROMS)
+$(EXE): tb_l2.sv main_l2.cpp l2_disk_host.h $(MACH_SRC) $(CPU_SRC) $(DISK_SRC) $(COMP_SRC) $(SS_SRC) $(ROMS)
 	@mkdir -p $(OUT)/obj_dir
 	VERILATOR_ROOT=$(VROOT) $(V) --cc -exe $(V_OPT) $(V_DEF) --top-module tb_l2 \
 		-CFLAGS "$(HOSTINC)" \
-		-Mdir $(OUT)/obj_dir main_l2.cpp tb_l2.sv $(MACH_SRC) $(CPU_SRC) $(DISK_SRC)
+		-Mdir $(OUT)/obj_dir main_l2.cpp tb_l2.sv $(MACH_SRC) $(CPU_SRC) $(DISK_SRC) $(COMP_SRC) $(SS_SRC)
 	$(MAKE) -C $(OUT)/obj_dir -f Vtb_l2.mk
 	@echo "built $@  (run from the REPO ROOT: +cpu=0 nmos / +cpu=1 wdc)"
 
-$(GUIEXE): tb_l2.sv l2_disk_host.h $(GUI_SRC) $(MACH_SRC) $(CPU_SRC) $(DISK_SRC) $(ROMS)
+$(GUIEXE): tb_l2.sv l2_disk_host.h $(GUI_SRC) $(MACH_SRC) $(CPU_SRC) $(DISK_SRC) $(COMP_SRC) $(SS_SRC) $(ROMS)
 	@mkdir -p $(GUIOUT)/obj_dir
 	VERILATOR_ROOT=$(VROOT) $(V) --cc -exe $(V_OPT) $(V_DEF) --top-module tb_l2 \
 		-CFLAGS "$(GUI_CFLAGS)" -LDFLAGS "$(GUI_LDFLAGS)" \
-		-Mdir $(GUIOUT)/obj_dir $(GUI_SRC) tb_l2.sv $(MACH_SRC) $(CPU_SRC) $(DISK_SRC)
+		-Mdir $(GUIOUT)/obj_dir $(GUI_SRC) tb_l2.sv $(MACH_SRC) $(CPU_SRC) $(DISK_SRC) $(COMP_SRC) $(SS_SRC)
 	$(MAKE) -C $(GUIOUT)/obj_dir -f Vtb_l2.mk
 	@echo "built $@  (run from the REPO ROOT: +cpu=0 nmos / +cpu=1 wdc; see run_l2.sh gui)"
 
 run: all
 	$(EXE) +cpu=0
 
+$(COMPEXE): tb_composite.sv $(COMP_SRC)
+	@mkdir -p $(COMPOUT)/obj_dir
+	VERILATOR_ROOT=$(VROOT) $(V) $(COMP_VFLAGS) --top-module tb_composite \
+		-Mdir $(COMPOUT)/obj_dir tb_composite.sv $(COMP_SRC)
+	$(MAKE) -C $(COMPOUT)/obj_dir -f Vtb_composite.mk
+	@mv -f $(COMPOUT)/obj_dir/Vtb_composite $(COMPOUT)/obj_dir/Vtb_composite.exe
+	@echo "built $@  (run from the REPO ROOT)"
+
+$(COMPDBGE): tb_composite_dbg.sv $(COMP_SRC)
+	@mkdir -p $(COMPDBG)/obj_dir
+	VERILATOR_ROOT=$(VROOT) $(V) $(COMP_VFLAGS) --top-module tb_composite_dbg \
+		-Mdir $(COMPDBG)/obj_dir tb_composite_dbg.sv $(COMP_SRC)
+	$(MAKE) -C $(COMPDBG)/obj_dir -f Vtb_composite_dbg.mk
+	@mv -f $(COMPDBG)/obj_dir/Vtb_composite_dbg $(COMPDBG)/obj_dir/Vtb_composite_dbg.exe
+	@echo "built $@  (run from the REPO ROOT)"
+
+$(MIXEXE): mister/tb_mixplus.sv $(COMP_SRC) mister/video_mixer_plus.sv \
+		mister/composite_decoder.sv mister/sys/video_freezer.sv \
+		mister/sys/gamma_corr.sv mister/sys/hq2x.sv mister/sys/scandoubler.v
+	@mkdir -p $(MIXOUT)/obj_dir
+	VERILATOR_ROOT=$(VROOT) $(V) $(MIX_VFLAGS) --top-module tb_mixplus \
+		-Mdir $(MIXOUT)/obj_dir mister/tb_mixplus.sv $(COMP_SRC) \
+		mister/video_mixer_plus.sv mister/composite_decoder.sv \
+		mister/sys/video_freezer.sv mister/sys/gamma_corr.sv mister/sys/hq2x.sv \
+		mister/sys/scandoubler.v
+	$(MAKE) -C $(MIXOUT)/obj_dir -f Vtb_mixplus.mk
+	@if [ -f $(MIXOUT)/obj_dir/Vtb_mixplus ]; then mv -f $(MIXOUT)/obj_dir/Vtb_mixplus $(MIXEXE); fi
+	@echo "built $@  (run from the REPO ROOT)"
+
 clean:
-	rm -rf build build_gui
+	rm -rf build build_gui build_comp build_comp_dbg build_mixplus

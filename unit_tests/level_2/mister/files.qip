@@ -38,3 +38,16 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../../../rtl/floppy_track.sv
 # simulation/differential candidate in the repo.
 set_global_assignment -name VHDL_FILE rtl/dpram.vhd
 set_global_assignment -name VERILOG_FILE rtl/drive_status_overlay.sv
+# Save-state (level_1b port, 2026-09-08): referenced LIVE from
+# unit_tests/level_1b/ - the same modules the level_1b mister build
+# uses (manager + corrected DDR bridge; the regs/ram/arbiter clients
+# are Verilator-TB-only and not needed here).
+set_global_assignment -name SYSTEMVERILOG_FILE ../../level_1b/savestate_manager_l1b.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../level_1b/savestate_ddr_l1b.sv
+# Composite video (2026-09-08): encoder from the repo (live reference,
+# same pattern as the machine core); mixer-plus and vendored decoder are
+# project-local.  NOTE: rtl/video_mixer_plus.sv is a byte-identical
+# duplicate and is deliberately NOT registered.
+set_global_assignment -name SYSTEMVERILOG_FILE ../../../rtl/apple_composite.sv
+set_global_assignment -name SYSTEMVERILOG_FILE video_mixer_plus.sv
+set_global_assignment -name SYSTEMVERILOG_FILE composite_decoder.sv

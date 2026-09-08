@@ -488,3 +488,158 @@ no level_1b file touched — the parallel session's WIP stays clean):
 No commit (files untracked; user commits at discretion). EOL: all three
 new files pure LF. level_1b WIP untouched (verified: only tracked
 mod remains Apple-II.qsf).
+
+## 2026-09-08: Save-state (level_1b) ported to level_2 — Verilator + mister
+
+Triggered by the user: port the level_1b save-state work to level_2 first
+(level_2b later), and make it part of the level_2 mister build.
+
+### What was ported (v1 scope, unchanged from level_1b)
+`savestate_manager_l1b` (atomic coordinator: freeze -> headers -> register
+words 0-10 -> both 64 KiB RAM banks; restore RAM -> machine words 3-10 ->
+CPU words 0-2) + `savestate_ddr_l1b` (direct 64-bit DDRAM bridge, corrected
+2026-09-07: beat base, stride 1, burst 1). Referenced LIVE from
+`unit_tests/level_1b/` (the regs/ram/arbiter clients are Verilator-TB-only
+in level_1b and are NOT used here - the manager drives the slot bus
+directly, exactly as the level_1b mister wrapper does).
+
+**V1 scope = CPU + main/aux RAM + machine latches + timing/video phase.
+The Disk II path (disk_ii/drive_ii/floppy_track) is NOT in the state.**
+`SAVESTATE_V2_DISK_MAP.md` remains the planned v2 extension (needs ss ports
+on the disk DUTs + track-buffer walker regions - not done).
+
+### Verilator harness (`tb_l2.sv` + `main_l2.cpp` + `Makefile`)
+- `tb_l2.sv`: manager + DDR bridge + a TB model of the HPS DDRAM port
+  (64-bit beats, one acknowledged tx at a time, 4-cycle latency;
+  `ddram_mem[0:32767]`); ss bus wired into `apple2`
+  (`.machine_ce(machine_ce)`, `.ss_*`, `.cpu_frozen`); STALL =
+  `stall || ss_busy`; RAM ss read/write path in the inferred arrays
+  (ss write takes priority; the machine's frozen idempotent write is
+  suppressed while ss_busy - inert in normal operation); reset-chain
+  ss-restore branch (word 8); wrapper ss_rdata mux (words 8/9/10).
+  New C++-driven input ports `ss_save_req`/`ss_load_req`.
+- `main_l2.cpp`: new `--savestate` scenario - cold-boot + quiesce ->
+  SAVE -> snapshot (full 64 KiB ram0 image + PC + manager register
+  shadow) -> 100 ms run (drift) -> perturb ONE byte of the STORED state
+  in the DDRAM model (slot word 0xA0, lane 0 = main RAM $0400) -> LOAD
+  (machine stalled via the TB `stall` reg) -> verify the full 64 KiB
+  main-RAM image equals the saved image with exactly that one byte
+  changed, PC + register shadow match, no ss_error -> release stall,
+  confirm frames keep advancing.
+- `Makefile`: `SS_SRC` added to the headless and GUI builds.
+
+**Result (2026-09-08, both CPUs, deterministic - identical timelines):**
+```
+L2 SAVE-TEST: save complete (t=4.722s pc=$1C15)
+L2 SAVE-TEST: drift done (ram_diff=6081 pc_drift=1) - perturbed @word 0xA0
+L2 SAVE-TEST: verify ram_mm=0 pc=$1C15 (saved $1C15) shadow=1 err=0 drift=1 OK
+L2 SAVE-TEST: resume frames=290 (was 287) OK
+L2 SAVE-TEST PASS        (nmos6502 and wdc65c02)
+```
+Regression: `--disk` PRELOADED PASS, `--empty` EMPTY PASS (ss path inert).
+
+Bugs found by the test (both fixed): the `apple2` instance in the TB (and
+initially the mister wrapper) did not connect the `.cpu_frozen` output -
+the manager's FREEZE state hangs forever without it; and the generic
+preloaded pass-check had to exclude `do_ss` (it broke the loop at boot).
+
+### mister build (`mister/Apple-II.sv` + `files.qip` + `level2.qsf`)
+Same wiring as the level_1b mister wrapper: `SS3E000000:200000` in
+CONF_STR, OSD `O2,Save State` / `O3,Load State` (edge-detected), manager +
+`savestate_ddr_l1b #(.BASE_ADDR(29'h07C00000))` driving the DDRAM_* ports
+(were tied 0), STALL = `osd_pause || ss_busy`, `.cpu(active_cpu)`
+(locked CPU during a transaction), RAM ss path in the inferred arrays,
+reset-chain ss-restore, `HDMI_FREEZE = ss_busy`. Both savestate sources
+registered in `files.qip` AND the qsf source list (live refs to
+`../../level_1b/`).
+
+Verified at the Verilator lint level (full wrapper elaborates clean; the
+only remaining lint errors are pre-existing PROCASSWIRE strictness in
+`sys/hps_io.sv`/`hq2x.sv`, which Quartus compiles fine). **The Quartus
+compile is for the user** (build.bat). Watch for: the inferred-RAM
+dual-read-port inference (machine read + ss read per bank) and any
+fit/timing delta from the manager + DDR bridge.
+
+### Not done / remaining
+- Quartus full compile of the level_2 mister core (user).
+- Hardware: OSD Save/Load with a disk mounted; confirm persistence and
+  that the disk path (not in v1 state) behaves acceptably across a load.
+- v2 disk map (disk path state) - separate work, `SAVESTATE_V2_DISK_MAP.md`.
+- level_2b port - explicitly deferred by the user.
+- NOTE: `mister/level2.qsf` was rewritten CRLF by the parallel composite
+  session (HEAD was pure LF) - EOL drift to normalize at commit time.
+
+### 2026-09-08 (cont.): Quartus Error 276003 - save-state RAM read broke inference (FIXED)
+
+First level_2 mister compile with save state failed A&S:
+`Info (276007): RAM logic "emu:emu|ram0/ram1" is uninferred due to
+asynchronous read logic` -> 262,144 leftover registers ->
+`Error (276003)`. Cause: the save-state read
+`ram_ss_rdata_r <= ram_ss_bank ? ram1[ram_ss_addr] : ram0[ram_ss_addr]`
+muxes the ARRAY INDEX across two memories; Quartus 17 sees asynchronous
+read logic and refuses to infer either bank.
+
+Fix (mister/Apple-II.sv AND tb_l2.sv, mirrored): canonical dual-port
+pattern - port A = the ORIGINAL machine pattern (inferred RAM, registered
+read, write-through; only change: wren gated by !ss_busy so the two
+write ports can never be enabled in the same cycle), port B = separate
+per-bank always blocks (`ss_ram0`/`ss_ram1`) with the bank mux on the
+REGISTERED OUTPUTS (`ram0_ss_r`/`ram1_ss_r`), never on the array.
+`video_rom` (video_generator) shows the same "uninferred due to
+asynchronous read" info but is pre-existing (the Sep 6 build fit with
+it) and harmless.
+
+Re-verified after the restructure: L2 SAVE-TEST PASS both CPUs,
+byte-identical timelines to before (ram_mm=0, pc/shadow match, drift=1,
+resume OK). Quartus re-compile is for the user: the map report must show
+ram0/ram1 inferred (no 276007 for emu:emu|ram0/ram1) and no 276003.
+
+### 2026-09-08 (cont. 2): second inference failure -> explicit dpram RAMs (FIXED, verified)
+
+Second compile still failed A&S, new reason:
+`Info (276009): RAM logic "emu:emu|ram0/ram1" is uninferred due to
+unsupported read-during-write behavior` (the async-read issue was gone).
+Quartus 17 will not infer the dual-client arrays in any shape tried
+(cross-array ternary read; then per-bank blocks with write-through port A
++ conditional port B). Stopped fighting the inference heuristics and
+switched to the pattern the newsdee project and the level_1b mister both
+landed on: **two explicit `dpram` (altsyncram) instances**
+(`rtl/dpram.vhd`, already registered in this project for floppy_track):
+
+- port A = machine (`wren_a = ram_we_mach && aux_sel`), port B = save
+  state (`wren_b = ram_ss_wr && bank_sel && !ss_reset`); the two write
+  ports can never be enabled in the same cycle.
+- `ram_do` = one register stage on the combinational NEW_DATA `q_a` -
+  byte-identical timing to the previously verified inferred RAM
+  (write-through preserved: q_a = new data on write cycles).
+- ss read = the RAW `q_b` (exactly the level_1b mister wiring): port B's
+  address is registered (address_reg_b=CLOCK1), so q_b in cycle N+1
+  holds the byte at the address presented in cycle N - precisely the
+  manager's one-cycle protocol (ram_rd in N, ram_rdata sampled in N+1).
+
+The TB (`tb_l2.sv`) mirrors the FPGA wiring EXACTLY: the same `dpram`
+module (Verilog behavioral model `rtl/dpram.v`, verified against the
+altsyncram config), same port connections, same raw-q_b read, same
+register stage. C++ rootp paths updated (`main_ram.mem`).
+
+Differential result: L2 SAVE-TEST PASS both CPUs with a
+byte-identical timeline to the inferred-RAM version (load complete
+t=4.840s, ram_mm=0, pc/shadow match, drift=1, resume frames 287->290) -
+i.e. the FPGA wiring is now simulation-verified end-to-end. Regression:
+PRELOADED PASS. Quartus re-compile for the user: expect main_ram/aux_ram
+as altsyncram (block RAM), no 276007/276009 for emu:emu|ram0/ram1, no
+276003. Resource note: 2 x 64 KiB in M10Ks (was inferred before the
+save-state change; same memory, now explicit).
+
+### 2026-09-08 (cont. 3): level_2 mister full compile GREEN with save state
+
+User-confirmed. `level2.map.summary` A&S Successful 07:20, Fitter
+Successful 07:28, Assembler Successful 07:28, RBF built
+(`level2_build05.rbf`). Map report: `dpram:main_ram|altsyncram` and
+`dpram:aux_ram|altsyncram` - both main RAMs in block RAM; no 276009, no
+276003; only the pre-existing harmless `video_rom` 276007 (present in
+the Sep 6 passing build too). ALM 11,503 / 41,910 (27%).
+
+Remaining: on-hardware OSD Save/Load test (save with a disk mounted,
+change machine state, load, confirm continuation) and the v2 disk map
+when wanted.

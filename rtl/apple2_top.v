@@ -50,6 +50,8 @@ module apple2_top(
     palette_switch,
     COLOR_PALETTE,
     GRAY_SEAM_FIX,
+    SEAM_RUN_FILL,
+    SEAM_RUN_WIDE,
     NTSC_VERTICAL_COMB,
     PALMODE,
     ROMSWITCH,
@@ -63,6 +65,7 @@ module apple2_top(
     virtual_closed_apple,
     joy,
     joy_an,
+    JOY_TO_KEY_EN,
     TRACK1,
     TRACK1_ADDR,
     TRACK1_DI,
@@ -112,8 +115,6 @@ module apple2_top(
     mouse_x,
     mouse_y,
     mouse_button,
-    mouse_scale,
-    mouse_rate,
     mouse_4_inslot,
     mouse_5_inslot,
     mb_4_inslot,
@@ -158,6 +159,8 @@ module apple2_top(
     output        palette_switch;
     input  [1:0]  COLOR_PALETTE;	// 00: Original (//e NTSC), 01: //gs, 02: AppleWin, 03: //c PAL
     input         GRAY_SEAM_FIX;
+    input         SEAM_RUN_FILL;
+    input         SEAM_RUN_WIDE;
     input         NTSC_VERTICAL_COMB;
     input         PALMODE;		// PAL/NTSC selection
     input         ROMSWITCH;
@@ -172,6 +175,7 @@ module apple2_top(
     input         virtual_closed_apple;
     input  [7:0]  joy;
     input  [15:0] joy_an;
+    input         JOY_TO_KEY_EN;
 
     // disk control
     output [5:0]  TRACK1;		// Current track (0-34)
@@ -230,8 +234,6 @@ module apple2_top(
     input  [8:0]  mouse_x;
     input  [8:0]  mouse_y;
     input         mouse_button;
-    input  [1:0]  mouse_scale;
-    input  [1:0]  mouse_rate;
 
     // slot status
     input         mouse_4_inslot;
@@ -280,6 +282,7 @@ module apple2_top(
     wire          VBL;
     wire          COLOR_LINE;
     wire          COLOR_LINE_CONTROL;
+    wire          RUN_FILL_OK;
     wire          TEXT_MODE;
 
     wire [7:0]    GAMEPORT;
@@ -424,6 +427,7 @@ module apple2_top(
         .ram_we(we_ram),
         .VIDEO(VIDEO),
         .COLOR_LINE(COLOR_LINE),
+        .RUN_FILL_OK(RUN_FILL_OK),
         .TEXT_MODE(TEXT_MODE),
         .HBL(HBL),
         .VBL(VBL),
@@ -443,7 +447,17 @@ module apple2_top(
         .ioctl_download(ioctl_download),
         .ioctl_wr(ioctl_wr),
         .saturn_5_inslot(saturn_5_inslot),
-        .speaker(spk_bit)
+        .speaker(spk_bit),
+        .DBG_T65_REGS(),
+        .DBG_DI(),
+        .DBG_ROM_ADDR(),
+        .DBG_ROM_OUT(),
+        .ss_addr(10'd0),
+        .ss_wdata(64'd0),
+        .ss_wren(1'b0),
+        .ss_rdata(),
+        .machine_ce(1'b1),
+        .cpu_frozen()
     );
 
     vga_controller tv(
@@ -453,11 +467,9 @@ module apple2_top(
         .SCREEN_MODE(SCREEN_MODE),
         .COLOR_PALETTE(COLOR_PALETTE),
         .GRAY_SEAM_FIX(GRAY_SEAM_FIX),
-        // Run fill (2-3 px seam runs) is developed/A/B-tested in vga_color_test;
-        // kept off in the full sim (bit-identical to v2-only).
-        .SEAM_RUN_FILL(1'b0),
-        .SEAM_RUN_WIDE(1'b0),
-        .RUN_FILL_OK(1'b0),
+        .SEAM_RUN_FILL(SEAM_RUN_FILL),
+        .SEAM_RUN_WIDE(SEAM_RUN_WIDE),
+        .RUN_FILL_OK(RUN_FILL_OK),
         .NTSC_VERTICAL_COMB(NTSC_VERTICAL_COMB),
         .HBL(HBL),
         .VBL(VBL),
@@ -481,14 +493,14 @@ module apple2_top(
     // Joy-to-key: map the digital joystick to Apple II keystrokes. Sits next
     // to the keyboard (CLK_14M domain) and injects one-shot key presses
     // independently of the OSK virtual path, so PS/2 and the raw joystick are
-    // both untouched. Enabled at build time via -DJOY_TO_KEY (tied on here);
-    // a runtime OSD toggle can replace the 1'b1 later.
+    // both untouched. The build flag includes the feature and the OSD input
+    // controls it at runtime.
     wire        joy_key_press;
     wire [6:0]  joy_key_code;
     joy_to_key joy_to_key(
         .clk(CLK_14M),
         .reset(reset_cold),
-        .enable(1'b1),
+        .enable(JOY_TO_KEY_EN),
         .joy(joy),
         .ioctl_download(ioctl_download),
         .ioctl_wr(ioctl_wr),
@@ -722,8 +734,7 @@ module apple2_top(
         .STROBE(mouse_strobe),
         .X(mouse_x),
         .Y(mouse_y),
-        .SCALE(mouse_scale),
-        .RATE(mouse_rate),
+        .SCALE(2'b00),
         .BUTTON(mouse_button)
     );
 `endif
@@ -751,8 +762,7 @@ module apple2_top(
         .STROBE(mouse_strobe),
         .X(mouse_x),
         .Y(mouse_y),
-        .SCALE(mouse_scale),
-        .RATE(mouse_rate),
+        .SCALE(2'b00),
         .BUTTON(mouse_button)
     );
 `endif

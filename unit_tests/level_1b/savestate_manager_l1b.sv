@@ -3,6 +3,7 @@ module savestate_manager_l1b (
   input  wire        reset,
   input  wire        request_save,
   input  wire        request_load,
+  input  wire        allow_save_state,
   input  wire        cpu_type,
   input  wire        cpu_frozen,
   output wire        stall,
@@ -154,10 +155,15 @@ module savestate_manager_l1b (
       case (state)
         IDLE: begin
           if (request_save || request_load) begin
-            busy <= 1'b1;
-            locked_cpu_type <= cpu_type;
-            operation_load <= request_load;
-            state <= FREEZE;
+            if (!allow_save_state) begin
+              done <= 1'b1;
+              error <= 1'b1;
+            end else begin
+              busy <= 1'b1;
+              locked_cpu_type <= cpu_type;
+              operation_load <= request_load;
+              state <= FREEZE;
+            end
           end
         end
         FREEZE: begin

@@ -334,6 +334,8 @@ apple2_top apple2_top
 	.TEXT_COLOR(text_color),
 	.COLOR_PALETTE(palette_int),
 	.GRAY_SEAM_FIX(gray_seam_fix),
+	.SEAM_RUN_FILL(1'b0),
+	.SEAM_RUN_WIDE(1'b0),
 	.NTSC_VERTICAL_COMB(ntsc_vertical_comb),
 	.ioctl_addr(ioctl_addr),
 	.ioctl_data(ioctl_dout),
@@ -357,6 +359,7 @@ apple2_top apple2_top
 
 	.joy(virtual_keyboard_active ? 8'h00 : joyd),
 	.joy_an(virtual_keyboard_active ? 16'h0000 : joya),
+	.JOY_TO_KEY_EN(1'b1),
 
 	.mb_4_inslot(1'b1),
 	.mb_5_inslot(1'b0),
@@ -367,8 +370,6 @@ apple2_top apple2_top
 	.mouse_x(virtual_keyboard_active ? 9'sd0 : {ps2_mouse[4],ps2_mouse[15:8]}),
 	.mouse_y(virtual_keyboard_active ? 9'sd0 : {ps2_mouse[5],ps2_mouse[23:16]}),
 	.mouse_button(virtual_keyboard_active ? 1'b0 : ps2_mouse[0]),
-	.mouse_scale(2'b00),
-	.mouse_rate(2'b00),
 
 
 	.TRACK1(TRACK1),

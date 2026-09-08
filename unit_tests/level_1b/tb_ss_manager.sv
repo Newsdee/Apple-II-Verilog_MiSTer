@@ -7,6 +7,7 @@ module tb_ss_manager;
   reg reset = 1'b1;
   reg request_save = 1'b0;
   reg request_load = 1'b0;
+  reg allow_save_state = 1'b1;
   reg cpu_type = 1'b0;
   reg cpu_frozen = 1'b0;
   wire stall, machine_ce, busy, done, error, locked_cpu_type;
@@ -44,7 +45,8 @@ module tb_ss_manager;
 
   savestate_manager_l1b dut (
     .clk(clk), .reset(reset), .request_save(request_save), .request_load(request_load),
-    .cpu_type(cpu_type), .cpu_frozen(cpu_frozen), .stall(stall),
+    .allow_save_state(allow_save_state), .cpu_type(cpu_type),
+    .cpu_frozen(cpu_frozen), .stall(stall),
     .machine_ce(machine_ce), .busy(busy), .done(done), .error(error),
     .locked_cpu_type(locked_cpu_type), .ss_addr(ss_addr), .ss_wdata(ss_wdata),
     .ss_wren(ss_wren), .ss_rdata(ss_rdata), .ram_bank(ram_bank),
@@ -209,6 +211,20 @@ module tb_ss_manager;
     if (!completion_error || slot_reads != 2 || ram_writes != 0 || reg_writes != 0) begin
       $display("ERROR: CPU mismatch rejection error=%0b reads=%0d ram=%0d regs=%0d",
                completion_error, slot_reads, ram_writes, reg_writes);
+      errors = errors + 1;
+    end
+
+    allow_save_state = 1'b0;
+    slot_reads = 0;
+    slot_writes = 0;
+    ram_writes = 0;
+    reg_writes = 0;
+    pulse_save();
+    wait_done();
+    if (!completion_error || busy || slot_reads != 0 || slot_writes != 0 ||
+        ram_writes != 0 || reg_writes != 0) begin
+      $display("ERROR: disabled rejection error=%0b busy=%0b reads=%0d writes=%0d ram=%0d regs=%0d",
+               completion_error, busy, slot_reads, slot_writes, ram_writes, reg_writes);
       errors = errors + 1;
     end
 

@@ -33,6 +33,7 @@ module apple2(
     ram_we,
     VIDEO,
     COLOR_LINE,
+    RUN_FILL_OK,
     TEXT_MODE,
     HBL,
     VBL,
@@ -88,6 +89,7 @@ module apple2(
     output        ram_we;		// RAM write enable
     output        VIDEO;
     output        COLOR_LINE;
+    output        RUN_FILL_OK;
     output        TEXT_MODE;
     output        HBL;
     output        VBL;
@@ -416,6 +418,7 @@ module apple2(
     assign HIRES_MODE = soft_switches[3];
     assign AN = soft_switches[7:4];
     assign DHIRES_MODE = AN[3];
+    assign RUN_FILL_OK = ~HIRES_MODE | ~DHIRES_MODE;
 
 
     always @(posedge CLK_14M)
