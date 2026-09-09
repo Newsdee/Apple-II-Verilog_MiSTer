@@ -39,7 +39,8 @@
 //                      disk_protect[1:0], stall, reset_cold, ps2_key[10:0],
 //                      flash_div[22:0], romsw,
 //                      dbg_ft_wr_en/addr/data (write-test injection),
-//                      use_composite, comp_sat[7:0], comp_hue[7:0]
+//                      use_composite, comp_sat[7:0], comp_hue[7:0],
+//                      comp_bright[7:0], comp_contrast[7:0]
 //                      (composite video path, 2026-09-07),
 //                      ss_save_req, ss_load_req (save-state, 2026-09-08)
 //   out (C++ reads):   sd_rd[1:0], sd_wr[1:0], sd_lba_a/b[31:0],
@@ -50,7 +51,10 @@
 //                      dbg_motor1_cnt, dbg_track1_cnt, dbg_sdwr_cnt,
 //                      phzf_cnt, dbg_2m_*, dbg_t1a_*, dbg_wra/wrb_cnt,
 //                      dbg_wri_cnt, h_t1_busy, errors,
-//                      comp_ink/comp_nongray[15:0], comp_gmin/comp_gmax[7:0]
+//                      comp_ink/comp_nongray[15:0], comp_gmin/comp_gmax[7:0],
+//                      comp_dark_n/sr/sg/sb, comp_bri_n/sr/sg/sb,
+//                      comp_p0..p3_n/sr/sg/sb, comp_bg_n/sr/sg/sb
+//                      (color-aware palette probe, 2026-09-09)
 //                      (per-frame composite-decoder stats, use_composite=1),
 //                      ss_busy, ss_done, ss_error (save-state, 2026-09-08)
 //
@@ -90,6 +94,8 @@ module tb_l2 (
     input logic        use_composite,
     input logic [7:0]  comp_sat,
     input logic [7:0]  comp_hue,
+    input logic [7:0]  comp_bright,
+    input logic [7:0]  comp_contrast,
     // Save-state requests (level_1b port, 2026-09-08): C++-driven
     // one-shot pulses into the savestate_manager_l1b coordinator -
     // the same manager + DDR bridge the level_2 mister build uses.
@@ -718,6 +724,8 @@ module tb_l2 (
     .vb     (w_vbl),
     .sat    (comp_sat),
     .hue    (comp_hue),
+    .bright (comp_bright),
+    .contrast (comp_contrast),
     .r      (comp_r),
     .g      (comp_g),
     .b      (comp_b),
@@ -758,8 +766,193 @@ module tb_l2 (
   reg [19:0] comp_cn      = 20'd0;
   reg [7:0]  comp_gmin_a  = 8'hFF;
   reg [7:0]  comp_gmax_a  = 8'h00;
+  // Color-aware palette probe (2026-09-09): per-luma-band averages over the
+  // nongray samples.  The nongray gate (|r-g|>16 or |g-b|>16) excludes the
+  // flat gray core of the 1-bit picture and keeps the artifact chroma;
+  // dark band (g < 64) = the large dark field (background), bright band
+  // (g >= 128) = the text/edge fringes.  C++ converts each band's sums to
+  // an average RGB hue angle; the hue-knob matrix run reads these to pick
+  // the knob value where the palette is the classic blue-background /
+  // orange-text look (and to prove the sine path is linear: +16 knob steps
+  // must rotate the angle by +22.5 deg).  Print-only in the harness - no
+  // pass/fail gating.
+  //
+  // Phase-class probe (2026-09-09, matrix round 2): the band averages are
+  // confounded because the nongray/band POPULATIONS shift across thresholds
+  // as the palette rotates (measured: the k vs k+128 band angles agree to
+  // 0.5 deg while the per-pixel colors are a 180-deg-flipped mix).  The
+  // 1-bit picture's artifact palette is the set of colors the boxcar demod
+  // gives the step transitions at the four subcarrier phases (the video bit
+  // is held ~4 samples = one subcarrier cycle; only the 1-sample transitions
+  // carry chroma, one per column mod 4).  These classes rotate RIGIDLY with
+  // the hue knob (-22.5 deg per +16 knob steps), so per-class averages are
+  // the right resolution for the knob matrix.  comp_pN_n/r/g/b (N = 0..3):
+  // nongray pixels at line-sample phase N (line counter comp_lc, origin at
+  // HBL rise - a fixed column grid, so the classes are stable across knob
+  // values).  comp_bg_*: the flat dark background (gray pixels with g < 32)
+  // - the decoded background tint (the user's "blue background").
+  //
+  // Round 2b (2026-09-09): per-class averages alone came back near-GRAY at
+  // every knob (measured ~140,140,130) because each phase class contains
+  // BOTH up-steps and down-steps (a character's left and right edges are 4
+  // columns apart = the SAME class) and their chroma vectors are 180 deg
+  // apart, so they cancel in the average.  Split by luma SLOPE instead: the
+  // SPC=4 boxcar turns a 1-bit step into a ~4-sample luma ramp (the 4th,
+  // full-bright window sample has zero chroma and fails the nongray gate),
+  // so every nongray pixel sits on a ramp: slope g - g[s-2] > +16 = up-step
+  // (bg -> text), < -16 = down-step.  comp_un/ur/ug/ub and comp_dn/dr/dg/db
+  // (index = phase class) accumulate the up/down pixels separately.  The 4
+  // up-class hues and 4 down-class hues each rotate rigidly -22.5 deg per
+  // +16 knob; that rigid rotation is what the knob matrix needs.
+  reg [19:0] comp_dark_n   = 20'd0;
+  reg [23:0] comp_dark_sr  = 24'd0;
+  reg [23:0] comp_dark_sg  = 24'd0;
+  reg [23:0] comp_dark_sb  = 24'd0;
+  reg [19:0] comp_bri_n    = 20'd0;
+  reg [23:0] comp_bri_sr   = 24'd0;
+  reg [23:0] comp_bri_sg   = 24'd0;
+  reg [23:0] comp_bri_sb   = 24'd0;
+  reg [19:0] comp_dark_na  = 20'd0;
+  reg [23:0] comp_dark_sra = 24'd0;
+  reg [23:0] comp_dark_sga = 24'd0;
+  reg [23:0] comp_dark_sba = 24'd0;
+  reg [19:0] comp_bri_na   = 20'd0;
+  reg [23:0] comp_bri_sra  = 24'd0;
+  reg [23:0] comp_bri_sga  = 24'd0;
+  reg [23:0] comp_bri_sba  = 24'd0;
+  // Phase-class + flat-background accumulators (matrix round 2, 2026-09-09).
+  reg [19:0] comp_p0_n   = 20'd0;
+  reg [23:0] comp_p0_sr  = 24'd0;
+  reg [23:0] comp_p0_sg  = 24'd0;
+  reg [23:0] comp_p0_sb  = 24'd0;
+  reg [19:0] comp_p1_n   = 20'd0;
+  reg [23:0] comp_p1_sr  = 24'd0;
+  reg [23:0] comp_p1_sg  = 24'd0;
+  reg [23:0] comp_p1_sb  = 24'd0;
+  reg [19:0] comp_p2_n   = 20'd0;
+  reg [23:0] comp_p2_sr  = 24'd0;
+  reg [23:0] comp_p2_sg  = 24'd0;
+  reg [23:0] comp_p2_sb  = 24'd0;
+  reg [19:0] comp_p3_n   = 20'd0;
+  reg [23:0] comp_p3_sr  = 24'd0;
+  reg [23:0] comp_p3_sg  = 24'd0;
+  reg [23:0] comp_p3_sb  = 24'd0;
+  reg [19:0] comp_bg_n   = 20'd0;
+  reg [23:0] comp_bg_sr  = 24'd0;
+  reg [23:0] comp_bg_sg  = 24'd0;
+  reg [23:0] comp_bg_sb  = 24'd0;
+  reg [19:0] comp_p0_na  = 20'd0;
+  reg [23:0] comp_p0_sra = 24'd0;
+  reg [23:0] comp_p0_sga = 24'd0;
+  reg [23:0] comp_p0_sba = 24'd0;
+  reg [19:0] comp_p1_na  = 20'd0;
+  reg [23:0] comp_p1_sra = 24'd0;
+  reg [23:0] comp_p1_sga = 24'd0;
+  reg [23:0] comp_p1_sba = 24'd0;
+  reg [19:0] comp_p2_na  = 20'd0;
+  reg [23:0] comp_p2_sra = 24'd0;
+  reg [23:0] comp_p2_sga = 24'd0;
+  reg [23:0] comp_p2_sba = 24'd0;
+  reg [19:0] comp_p3_na  = 20'd0;
+  reg [23:0] comp_p3_sra = 24'd0;
+  reg [23:0] comp_p3_sga = 24'd0;
+  reg [23:0] comp_p3_sba = 24'd0;
+  reg [19:0] comp_bg_na  = 20'd0;
+  reg [23:0] comp_bg_sra = 24'd0;
+  reg [23:0] comp_bg_sga = 24'd0;
+  reg [23:0] comp_bg_sba = 24'd0;
+  // Up/down edge accumulators per phase class (round 2b).  Unpacked arrays:
+  // with --public each element is C++-visible as tb_l2__DOT__<name>[i].
+  reg [19:0] comp_un [0:3];
+  reg [23:0] comp_ur [0:3];
+  reg [23:0] comp_ug [0:3];
+  reg [23:0] comp_ub [0:3];
+  reg [19:0] comp_dn [0:3];
+  reg [23:0] comp_dr [0:3];
+  reg [23:0] comp_dg [0:3];
+  reg [23:0] comp_db [0:3];
+  reg [19:0] comp_una [0:3];
+  reg [23:0] comp_ura [0:3];
+  reg [23:0] comp_uga [0:3];
+  reg [23:0] comp_uba [0:3];
+  reg [19:0] comp_dna [0:3];
+  reg [23:0] comp_dra [0:3];
+  reg [23:0] comp_dga [0:3];
+  reg [23:0] comp_dba [0:3];
+  // Round 2c: raw demodulated I/Q per phase class.  Hierarchical tap into
+  // the decoder's post-gain i8/q8 registers (BEFORE YIQ->RGB and the 0/255
+  // clamps, which is why the post-RGB back-calculations were not rigid).
+  // The sample set is UN-gated (pure geometry: the w_hbl window), so it is
+  // knob-independent and each class sum rotates RIGIDLY with the hue knob
+  // (the knob rotation is applied to every pixel's I/Q identically).
+  // Flat pixels contribute ~0; the edge pixels dominate.  Signed 48 bits
+  // cover ~240k samples x 131071 per frame.
+  wire signed [17:0] comp_iq_i = comp_dut.u_dec.i8;
+  wire signed [17:0] comp_iq_q = comp_dut.u_dec.q8;
+  reg signed [47:0] comp_li8  [0:3];
+  reg signed [47:0] comp_lq8  [0:3];
+  reg signed [47:0] comp_li8u [0:3];
+  reg signed [47:0] comp_lq8u [0:3];
+  reg signed [47:0] comp_li8d [0:3];
+  reg signed [47:0] comp_lq8d [0:3];
+  reg signed [47:0] comp_ai8  [0:3];
+  reg signed [47:0] comp_aq8  [0:3];
+  reg signed [47:0] comp_ai8u [0:3];
+  reg signed [47:0] comp_aq8u [0:3];
+  reg signed [47:0] comp_ai8d [0:3];
+  reg signed [47:0] comp_aq8d [0:3];
+  reg [7:0]  comp_g_d1 = 8'd0;
+  reg [7:0]  comp_g_d2 = 8'd0;
+  // Sample index within the 912-sample line; the subcarrier phase class is
+  // comp_lc[1:0] (4 samples per 3.58 MHz subcarrier cycle; the drift over a
+  // line is ~0.1 samples, negligible for averaging).  Origin at the HBL
+  // rise (fixed column grid -> the classes are identical across knob runs).
+  reg [10:0] comp_lc = 11'd0;
+  always @(negedge clk_14m) begin
+    if (comp_hbl_rise) comp_lc <= 11'd0;
+    else               comp_lc <= comp_lc + 11'd1;
+  end
+  wire [1:0] comp_ph4 = comp_lc[1:0];
+  always @(negedge clk_14m) begin
+    comp_g_d1 <= comp_g;
+    comp_g_d2 <= comp_g_d1;
+  end
+  wire signed [8:0] comp_slope = $signed({1'b0, comp_g}) - $signed({1'b0, comp_g_d2});
+  wire comp_ng = (comp_drg >  9'sd16 || comp_drg < -9'sd16 ||
+                  comp_dgb >  9'sd16 || comp_dgb < -9'sd16);
   wire signed [8:0] comp_drg = $signed({1'b0, comp_r}) - $signed({1'b0, comp_g});
   wire signed [8:0] comp_dgb = $signed({1'b0, comp_g}) - $signed({1'b0, comp_b});
+  // Round 2d: PEAK-pixel I/Q per phase class.  For each up/down edge run
+  // (consecutive pixels with the same slope sign, |slope|>16), the
+  // strongest-chroma pixel is the boxcar peak; every peak pixel in class c
+  // points at the SAME I/Q angle 90c + Phi(K) (K = hue knob), so the
+  // per-class sums are high-SNR rigid vectors: Phi(K) = angle(c) - 90c is
+  // the palette constant, and K* = Phi(0)/1.40625 (mod 256) puts class 0
+  // on the red (I) axis.  xchk latches the LO phase word and the encoder
+  // burst counter at a fixed column: (P-B) mod 4 = s_p - s_b, so the raw
+  // burst angle must be 225 + 90*(P-B) (the independent 225-deg check).
+  wire [39:0] comp_chroma2 =
+      {4'b0, $unsigned(comp_iq_i * comp_iq_i)} +
+      {4'b0, $unsigned(comp_iq_q * comp_iq_q)};
+  reg  [39:0] comp_pk2_u = 40'd0, comp_pk2_d = 40'd0;
+  reg  [17:0] comp_pki_u = 18'sd0, comp_pkq_u = 18'sd0;
+  reg  [17:0] comp_pki_d = 18'sd0, comp_pkq_d = 18'sd0;
+  reg  [10:0] comp_pkcol_u = 11'd0, comp_pkcol_d = 11'd0;
+  reg signed [47:0] comp_pki  [0:3];
+  reg signed [47:0] comp_pkq  [0:3];
+  reg signed [47:0] comp_pkid [0:3];
+  reg signed [47:0] comp_pkqd [0:3];
+  reg [19:0] comp_pkn_u [0:3];
+  reg [19:0] comp_pkn_d [0:3];
+  reg signed [47:0] comp_lpki   [0:3];
+  reg signed [47:0] comp_lpq    [0:3];
+  reg signed [47:0] comp_lpki_d [0:3];
+  reg signed [47:0] comp_lpq_d  [0:3];
+  reg [19:0] comp_lpn_u [0:3];
+  reg [19:0] comp_lpn_d [0:3];
+  reg [1:0]  comp_xP = 2'd0, comp_xB = 2'd0;
+  reg [1:0]  comp_lxP = 2'd0, comp_lxB = 2'd0;
+  reg signed [15:0] comp_lxib = 16'sd0, comp_lxqb = 16'sd0;
   always @(negedge clk_14m) begin: comp_stats
     if (vbl_p == 1'b1 && vbl_s == 1'b0) begin
       if (use_composite) begin
@@ -767,17 +960,223 @@ module tb_l2 (
         comp_nongray <= comp_cn;
         comp_gmin    <= comp_gmin_a;
         comp_gmax    <= comp_gmax_a;
+        comp_dark_n  <= comp_dark_na;
+        comp_dark_sr <= comp_dark_sra;
+        comp_dark_sg <= comp_dark_sga;
+        comp_dark_sb <= comp_dark_sba;
+        comp_bri_n   <= comp_bri_na;
+        comp_bri_sr  <= comp_bri_sra;
+        comp_bri_sg  <= comp_bri_sga;
+        comp_bri_sb  <= comp_bri_sba;
+        comp_p0_n    <= comp_p0_na;
+        comp_p0_sr   <= comp_p0_sra;
+        comp_p0_sg   <= comp_p0_sga;
+        comp_p0_sb   <= comp_p0_sba;
+        comp_p1_n    <= comp_p1_na;
+        comp_p1_sr   <= comp_p1_sra;
+        comp_p1_sg   <= comp_p1_sga;
+        comp_p1_sb   <= comp_p1_sba;
+        comp_p2_n    <= comp_p2_na;
+        comp_p2_sr   <= comp_p2_sra;
+        comp_p2_sg   <= comp_p2_sga;
+        comp_p2_sb   <= comp_p2_sba;
+        comp_p3_n    <= comp_p3_na;
+        comp_p3_sr   <= comp_p3_sra;
+        comp_p3_sg   <= comp_p3_sga;
+        comp_p3_sb   <= comp_p3_sba;
+        comp_bg_n    <= comp_bg_na;
+        comp_bg_sr   <= comp_bg_sra;
+        comp_bg_sg   <= comp_bg_sga;
+        comp_bg_sb   <= comp_bg_sba;
+        comp_un      <= comp_una;
+        comp_ur      <= comp_ura;
+        comp_ug      <= comp_uga;
+        comp_ub      <= comp_uba;
+        comp_dn      <= comp_dna;
+        comp_dr      <= comp_dra;
+        comp_dg      <= comp_dga;
+        comp_db      <= comp_dba;
+        comp_li8     <= comp_ai8;
+        comp_lq8     <= comp_aq8;
+        comp_li8u    <= comp_ai8u;
+        comp_lq8u    <= comp_aq8u;
+        comp_li8d    <= comp_ai8d;
+        comp_lq8d    <= comp_aq8d;
+        comp_lpki    <= comp_pki;
+        comp_lpq     <= comp_pkq;
+        comp_lpki_d  <= comp_pkid;
+        comp_lpq_d   <= comp_pkqd;
+        comp_lpn_u   <= comp_pkn_u;
+        comp_lpn_d   <= comp_pkn_d;
+        comp_lxP     <= comp_xP;
+        comp_lxB     <= comp_xB;
+        comp_lxib    <= comp_dut.u_dec.ib;
+        comp_lxqb    <= comp_dut.u_dec.qb;
       end
       comp_ci     <= 20'd0;
       comp_cn     <= 20'd0;
       comp_gmin_a <= 8'hFF;
       comp_gmax_a <= 8'h00;
+      comp_dark_na  <= 20'd0;
+      comp_dark_sra <= 24'd0;
+      comp_dark_sga <= 24'd0;
+      comp_dark_sba <= 24'd0;
+      comp_bri_na   <= 20'd0;
+      comp_bri_sra  <= 24'd0;
+      comp_bri_sga  <= 24'd0;
+      comp_bri_sba  <= 24'd0;
+      comp_p0_na    <= 20'd0;
+      comp_p0_sra   <= 24'd0;
+      comp_p0_sga   <= 24'd0;
+      comp_p0_sba   <= 24'd0;
+      comp_p1_na    <= 20'd0;
+      comp_p1_sra   <= 24'd0;
+      comp_p1_sga   <= 24'd0;
+      comp_p1_sba   <= 24'd0;
+      comp_p2_na    <= 20'd0;
+      comp_p2_sra   <= 24'd0;
+      comp_p2_sga   <= 24'd0;
+      comp_p2_sba   <= 24'd0;
+      comp_p3_na    <= 20'd0;
+      comp_p3_sra   <= 24'd0;
+      comp_p3_sga   <= 24'd0;
+      comp_p3_sba   <= 24'd0;
+      comp_bg_na    <= 20'd0;
+      comp_bg_sra   <= 24'd0;
+      comp_bg_sga   <= 24'd0;
+      comp_bg_sba   <= 24'd0;
+      comp_una      <= '{default: 20'd0};
+      comp_ura      <= '{default: 24'd0};
+      comp_uga      <= '{default: 24'd0};
+      comp_uba      <= '{default: 24'd0};
+      comp_dna      <= '{default: 20'd0};
+      comp_dra      <= '{default: 24'd0};
+      comp_dga      <= '{default: 24'd0};
+      comp_dba      <= '{default: 24'd0};
+      comp_ai8      <= '{default: 48'sd0};
+      comp_aq8      <= '{default: 48'sd0};
+      comp_ai8u     <= '{default: 48'sd0};
+      comp_aq8u     <= '{default: 48'sd0};
+      comp_ai8d     <= '{default: 48'sd0};
+      comp_aq8d     <= '{default: 48'sd0};
+      comp_pki      <= '{default: 48'sd0};
+      comp_pkq      <= '{default: 48'sd0};
+      comp_pkid     <= '{default: 48'sd0};
+      comp_pkqd     <= '{default: 48'sd0};
+      comp_pkn_u    <= '{default: 20'd0};
+      comp_pkn_d    <= '{default: 20'd0};
     end else if (use_composite && w_hbl == 1'b0) begin
       if (comp_g >= 8'd128) comp_ci <= comp_ci + 20'd1;
       if (comp_g <  comp_gmin_a) comp_gmin_a <= comp_g;
       if (comp_g >  comp_gmax_a) comp_gmax_a <= comp_g;
-      if (comp_drg >  9'sd16 || comp_drg < -9'sd16 ||
-          comp_dgb >  9'sd16 || comp_dgb < -9'sd16) comp_cn <= comp_cn + 20'd1;
+      if (comp_ng) begin
+        comp_cn <= comp_cn + 20'd1;
+        if (comp_g < 8'd64) begin
+          comp_dark_na  <= comp_dark_na + 20'd1;
+          comp_dark_sra <= comp_dark_sra + {16'd0, comp_r};
+          comp_dark_sga <= comp_dark_sga + {16'd0, comp_g};
+          comp_dark_sba <= comp_dark_sba + {16'd0, comp_b};
+        end else if (comp_g >= 8'd128) begin
+          comp_bri_na   <= comp_bri_na + 20'd1;
+          comp_bri_sra  <= comp_bri_sra + {16'd0, comp_r};
+          comp_bri_sga  <= comp_bri_sga + {16'd0, comp_g};
+          comp_bri_sba  <= comp_bri_sba + {16'd0, comp_b};
+        end
+        case (comp_ph4)
+          2'd0: begin
+            comp_p0_na  <= comp_p0_na + 20'd1;
+            comp_p0_sra <= comp_p0_sra + {16'd0, comp_r};
+            comp_p0_sga <= comp_p0_sga + {16'd0, comp_g};
+            comp_p0_sba <= comp_p0_sba + {16'd0, comp_b};
+          end
+          2'd1: begin
+            comp_p1_na  <= comp_p1_na + 20'd1;
+            comp_p1_sra <= comp_p1_sra + {16'd0, comp_r};
+            comp_p1_sga <= comp_p1_sga + {16'd0, comp_g};
+            comp_p1_sba <= comp_p1_sba + {16'd0, comp_b};
+          end
+          2'd2: begin
+            comp_p2_na  <= comp_p2_na + 20'd1;
+            comp_p2_sra <= comp_p2_sra + {16'd0, comp_r};
+            comp_p2_sga <= comp_p2_sga + {16'd0, comp_g};
+            comp_p2_sba <= comp_p2_sba + {16'd0, comp_b};
+          end
+          2'd3: begin
+            comp_p3_na  <= comp_p3_na + 20'd1;
+            comp_p3_sra <= comp_p3_sra + {16'd0, comp_r};
+            comp_p3_sga <= comp_p3_sga + {16'd0, comp_g};
+            comp_p3_sba <= comp_p3_sba + {16'd0, comp_b};
+          end
+        endcase
+        if (comp_slope > 9'sd16) begin
+          comp_una[comp_ph4]  <= comp_una[comp_ph4]  + 20'd1;
+          comp_ura[comp_ph4]  <= comp_ura[comp_ph4]  + {16'd0, comp_r};
+          comp_uga[comp_ph4]  <= comp_uga[comp_ph4]  + {16'd0, comp_g};
+          comp_uba[comp_ph4]  <= comp_uba[comp_ph4]  + {16'd0, comp_b};
+        end else if (comp_slope < -9'sd16) begin
+          comp_dna[comp_ph4]  <= comp_dna[comp_ph4]  + 20'd1;
+          comp_dra[comp_ph4]  <= comp_dra[comp_ph4]  + {16'd0, comp_r};
+          comp_dga[comp_ph4]  <= comp_dga[comp_ph4]  + {16'd0, comp_g};
+          comp_dba[comp_ph4]  <= comp_dba[comp_ph4]  + {16'd0, comp_b};
+        end
+        // Round 2c: un-gated I/Q class sums (rigid-rotation measurement).
+        comp_ai8[comp_ph4] <= comp_ai8[comp_ph4] + comp_iq_i;
+        comp_aq8[comp_ph4] <= comp_aq8[comp_ph4] + comp_iq_q;
+        if (comp_slope > 9'sd16) begin
+          comp_ai8u[comp_ph4] <= comp_ai8u[comp_ph4] + comp_iq_i;
+          comp_aq8u[comp_ph4] <= comp_aq8u[comp_ph4] + comp_iq_q;
+        end else if (comp_slope < -9'sd16) begin
+          comp_ai8d[comp_ph4] <= comp_ai8d[comp_ph4] + comp_iq_i;
+          comp_aq8d[comp_ph4] <= comp_aq8d[comp_ph4] + comp_iq_q;
+        end
+        // Round 2d: per-run peak tracking + cross-check latches.
+        if (comp_lc == 11'd500) begin
+          comp_xP <= comp_dut.u_dec.phase[23:22];
+          comp_xB <= comp_dut.burst_cnt;
+        end
+        if (comp_slope > 9'sd16) begin
+          if (comp_chroma2 > comp_pk2_u) begin
+            comp_pk2_u   <= comp_chroma2;
+            comp_pki_u   <= comp_iq_i;
+            comp_pkq_u   <= comp_iq_q;
+            comp_pkcol_u <= comp_lc;
+          end
+        end else begin
+          if (comp_pk2_u > 40'd4096) begin
+            comp_pki[comp_pkcol_u[1:0]] <=
+                comp_pki[comp_pkcol_u[1:0]] + comp_pki_u;
+            comp_pkq[comp_pkcol_u[1:0]] <=
+                comp_pkq[comp_pkcol_u[1:0]] + comp_pkq_u;
+            comp_pkn_u[comp_pkcol_u[1:0]] <=
+                comp_pkn_u[comp_pkcol_u[1:0]] + 20'd1;
+          end
+          comp_pk2_u <= 40'd0;
+        end
+        if (comp_slope < -9'sd16) begin
+          if (comp_chroma2 > comp_pk2_d) begin
+            comp_pk2_d   <= comp_chroma2;
+            comp_pki_d   <= comp_iq_i;
+            comp_pkq_d   <= comp_iq_q;
+            comp_pkcol_d <= comp_lc;
+          end
+        end else begin
+          if (comp_pk2_d > 40'd4096) begin
+            comp_pkid[comp_pkcol_d[1:0]] <=
+                comp_pkid[comp_pkcol_d[1:0]] + comp_pki_d;
+            comp_pkqd[comp_pkcol_d[1:0]] <=
+                comp_pkqd[comp_pkcol_d[1:0]] + comp_pkq_d;
+            comp_pkn_d[comp_pkcol_d[1:0]] <=
+                comp_pkn_d[comp_pkcol_d[1:0]] + 20'd1;
+          end
+          comp_pk2_d <= 40'd0;
+        end
+      end else if (comp_g < 8'd32) begin
+        // flat dark background (gray core of the 1-bit picture)
+        comp_bg_na  <= comp_bg_na + 20'd1;
+        comp_bg_sra <= comp_bg_sra + {16'd0, comp_r};
+        comp_bg_sga <= comp_bg_sga + {16'd0, comp_g};
+        comp_bg_sba <= comp_bg_sba + {16'd0, comp_b};
+      end
     end
   end
 

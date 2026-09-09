@@ -128,6 +128,8 @@ COMPDBG   := $(LEVELDIR)/build_comp_dbg
 COMPDBGE  := $(COMPDBG)/obj_dir/Vtb_composite_dbg.exe
 MIXOUT    := $(LEVELDIR)/build_mixplus
 MIXEXE    := $(MIXOUT)/obj_dir/Vtb_mixplus.exe
+VBOUT     := $(LEVELDIR)/build_vblend
+VBEXE     := $(VBOUT)/obj_dir/Vtb_vblend.exe
 # --binary (not --exe): a pure self-driving TB has no C++ main, so
 # Verilator's auto main is required - it also provides the sc_time_stamp()
 # stub that --timing links need (a bare --exe link fails with undefined
@@ -139,7 +141,7 @@ COMP_VFLAGS := --cc --binary -O2 -Wno-fatal -Wno-WIDTH --timing
 # instantiated but never selected (hq2x=0).
 MIX_VFLAGS := $(COMP_VFLAGS) -Wno-PROCASSWIRE
 
-.PHONY: all gui clean run composite composite_dbg
+.PHONY: all gui clean run composite composite_dbg vblend
 all: $(EXE)
 gui: $(GUIEXE)
 composite: $(COMPEXE)
@@ -148,6 +150,9 @@ composite_dbg: $(COMPDBGE)
 # COMPOSITE VIDEO section (2-FF sync + CLK_VIDEO-domain sync derivation +
 # encoder + video_mixer_plus A/B) from a 4x clock with a ce_pix divider.
 mixplus: $(MIXEXE)
+# NTSC vertical blend module unit TB (2026-09-11): self-driving, ce=1,
+# no CWD-relative files - runs from anywhere.
+vblend: $(VBEXE)
 
 $(EXE): tb_l2.sv main_l2.cpp l2_disk_host.h $(MACH_SRC) $(CPU_SRC) $(DISK_SRC) $(COMP_SRC) $(SS_SRC) $(ROMS)
 	@mkdir -p $(OUT)/obj_dir
@@ -185,17 +190,27 @@ $(COMPDBGE): tb_composite_dbg.sv $(COMP_SRC)
 	@echo "built $@  (run from the REPO ROOT)"
 
 $(MIXEXE): mister/tb_mixplus.sv $(COMP_SRC) mister/video_mixer_plus.sv \
+		mister/ntsc_vertical_blend.sv \
 		mister/composite_decoder.sv mister/sys/video_freezer.sv \
 		mister/sys/gamma_corr.sv mister/sys/hq2x.sv mister/sys/scandoubler.v
 	@mkdir -p $(MIXOUT)/obj_dir
 	VERILATOR_ROOT=$(VROOT) $(V) $(MIX_VFLAGS) --top-module tb_mixplus \
 		-Mdir $(MIXOUT)/obj_dir mister/tb_mixplus.sv $(COMP_SRC) \
-		mister/video_mixer_plus.sv mister/composite_decoder.sv \
+		mister/video_mixer_plus.sv mister/ntsc_vertical_blend.sv \
+		mister/composite_decoder.sv \
 		mister/sys/video_freezer.sv mister/sys/gamma_corr.sv mister/sys/hq2x.sv \
 		mister/sys/scandoubler.v
 	$(MAKE) -C $(MIXOUT)/obj_dir -f Vtb_mixplus.mk
-	@if [ -f $(MIXOUT)/obj_dir/Vtb_mixplus ]; then mv -f $(MIXOUT)/obj_dir/Vtb_mixplus $(MIXEXE); fi
+	@if [ -f $(MIXEXE) ]; then :; elif [ -f $(MIXOUT)/obj_dir/Vtb_mixplus ]; then mv -f $(MIXOUT)/obj_dir/Vtb_mixplus $(MIXEXE); else echo "ERROR: $(MIXEXE) missing after build" >&2; exit 1; fi
 	@echo "built $@  (run from the REPO ROOT)"
 
+$(VBEXE): mister/tb_vblend.sv mister/ntsc_vertical_blend.sv
+	@mkdir -p $(VBOUT)/obj_dir
+	VERILATOR_ROOT=$(VROOT) $(V) $(COMP_VFLAGS) --top-module tb_vblend \
+		-Mdir $(VBOUT)/obj_dir mister/tb_vblend.sv mister/ntsc_vertical_blend.sv
+	$(MAKE) -C $(VBOUT)/obj_dir -f Vtb_vblend.mk
+	@if [ -f $(VBEXE) ]; then :; elif [ -f $(VBOUT)/obj_dir/Vtb_vblend ]; then mv -f $(VBOUT)/obj_dir/Vtb_vblend $(VBEXE); else echo "ERROR: $(VBEXE) missing after build" >&2; exit 1; fi
+	@echo "built $@  (run from anywhere - no CWD-relative files)"
+
 clean:
-	rm -rf build build_gui build_comp build_comp_dbg build_mixplus
+	rm -rf build build_gui build_comp build_comp_dbg build_mixplus build_vblend

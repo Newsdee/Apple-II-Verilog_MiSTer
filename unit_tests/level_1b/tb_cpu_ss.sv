@@ -42,7 +42,7 @@ module tb_cpu_ss;
     expected[4] = 64'h0000_0000_0312_345A;
     expected[5] = 64'h0000_0000_0055_0955;
     expected[6] = 64'h0000_0000_0000_00AD;
-    expected[7] = 64'h0000_0000_0000_5CA6;
+    expected[7] = 64'h0000_0000_0000_5C00;
 
     repeat (8) @(posedge clk);
     reset <= 1'b0;
@@ -60,7 +60,7 @@ module tb_cpu_ss;
     for (index = 0; index < 8; index = index + 1) begin
       @(negedge clk);
       ss_addr <= index[9:0];
-      ss_wdata <= expected[index];
+      ss_wdata <= expected[index] | ((index == 7) ? 64'hA6 : 64'd0);
       ss_wren <= 1'b1;
       @(posedge clk);
       ss_wren <= 1'b0;

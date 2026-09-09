@@ -236,12 +236,32 @@ parameter CONF_STR = {
 	"O7,WP Drive 2,Off,On;",
 	"O8,Disk LED overlay,Yes,No;",
 	"O9,Composite video,Off,On;",
-	// Composite knobs (16 states each; see COMPOSITE_ARTIFACT_COLOR_PLAN.md
-	// 5.3): the framework writes each option's state index into the 4-bit
-	// field at the first ID char's value ("OCD" C=12 -> [15:12], "OHI"
-	// H=17 -> [20:17]).  sat step = idx*17 (0..255), hue step = idx*16.
-	"OCD,Comp sat,Off,17,34,51,68,85,102,119,136,153,170,187,204,221,238,255;",
-	"OHI,Comp hue,0,16,32,48,64,80,96,112,128,144,160,176,192,208,224,240;",
+	// 2-line vertical comb (keep current-line luma, average chroma over
+	// two lines) on the composite decode branch.  OB -> status[11];
+	// default Off so the shipped composite presentation is unchanged
+	// (the main-branch core defaults this option to On).
+	"OB,NTSC vertical blend,Off,On;",
+	// One-toggle calibrated preset (2026-09-08): ON forces the four
+	// composite knobs to the CAL_* values in the decode below regardless
+	// of what they are dialed to, for fast setup.  O4 -> status[4].
+	"O4,Comp cal,Off,On;",
+	// Composite knobs as coarse/fine pairs (16 states each; see
+	// COMPOSITE_ARTIFACT_COLOR_PLAN.md 5.3). MiSTer option IDs encode the
+	// inclusive low/high status-bit endpoints: "OCF" -> [15:12], "OLO"
+	// -> [24:21], "OHK" -> [20:17], and lowercase "o03" -> [35:32] in
+	// the second 32-bit status bank. Value = coarse*16 + fine ->
+	// exact 0..255 on both knobs (hue 255 = full 360-degree rotation).
+	// Luma: "OQT" -> [29:26] and "o47" -> [39:36], coarse only.
+	// Bright's coarse value is a signed 2's-complement
+	// offset (128..240 = -128..-16, hence the negative coarse labels),
+	// and contrast 0 is remapped to unity, so the default all-zero OSD
+	// is neutral on both.
+	"OCF,Comp sat,Off,16,32,48,64,80,96,112,128,144,160,176,192,208,224,240;",
+	"OLO,Sat fine,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15;",
+	"OHK,Comp hue,0,16,32,48,64,80,96,112,128,144,160,176,192,208,224,240;",
+	"o03,Hue fine,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15;",
+	"OQT,Comp bright,Off,16,32,48,64,80,96,112,-128,-112,-96,-80,-64,-48,-32,-16;",
+	"o47,Comp contrast,Off,16,32,48,64,80,96,112,128,144,160,176,192,208,224,240;",
 	"R0,Cold Reset;",
 	"-;"
 };
@@ -254,16 +274,63 @@ wire osd_pause = status[1] && OSD_STATUS;
 // (encoded + decoded 1-bit composite) instead of the native monochrome path.
 wire use_composite = status[9];
 
-// OSD composite knobs (CONF_STR "OCD"/"OHI" above; 16 states each).  The
-// framework writes the option's state index into the 4-bit field at the
-// first ID char's value: C=12 -> [15:12], H=17 -> [20:17].  comp_sat_v =
-// idx*17 over 0..255 (state 0 = Off/gray, 8 -> 136 ~ unity, 15 -> 255
-// over-saturated); comp_hue_v = idx*16 over the 256-step burst phase.
+// OSD "NTSC vertical blend" (OB): 2-line vertical comb on the composite
+// branch (ntsc_vertical_blend.sv in the mixer).  Default Off = zero-
+// latency bypass, byte-identical to the pre-blend composite path.
+wire ntsc_blend = status[11];
+
+// OSD composite knobs (CONF_STR "OCF"/"OLO", "OHK"/"o03" above -
+// coarse+fine 16 states each; "OQ"/"OY" coarse only).  The framework
+// writes each option's state index into the inclusive range named by its
+// two endpoint characters. Uppercase O addresses status[31:0]; lowercase
+// o addresses status[63:32]: [15:12], [24:21], [20:17], [35:32],
+// [29:26], and [39:36], respectively.
+// Value = {coarse, fine} -> exact 0..255 on the sat/hue knobs:
+// comp_sat_v 0 (Off/gray) .. 255 (over-saturated, 128 ~ unity);
+// comp_hue_v 0..255 over the 256-step burst phase (255 = full 360-degree
+// rotation).  Luma is coarse-only (16-step granularity): the bright value
+// is a signed 2's-complement offset (coarse 8..15 = -128..-16), so the
+// default all-zero OSD is 0 (no offset), and contrast 0 is remapped to
+// unity so the default is identity, not black.  (The 1-LSB luma fine
+// knobs were dropped on 2026-09-09: no clean 4-bit OSD status slots were
+// left - see FIELD SPACING; the "Comp cal" preset still applies the exact
+// calibrated luma values.)
 // Decoder-side only: the encoder below keeps unity sat / zero hue.
-wire [3:0] comp_sat_idx = status[15:12];
-wire [3:0] comp_hue_idx = status[20:17];
-wire [7:0] comp_sat_v   = comp_sat_idx * 8'd17;
-wire [7:0] comp_hue_v   = {comp_hue_idx, 4'b0000};
+
+// OSD "Comp cal" (O4): force the calibrated preset over all four knobs.
+wire comp_cal = status[4];
+
+// Calibrated preset (2026-09-09, hue re-derived from the round-2d peak
+// probe): hue 128 = burst-locked identity - the decoder's hue knob
+// rotates the demod reference by (K+128)*1.40625 deg, so K=128 adds
+// exactly 360 deg and the chroma phase reference is the raw encoder
+// burst measured by the decoder itself. That is what a real NTSC
+// receiver locks to, i.e. the original Apple II fringe look: clean
+// 1-bit ramps land on the I axis (blue/red fringes) instead of the
+// green/purple mix produced by the old pre-derivation guess 230.
+// sat 0.78486603 -> 100 (x128 scale); bright +0.0458512 -> +12
+// (x255 scale); contrast 0.89208 -> 114 (x128 scale) unchanged.
+localparam [7:0] CAL_SAT      = 8'd100;
+localparam [7:0] CAL_HUE      = 8'd128;
+localparam [7:0] CAL_BRIGHT   = 8'd12;
+localparam [7:0] CAL_CONTRAST = 8'd114;
+
+wire [3:0] comp_sat_c    = status[15:12];   // "OCF" coarse (upper nibble)
+wire [3:0] comp_sat_f    = status[24:21];   // "OLO" fine (lower nibble)
+wire [3:0] comp_hue_c    = status[20:17];   // "OHK" coarse (upper nibble)
+wire [3:0] comp_hue_f    = status[35:32];   // "o03" fine (lower nibble)
+wire [3:0] comp_bright_c = status[29:26];   // "OQT" coarse (16-step signed)
+wire [3:0] comp_contr_c  = status[39:36];   // "o47" coarse (16-step gain)
+wire [7:0] comp_sat_v      = comp_cal ? CAL_SAT :
+                                        {comp_sat_c, comp_sat_f};
+wire [7:0] comp_hue_v      = comp_cal ? CAL_HUE :
+                                        {comp_hue_c, comp_hue_f};
+wire [7:0] comp_bright_v   = comp_cal ? CAL_BRIGHT :
+                                        {comp_bright_c, 4'd0};
+wire [7:0] comp_contrast_v = comp_cal ? CAL_CONTRAST :
+                                        (({comp_contr_c, 4'd0} == 8'd0)
+                                         ? 8'd128
+                                         : {comp_contr_c, 4'd0});
 
 // Save-state requests (level_1b pattern): the OSD "Save State"/"Load
 // State" options are one-shot - edge-detect the option being armed while
@@ -838,12 +905,19 @@ wire vbl_c = vbl_s2;
 // path above, but cycle/line counts tick on ce_pix (machine cycles) and
 // the edges are of the synchronized blanking, so the encoder and the
 // mixer's decoder see one coherent, mutually aligned signal set.
+//
+// The counter must HOLD on non-ce_pix cycles (ce_pix is high one cycle in
+// four).  An else-clear like the machine-domain counter above would reset
+// it on three of every four cycles and it could never reach the sync
+// window: comp_hsync_c would never pulse, the encoder/decoder hcnt would
+// never restart, the burst lock could never re-engage, and the output
+// would be stuck at colour_ok=0 (pure B&W) regardless of the sat knob.
 reg [9:0] hblank_cnt_c = 10'd0;
 always @(posedge CLK_VIDEO) begin
-	if (ce_pix && hbl_c)
-		hblank_cnt_c <= hblank_cnt_c + 10'd1;
-	else
+	if (!hbl_c)
 		hblank_cnt_c <= 10'd0;
+	else if (ce_pix)
+		hblank_cnt_c <= hblank_cnt_c + 10'd1;
 end
 reg         hbl_c_d    = 1'b0;
 wire        hbl_c_rise = hbl_c & ~hbl_c_d;
@@ -879,6 +953,8 @@ apple_composite #(
 	.vb          (vbl_c),
 	.sat         (8'd128),
 	.hue         (8'd0),
+	.bright      (8'd0),
+	.contrast    (8'd128),
 	.r           (),
 	.g           (),
 	.b           (),
@@ -931,11 +1007,14 @@ video_mixer_plus #(.LINE_LENGTH(580), .GAMMA(1), .COMP_SPC(4)) video_mixer_plus
 	.comp_burst_len  (10'd64),
 	.comp_sat    (comp_sat_v),
 	.comp_hue    (comp_hue_v),
+	.comp_bright (comp_bright_v),
+	.comp_contrast(comp_contrast_v),
 	.comp_smear  (4'd0),
 	.comp_luma_delay(4'd0),
 	.comp_setup  (16'sd0),
 	.comp_luma_gain(16'sd2857),
 	.comp_agc    (1'b1),
+	.ntsc_blend  (ntsc_blend),
 	.gamma_bus (gamma_bus),
 	.R         (drive_overlay_rgb[23:16]),
 	.G         (drive_overlay_rgb[15:8]),

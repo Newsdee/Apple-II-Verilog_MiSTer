@@ -86,6 +86,7 @@
 #include "verilated_vcd_c.h"
 
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -180,8 +181,13 @@ int main(int argc, char** argv)
 	bool  do_composite = false; // --composite: decoded composite video smoke
 	uint8_t comp_sat = 0;       // --csat=N (decoder saturation, 128 = unity)
 	uint8_t comp_hue = 0;       // --chue=N (decoder hue)
-	int    comp_sat_idx = -1;   // --csatidx=N (0..15, FPGA OSD "OCD" step map)
-	int    comp_hue_idx = -1;   // --chueidx=N (0..15, FPGA OSD "OHI" step map)
+	int8_t  comp_bright = 0;    // --cbright=N (signed luma offset, 0 = none)
+	uint8_t comp_contrast = 128;// --ccontrast=N (128 = unity)
+	bool  do_ccal = false;      // --ccal: FPGA OSD "O4,Comp cal" preset
+	int    comp_sat_idx = -1;   // --csatidx=N (0..15, FPGA OSD "OCD" coarse)
+	int    comp_sat_fine = -1;  // --cfineidx=N (0..15, FPGA OSD "OL" fine)
+	int    comp_hue_idx = -1;   // --chueidx=N (0..15, FPGA OSD "OHI" coarse)
+	int    comp_hue_fine = -1;  // --hfineidx=N (0..15, FPGA OSD "OM" fine)
 	bool  no_pass   = false;  // skip the early pass/break; run to full timeout
 	bool  ro_mount  = false;  // --readonly: explicit read-only open
 	bool  scratch   = false;  // --scratch: copy the image, mount the copy RW
@@ -223,8 +229,19 @@ int main(int argc, char** argv)
 			comp_hue = (uint8_t)atoi(argv[i] + 7);
 		} else if (strncmp(argv[i], "--csatidx=", 10) == 0) {
 			comp_sat_idx = atoi(argv[i] + 10);
+		} else if (strncmp(argv[i], "--cfineidx=", 11) == 0) {
+			comp_sat_fine = atoi(argv[i] + 11);
 		} else if (strncmp(argv[i], "--chueidx=", 10) == 0) {
 			comp_hue_idx = atoi(argv[i] + 10);
+		} else if (strncmp(argv[i], "--hfineidx=", 11) == 0) {
+			comp_hue_fine = atoi(argv[i] + 11);
+		} else if (strncmp(argv[i], "--cbright=", 10) == 0) {
+			int b = atoi(argv[i] + 10);
+			comp_bright = (int8_t)(b < -128 ? -128 : (b > 127 ? 127 : b));
+		} else if (strncmp(argv[i], "--ccontrast=", 12) == 0) {
+			comp_contrast = (uint8_t)atoi(argv[i] + 12);
+		} else if (strcmp(argv[i], "--ccal") == 0) {
+			do_ccal = true;
 		}
 	}
 	if (do_write) {
@@ -304,19 +321,42 @@ int main(int argc, char** argv)
 	// Composite video path (2026-09-07): static select + decoder knobs,
 	// set once before the clock starts.  use_composite=0 (default) leaves
 	// the composite cone frozen (ce=0) and its stats un-updated: the
-	// default run is unchanged.
+	// default run is unchanged.  (Assigned below, after the --ccal preset
+	// can flip it on.)
+	// FPGA OSD knob parity (mister/Apple-II.sv "OCD"+fine "OL",
+	// "OHI"+fine "OM"): coarse/fine pairs -> value = coarse*16 + fine
+	// (exact 0..255 on both knobs; hue 255 = full rotation).  The idx
+	// flags take precedence over raw --csat/--chue when either of a pair
+	// is given.
+	if (comp_sat_idx >= 0 || comp_sat_fine >= 0) {
+		int c = (comp_sat_idx >= 0 && comp_sat_idx <= 15) ? comp_sat_idx : 0;
+		int f = (comp_sat_fine >= 0 && comp_sat_fine <= 15) ? comp_sat_fine : 0;
+		comp_sat = (uint8_t)(c * 16 + f);
+	}
+	if (comp_hue_idx >= 0 || comp_hue_fine >= 0) {
+		int c = (comp_hue_idx >= 0 && comp_hue_idx <= 15) ? comp_hue_idx : 0;
+		int f = (comp_hue_fine >= 0 && comp_hue_fine <= 15) ? comp_hue_fine : 0;
+		comp_hue = (uint8_t)(c * 16 + f);
+	}
+	// FPGA OSD "O4,Comp cal" preset parity: one flag forces the four
+	// calibrated values (2026-09-08) over everything else, and turns the
+	// composite path on so a single flag is the fast setup.
+	if (do_ccal) {
+		do_composite = true;
+		comp_sat      = 100;
+		comp_hue      = 128;   // burst-locked identity (see CAL_HUE in mister/Apple-II.sv)
+		comp_bright   = 12;
+		comp_contrast = 114;
+	}
 	top->use_composite = do_composite ? 1 : 0;
-	// FPGA OSD knob parity (mister/Apple-II.sv "OCD"/"OHI"): state index ->
-	// sat = idx*17 over 0..255, hue = idx*16.  --csatidx/--chueidx take
-	// precedence over raw --csat/--chue when given.
-	if (comp_sat_idx >= 0 && comp_sat_idx <= 15)
-		comp_sat = (uint8_t)(comp_sat_idx * 17);
-	if (comp_hue_idx >= 0 && comp_hue_idx <= 15)
-		comp_hue = (uint8_t)(comp_hue_idx * 16);
 	top->comp_sat      = comp_sat;
 	top->comp_hue      = comp_hue;
+	top->comp_bright   = (uint8_t)comp_bright;
+	top->comp_contrast = comp_contrast;
 	if (do_composite)
-		printf("L2 composite path enabled sat=%u hue=%u\n", comp_sat, comp_hue);
+		printf("L2 composite path enabled sat=%u hue=%u bright=%d contrast=%u%s\n",
+		       comp_sat, comp_hue, comp_bright, comp_contrast,
+		       do_ccal ? " (cal preset)" : "");
 	// Save-state request pulses: low until the phase machine arms one.
 	top->ss_save_req = 0;
 	top->ss_load_req = 0;
@@ -1007,6 +1047,160 @@ int main(int argc, char** argv)
 		       (unsigned)gmn, (unsigned)gmx, comp_sat, comp_hue,
 		       comp_pass ? "OK" : "FAIL");
 		if (!comp_pass) pass = false;
+		// Hue probe (2026-09-09): average RGB hue angle of the dark
+		// (background) and bright (text/edge) nongray bands.  Print-only,
+		// no pass/fail: the hue-knob matrix run uses these to pick the
+		// CAL_HUE constant and to prove the decoder's sine path is linear
+		// (+16 knob steps = +22.5 deg rotation).
+		{
+			auto band = [](uint32_t n, uint32_t sr, uint32_t sg, uint32_t sb) {
+				struct Band { double r, g, b, ang; } v{0.0, 0.0, 0.0, -1000.0};
+				if (!n) return v;
+				v.r = double(sr) / double(n);
+				v.g = double(sg) / double(n);
+				v.b = double(sb) / double(n);
+				const double mx = v.r > v.g ? (v.r > v.b ? v.r : v.b)
+				                           : (v.g > v.b ? v.g : v.b);
+				const double mn = v.r < v.g ? (v.r < v.b ? v.r : v.b)
+				                           : (v.g < v.b ? v.g : v.b);
+				const double c = mx - mn;
+				if (c < 1e-3) { v.ang = -1.0; return v; } // near gray
+				double h;
+				if (mx == v.r)      h = std::fmod((v.g - v.b) / c, 6.0);
+				else if (mx == v.g) h = (v.b - v.r) / c + 2.0;
+				else                h = (v.r - v.g) / c + 4.0;
+				h *= 60.0;
+				if (h < 0.0) h += 360.0;
+				v.ang = h;
+				return v;
+			};
+			const auto dk = band((uint32_t)r->tb_l2__DOT__comp_dark_n,
+				                 (uint32_t)r->tb_l2__DOT__comp_dark_sr,
+				                 (uint32_t)r->tb_l2__DOT__comp_dark_sg,
+				                 (uint32_t)r->tb_l2__DOT__comp_dark_sb);
+			const auto br = band((uint32_t)r->tb_l2__DOT__comp_bri_n,
+				                 (uint32_t)r->tb_l2__DOT__comp_bri_sr,
+				                 (uint32_t)r->tb_l2__DOT__comp_bri_sg,
+				                 (uint32_t)r->tb_l2__DOT__comp_bri_sb);
+			printf("  hue-probe dark:   n=%7u avg=(%6.1f,%6.1f,%6.1f) angle=%7.1f deg\n",
+			        (unsigned)r->tb_l2__DOT__comp_dark_n,
+			        dk.r, dk.g, dk.b, dk.ang);
+			printf("  hue-probe bright: n=%7u avg=(%6.1f,%6.1f,%6.1f) angle=%7.1f deg\n",
+			        (unsigned)r->tb_l2__DOT__comp_bri_n,
+			        br.r, br.g, br.b, br.ang);
+			// Phase-class + flat-background (matrix round 2, 2026-09-09):
+			// the 4 subcarrier-phase artifact colors rotate RIGIDLY with the
+			// hue knob (-22.5 deg per +16 knob steps), unlike the threshold
+			// band averages; bg = decoded flat dark background tint.
+			const unsigned pn[4] = { (unsigned)r->tb_l2__DOT__comp_p0_n,
+			                         (unsigned)r->tb_l2__DOT__comp_p1_n,
+			                         (unsigned)r->tb_l2__DOT__comp_p2_n,
+			                         (unsigned)r->tb_l2__DOT__comp_p3_n };
+			const unsigned pr[4] = { (unsigned)r->tb_l2__DOT__comp_p0_sr,
+			                         (unsigned)r->tb_l2__DOT__comp_p1_sr,
+			                         (unsigned)r->tb_l2__DOT__comp_p2_sr,
+			                         (unsigned)r->tb_l2__DOT__comp_p3_sr };
+			const unsigned pg[4] = { (unsigned)r->tb_l2__DOT__comp_p0_sg,
+			                         (unsigned)r->tb_l2__DOT__comp_p1_sg,
+			                         (unsigned)r->tb_l2__DOT__comp_p2_sg,
+			                         (unsigned)r->tb_l2__DOT__comp_p3_sg };
+			const unsigned pb[4] = { (unsigned)r->tb_l2__DOT__comp_p0_sb,
+			                         (unsigned)r->tb_l2__DOT__comp_p1_sb,
+			                         (unsigned)r->tb_l2__DOT__comp_p2_sb,
+			                         (unsigned)r->tb_l2__DOT__comp_p3_sb };
+			for (int p = 0; p < 4; p++) {
+				const auto pc = band(pn[p], pr[p], pg[p], pb[p]);
+				printf("  hue-probe p%d: n=%7u avg=(%6.1f,%6.1f,%6.1f) angle=%7.1f deg\n",
+				        p, pn[p], pc.r, pc.g, pc.b, pc.ang);
+			}
+			const auto bg = band((unsigned)r->tb_l2__DOT__comp_bg_n,
+			                     (unsigned)r->tb_l2__DOT__comp_bg_sr,
+			                     (unsigned)r->tb_l2__DOT__comp_bg_sg,
+			                     (unsigned)r->tb_l2__DOT__comp_bg_sb);
+			printf("  hue-probe bg:   n=%7u avg=(%6.1f,%6.1f,%6.1f) angle=%7.1f deg\n",
+			        (unsigned)r->tb_l2__DOT__comp_bg_n,
+			        bg.r, bg.g, bg.b, bg.ang);
+			// Round 2b: up/down edges split by luma slope (per-class averages
+			// of the combined set cancel: up+down chroma are 180 deg apart).
+			for (int p = 0; p < 4; p++) {
+				const auto uc = band((unsigned)r->tb_l2__DOT__comp_un[p],
+				                     (unsigned)r->tb_l2__DOT__comp_ur[p],
+				                     (unsigned)r->tb_l2__DOT__comp_ug[p],
+				                     (unsigned)r->tb_l2__DOT__comp_ub[p]);
+				printf("  hue-probe u%d: n=%7u avg=(%6.1f,%6.1f,%6.1f) angle=%7.1f deg\n",
+				        p, (unsigned)r->tb_l2__DOT__comp_un[p],
+				        uc.r, uc.g, uc.b, uc.ang);
+			}
+			for (int p = 0; p < 4; p++) {
+				const auto dc = band((unsigned)r->tb_l2__DOT__comp_dn[p],
+				                     (unsigned)r->tb_l2__DOT__comp_dr[p],
+				                     (unsigned)r->tb_l2__DOT__comp_dg[p],
+				                     (unsigned)r->tb_l2__DOT__comp_db[p]);
+				printf("  hue-probe d%d: n=%7u avg=(%6.1f,%6.1f,%6.1f) angle=%7.1f deg\n",
+				        p, (unsigned)r->tb_l2__DOT__comp_dn[p],
+				        dc.r, dc.g, dc.b, dc.ang);
+			}
+			// Round 2c: raw demodulated I/Q class sums (pre-YIQ/RGB, un-gated
+			// geometric pixel set).  Each sum rotates RIGIDLY with the hue
+			// knob; the angle is the I/Q-plane palette angle (0 = I axis).
+			// The 48-bit sums wrap: the RTL member is uint64_t storage, so
+			// sign-extend from bit 47 (the values are small, ~+/-1e6).
+			auto iq48 = [](uint64_t raw) -> int64_t {
+				return (raw & (1ULL << 47)) ? (int64_t)(raw | (~0ULL << 48))
+				                               : (int64_t)raw;
+			};
+			const char* iqq[3][4] = { { "i0", "i1", "i2", "i3" },
+			                          { "iu0", "iu1", "iu2", "iu3" },
+			                          { "id0", "id1", "id2", "id3" } };
+			for (int s = 0; s < 3; s++) {
+				for (int p = 0; p < 4; p++) {
+					const int64_t ii = (s == 0) ? iq48(r->tb_l2__DOT__comp_li8[p])
+					                          : (s == 1) ? iq48(r->tb_l2__DOT__comp_li8u[p])
+					                          : iq48(r->tb_l2__DOT__comp_li8d[p]);
+					const int64_t qq = (s == 0) ? iq48(r->tb_l2__DOT__comp_lq8[p])
+					                          : (s == 1) ? iq48(r->tb_l2__DOT__comp_lq8u[p])
+					                          : iq48(r->tb_l2__DOT__comp_lq8d[p]);
+					double a = std::atan2((double)qq, (double)ii) * 180.0 / 3.14159265358979323846;
+					if (a < 0.0) a += 360.0;
+					printf("  hue-probe %s: I=%lld Q=%lld angle=%7.1f deg\n",
+					        iqq[s][p], (long long)ii, (long long)qq, a);
+				}
+			}
+			// Round 2d: PEAK-pixel I/Q per phase class.  Every peak pixel
+			// in one class points at the same I/Q angle 90c + Phi(K), so
+			// each per-class sum is a high-SNR rigid vector.  Phi is the
+			// palette constant; K* = Phi(0)/1.40625 (mod 256) puts class 0
+			// on the red (I) axis.  xchk: raw burst vector (pre-knob) +
+			// LO/burst counter alignment (P-B mod 4 = s_p - s_b).
+			const char* pkl[2][4] = { { "pku0", "pku1", "pku2", "pku3" },
+			                           { "pkd0", "pkd1", "pkd2", "pkd3" } };
+			for (int s = 0; s < 2; s++) {
+				for (int p = 0; p < 4; p++) {
+					const int64_t ii = (s == 0) ? iq48(r->tb_l2__DOT__comp_lpki[p])
+					                            : iq48(r->tb_l2__DOT__comp_lpki_d[p]);
+					const int64_t qq = (s == 0) ? iq48(r->tb_l2__DOT__comp_lpq[p])
+					                            : iq48(r->tb_l2__DOT__comp_lpq_d[p]);
+					const unsigned nn = (s == 0) ? (unsigned)r->tb_l2__DOT__comp_lpn_u[p]
+					                             : (unsigned)r->tb_l2__DOT__comp_lpn_d[p];
+					double a = std::atan2((double)qq, (double)ii) * 180.0 / 3.14159265358979323846;
+					if (a < 0.0) a += 360.0;
+					double phi = a - 90.0 * p;
+					while (phi < 0.0) phi += 360.0;
+					while (phi >= 360.0) phi -= 360.0;
+					printf("  hue-probe %s: n=%6u I=%lld Q=%lld angle=%7.1f phi=%7.1f deg\n",
+					        pkl[s][p], nn, (long long)ii, (long long)qq, a, phi);
+				}
+			}
+			{
+				const int xib = (int)(int16_t)r->tb_l2__DOT__comp_lxib;
+				const int xqb = (int)(int16_t)r->tb_l2__DOT__comp_lxqb;
+				double a = std::atan2((double)xqb, (double)xib) * 180.0 / 3.14159265358979323846;
+				if (a < 0.0) a += 360.0;
+				printf("  hue-probe xchk: P=%d B=%d raw_burst=(%d,%d) angle=%7.1f deg\n",
+				        (int)r->tb_l2__DOT__comp_lxP, (int)r->tb_l2__DOT__comp_lxB,
+				        xib, xqb, a);
+			}
+		}
 	}
 
 	// ----------------------------------------------------------------

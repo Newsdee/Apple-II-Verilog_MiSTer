@@ -148,7 +148,7 @@ word 1. Do not restore both cores.
 | 4 | `apple2` data path | `[7:0] CPU_DL`, `[23:8] VIDEO_DL_LATCH`, `[24] PHASE_ZERO_D`, `[25] READ_KEY`; remaining bits zero |
 | 5 | timing generator A | `[6:0] H`, `[15:7] V`, `[16] CLK_7M`, `[17] VID7M`, `[18] Q3`, `[19] RAS_N`, `[20] CAS_N`, `[21] AX`, `[22] PHI0`, `[23] COLOR_REF` |
 | 6 | timing generator B | `[0] SEGA`, `[1] SEGB`, `[2] SEGC`, `[3] GR1`, `[4] GR2`, `[5] HBLANK`, `[6] VBLANK`, `[7] WNDW_N`, `[8] LDPS_N`; remaining bits zero |
-| 7 | video generator | `[7:0] video_rom_out`, `[15:8] video_shiftreg`; remaining bits zero |
+| 7 | video generator | `[7:0]` reserved and zero, `[15:8] video_shiftreg`; remaining bits zero. The current video ROM output is not serialized or restored. |
 | 8 | wrapper reset/time | `[22:0] flash_div`, `[23] power_on_reset`, `[24] reset_sync`; remaining bits zero |
 | 9 | wrapper presentation | `[1:0] video_div`, `[2] ce_pix`, `[12:3] hblank_cnt`, `[13] hbl_d`, `[20:14] vblank_lines`; remaining bits zero |
 | 10 | format/control | `[0] saved CPU type`, `[1] PAL mode`; remaining bits reserved and zero |

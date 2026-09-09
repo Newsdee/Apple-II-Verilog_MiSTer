@@ -24,6 +24,15 @@
 #                   scratch copy (source image never written)
 #   --timeout S     per-scenario sim-time timeout in seconds (default:
 #                   1.5 for empty, 6.0 for preloaded)
+#   --savestate     directed save/perturb/load test
+#   --composite     enable composite decode and frame statistics
+#   --ccal          use the calibrated composite preset
+#   --csat=N / --chue=N / --cbright=N / --ccontrast=N
+#                   set raw composite controls
+#   --csatidx=N / --cfineidx=N / --chueidx=N / --hfineidx=N
+#                   mirror the MiSTer coarse/fine OSD controls
+#   --readonly / --scratch / --no-pass
+#                   image protection, scratch-copy, and diagnostic modes
 #
 #   gui             build/run the imgui GUI (same tb_l2 top; Makefile gui):
 #                   native monochrome video window + Disk II / DOS-boot
@@ -65,7 +74,9 @@ CPUSEL=both
 SCENARGS="--empty"
 SCENGIVEN=
 WT=
-EXE_ARGS=
+COMMON_ARGS=
+HEADLESS_ARGS=
+GUI_ARGS=
 while [ $# -gt 0 ]; do
 	case "$1" in
 		clean)      CLEAN=1; shift ;;
@@ -85,15 +96,21 @@ while [ $# -gt 0 ]; do
 		            fi ;;
 		--write-test) WT=1; SCENGIVEN=1; shift ;;
 		--timeout)  TIMEOUT=$2; shift 2 ;;
-		--headless) EXE_ARGS="$EXE_ARGS --headless"; shift
+		--readonly|--scratch)
+		            COMMON_ARGS="$COMMON_ARGS $1"; shift ;;
+		--savestate|--composite|--ccal|--no-pass)
+		            HEADLESS_ARGS="$HEADLESS_ARGS $1"; shift ;;
+		--csat=*|--chue=*|--csatidx=*|--cfineidx=*|--chueidx=*|--hfineidx=*|--cbright=*|--ccontrast=*)
+		            HEADLESS_ARGS="$HEADLESS_ARGS $1"; shift ;;
+		--headless) GUI_ARGS="$GUI_ARGS --headless"; shift
 		            if [ $# -gt 0 ] && [ "$1" -ge 1 ] 2>/dev/null; then
-		                EXE_ARGS="$EXE_ARGS $1"; shift
+		                GUI_ARGS="$GUI_ARGS $1"; shift
 		            fi ;;
-		--selfkey)  EXE_ARGS="$EXE_ARGS --selfkey"; shift ;;
-		--reboot)   EXE_ARGS="$EXE_ARGS --reboot"; shift ;;
-		--run-frames) EXE_ARGS="$EXE_ARGS --run-frames $2"; shift 2 ;;
-		--scale)    EXE_ARGS="$EXE_ARGS --scale $2"; shift 2 ;;
-		*) echo "unknown arg: $1 (expected clean, --trace, gui, nmos|wdc|both, --empty, --disk <nib>, --write-test, --timeout S, --headless [N], --selfkey, --reboot, --run-frames N, --scale N)"; exit 2 ;;
+		--selfkey)  GUI_ARGS="$GUI_ARGS --selfkey"; shift ;;
+		--reboot)   GUI_ARGS="$GUI_ARGS --reboot"; shift ;;
+		--run-frames) GUI_ARGS="$GUI_ARGS --run-frames $2"; shift 2 ;;
+		--scale)    GUI_ARGS="$GUI_ARGS --scale $2"; shift 2 ;;
+		*) echo "unknown arg: $1 (expected clean, --trace, gui, nmos|wdc|both, --empty, --disk <nib>, --write-test, --timeout S, --savestate, --composite, --ccal, composite knob flags, --readonly, --scratch, --no-pass, --headless [N], --selfkey, --reboot, --run-frames N, --scale N)"; exit 2 ;;
 	esac
 done
 
@@ -116,6 +133,10 @@ esac
 cd ../..
 
 if [ -n "$GUI" ]; then
+	if [ -n "$HEADLESS_ARGS$WT$TIMEOUT$TRACE" ]; then
+		echo "ERROR: gui mode does not support --trace, --timeout, --write-test, save-state, composite, or headless diagnostic options"
+		exit 2
+	fi
 	# imgui GUI build: same top module (tb_l2), separate link libs
 	# (Makefile gui).  One launch: nmos unless wdc was explicitly
 	# requested (a single window).
@@ -131,10 +152,10 @@ if [ -n "$GUI" ]; then
 	mkdir -p unit_tests/level_2/out
 	CPUIDX=0
 	if [ "$CPUSEL" = wdc ]; then CPUIDX=1; fi
-	echo "run: $gexe +cpu=$CPUIDX $SCENARGS $EXE_ARGS"
+	echo "run: $gexe +cpu=$CPUIDX $SCENARGS $COMMON_ARGS $GUI_ARGS"
 	# LOAD-BEARING: runs from the repo root (ROM $readmemh paths, and the
 	# default .nib path is CWD-relative too).
-	exec "$gexe" +cpu=$CPUIDX $SCENARGS $EXE_ARGS
+	exec "$gexe" +cpu=$CPUIDX $SCENARGS $COMMON_ARGS $GUI_ARGS
 fi
 
 if [ -n "$CLEAN" ]; then
@@ -159,10 +180,10 @@ fi
 STATUS=0
 if [ "$CPUSEL" = both ] || [ "$CPUSEL" = nmos ]; then
 	echo "=== run cpu=0 (nmos6502) $SCENARGS ==="
-	"$exe" +cpu=0 $SCENARGS || STATUS=1
+	"$exe" +cpu=0 $SCENARGS $TOPT $VCD $COMMON_ARGS $HEADLESS_ARGS || STATUS=1
 fi
 if [ "$CPUSEL" = both ] || [ "$CPUSEL" = wdc ]; then
 	echo "=== run cpu=1 (wdc65c02) $SCENARGS ==="
-	"$exe" +cpu=1 $SCENARGS || STATUS=2
+	"$exe" +cpu=1 $SCENARGS $TOPT $VCD $COMMON_ARGS $HEADLESS_ARGS || STATUS=2
 fi
 exit $STATUS

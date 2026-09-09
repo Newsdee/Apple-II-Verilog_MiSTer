@@ -51,3 +51,6 @@ set_global_assignment -name SYSTEMVERILOG_FILE ../../level_1b/savestate_ddr_l1b.
 set_global_assignment -name SYSTEMVERILOG_FILE ../../../rtl/apple_composite.sv
 set_global_assignment -name SYSTEMVERILOG_FILE video_mixer_plus.sv
 set_global_assignment -name SYSTEMVERILOG_FILE composite_decoder.sv
+# NTSC vertical blend (2026-09-11): 2-line vertical comb module
+# instantiated by video_mixer_plus.sv in the composite branch.
+set_global_assignment -name SYSTEMVERILOG_FILE ntsc_vertical_blend.sv
