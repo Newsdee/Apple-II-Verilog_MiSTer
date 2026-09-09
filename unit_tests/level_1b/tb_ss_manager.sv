@@ -11,6 +11,7 @@ module tb_ss_manager;
   reg cpu_type = 1'b0;
   reg cpu_frozen = 1'b0;
   wire stall, machine_ce, busy, done, error, locked_cpu_type;
+  wire [1:0] error_code;
   wire [9:0] ss_addr;
   wire [63:0] ss_wdata;
   wire ss_wren;
@@ -42,13 +43,15 @@ module tb_ss_manager;
   integer reg_writes = 0;
   reg saw_register_restore_early = 1'b0;
   reg completion_error = 1'b0;
+  reg [1:0] completion_error_code = 2'd0;
 
   savestate_manager_l1b dut (
     .clk(clk), .reset(reset), .request_save(request_save), .request_load(request_load),
     .allow_save_state(allow_save_state), .cpu_type(cpu_type),
     .cpu_frozen(cpu_frozen), .stall(stall),
     .machine_ce(machine_ce), .busy(busy), .done(done), .error(error),
-    .locked_cpu_type(locked_cpu_type), .ss_addr(ss_addr), .ss_wdata(ss_wdata),
+    .error_code(error_code), .locked_cpu_type(locked_cpu_type),
+    .ss_addr(ss_addr), .ss_wdata(ss_wdata),
     .ss_wren(ss_wren), .ss_rdata(ss_rdata), .ram_bank(ram_bank),
     .ram_addr(ram_addr), .ram_rd(ram_rd), .ram_wr(ram_wr),
     .ram_wdata(ram_wdata), .ram_rdata(ram_rdata), .slot_addr(slot_addr),
@@ -57,8 +60,10 @@ module tb_ss_manager;
   );
 
   always @(posedge clk) begin
-    if (done)
+    if (done) begin
       completion_error <= error;
+      completion_error_code <= error_code;
+    end
     cpu_frozen <= stall;
     ram_rdata <= memory[{ram_bank, ram_addr}];
     slot_ready <= 1'b0;
@@ -195,9 +200,10 @@ module tb_ss_manager;
     reg_writes = 0;
     pulse_load();
     wait_done();
-    if (!completion_error || slot_reads != 2 || ram_writes != 0 || reg_writes != 0) begin
-      $display("ERROR: invalid header rejection error=%0b reads=%0d ram=%0d regs=%0d",
-               completion_error, slot_reads, ram_writes, reg_writes);
+    if (!completion_error || completion_error_code != 2'd2 || slot_reads != 2 ||
+        ram_writes != 0 || reg_writes != 0) begin
+      $display("ERROR: invalid header rejection error=%0b code=%0d reads=%0d ram=%0d regs=%0d",
+               completion_error, completion_error_code, slot_reads, ram_writes, reg_writes);
       errors = errors + 1;
     end
 
@@ -208,9 +214,10 @@ module tb_ss_manager;
     reg_writes = 0;
     pulse_load();
     wait_done();
-    if (!completion_error || slot_reads != 2 || ram_writes != 0 || reg_writes != 0) begin
-      $display("ERROR: CPU mismatch rejection error=%0b reads=%0d ram=%0d regs=%0d",
-               completion_error, slot_reads, ram_writes, reg_writes);
+    if (!completion_error || completion_error_code != 2'd3 || slot_reads != 2 ||
+        ram_writes != 0 || reg_writes != 0) begin
+      $display("ERROR: CPU mismatch rejection error=%0b code=%0d reads=%0d ram=%0d regs=%0d",
+               completion_error, completion_error_code, slot_reads, ram_writes, reg_writes);
       errors = errors + 1;
     end
 
@@ -221,10 +228,11 @@ module tb_ss_manager;
     reg_writes = 0;
     pulse_save();
     wait_done();
-    if (!completion_error || busy || slot_reads != 0 || slot_writes != 0 ||
-        ram_writes != 0 || reg_writes != 0) begin
-      $display("ERROR: disabled rejection error=%0b busy=%0b reads=%0d writes=%0d ram=%0d regs=%0d",
-               completion_error, busy, slot_reads, slot_writes, ram_writes, reg_writes);
+    if (!completion_error || completion_error_code != 2'd1 || busy ||
+        slot_reads != 0 || slot_writes != 0 || ram_writes != 0 || reg_writes != 0) begin
+      $display("ERROR: disabled rejection error=%0b code=%0d busy=%0b reads=%0d writes=%0d ram=%0d regs=%0d",
+               completion_error, completion_error_code, busy, slot_reads, slot_writes,
+               ram_writes, reg_writes);
       errors = errors + 1;
     end
 

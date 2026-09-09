@@ -12,7 +12,7 @@ MACH_SRC := $(RTL)/apple2.v $(RTL)/timing_generator.v $(RTL)/video_generator.v \
 			$(RTL)/keyboard.v $(RTL)/rom.v $(RTL)/ramcard.v
 ROMS := $(RTL)/roms/apple2e.hex $(RTL)/roms/video2.hex
 
-.PHONY: all run coordinator manager ram hotkeys gui clean
+.PHONY: all run coordinator manager ram hotkeys ui gui clean
 all: $(EXE)
 
 COORDOUT := $(OUT)/coord_obj_dir
@@ -34,6 +34,11 @@ HOTKEYOUT := $(OUT)/hotkey_obj_dir
 HOTKEYEXE := $(HOTKEYOUT)/Vtb_savestate_hotkeys.exe
 
 hotkeys: $(HOTKEYEXE)
+
+UIOUT := $(OUT)/ui_obj_dir
+UIEXE := $(UIOUT)/Vtb_savestate_ui.exe
+
+ui: $(UIEXE)
 
 GUIOUT := $(OUT)/gui_obj_dir
 GUIEXE := $(GUIOUT)/Vtb_l1b_gui.exe
@@ -86,6 +91,13 @@ $(HOTKEYEXE): tb_savestate_hotkeys.sv $(RTL)/savestate_hotkeys.sv
 	VERILATOR_ROOT=$(VROOT) $(V) --binary --timing -O3 --x-assign fast --x-initial fast \
 		-Wno-fatal -Wno-TIMESCALEMOD --top-module tb_savestate_hotkeys \
 		-Mdir $(HOTKEYOUT) tb_savestate_hotkeys.sv $(RTL)/savestate_hotkeys.sv
+	@echo "built $@"
+
+$(UIEXE): tb_savestate_ui.sv savestate_ui.sv
+	@mkdir -p $(UIOUT)
+	VERILATOR_ROOT=$(VROOT) $(V) --binary --timing -O3 --x-assign fast --x-initial fast \
+		-Wno-fatal -Wno-TIMESCALEMOD --top-module tb_savestate_ui \
+		-Mdir $(UIOUT) tb_savestate_ui.sv savestate_ui.sv
 	@echo "built $@"
 
 $(GUIEXE): tb_l1b_gui.sv $(GUI_SRC) $(MACH_SRC) $(CPU_SRC)

@@ -4,6 +4,7 @@ module savestate_ddr_l1b #(
   input  wire        clk,
   input  wire        reset,
   input  wire [14:0] slot_addr,
+  input  wire [1:0]  slot_sel,   // selected slot; 512 KiB (0x10000 beats) stride
   input  wire        slot_rd,
   input  wire        slot_wr,
   input  wire [63:0] slot_wdata,
@@ -29,8 +30,12 @@ module savestate_ddr_l1b #(
   reg [1:0] state;
   reg [28:0] address_latched;
 
-  // The MiSTer DDRAM port is 64 bits wide. DDRAM_ADDR addresses complete
-  // 64-bit beats and DDRAM_BURSTCNT counts those beats.
+  // Slot base within the advertised SS3E000000:200000 region:
+  // 512 KiB per slot = 0x10000 64-bit beats. The 30-bit intermediate keeps
+  // the add lint-clean; the sum always fits the 29-bit DDRAM address space.
+  wire [29:0] slot_base_ext = {1'b0, BASE_ADDR} + {1'b0, slot_sel, 16'd0, 11'd0};
+  wire [28:0] slot_base = slot_base_ext[28:0];
+
   assign ddram_clk = clk;
   assign ddram_burstcnt = 8'd1;
   assign ddram_addr = address_latched;
@@ -51,12 +56,12 @@ module savestate_ddr_l1b #(
       case (state)
         IDLE: begin
           if (!ddram_busy && slot_rd) begin
-            address_latched <= BASE_ADDR + {14'd0, slot_addr};
+            address_latched <= slot_base + {14'd0, slot_addr};
             ddram_rd <= 1'b1;
             state <= READ_WAIT;
           end
           else if (!ddram_busy && slot_wr) begin
-            address_latched <= BASE_ADDR + {14'd0, slot_addr};
+            address_latched <= slot_base + {14'd0, slot_addr};
             ddram_din <= slot_wdata;
             ddram_we <= 1'b1;
             state <= WRITE_WAIT;

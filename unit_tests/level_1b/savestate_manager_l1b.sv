@@ -11,6 +11,7 @@ module savestate_manager_l1b (
   output reg         busy,
   output reg         done,
   output reg         error,
+  output reg  [1:0]  error_code,  // 0 none, 1 rejected, 2 invalid/empty, 3 incompatible
   output reg         locked_cpu_type,
 
   output reg  [9:0]  ss_addr,
@@ -57,6 +58,7 @@ module savestate_manager_l1b (
 
   reg [4:0] state;
   reg       operation_load;
+  reg [1:0] fail_code;
   reg [1:0] settle_count;
   reg [4:0] header_index;
   reg [3:0] reg_index;
@@ -137,10 +139,12 @@ module savestate_manager_l1b (
   always @(posedge clk) begin
     done <= 1'b0;
     error <= 1'b0;
+    error_code <= 2'd0;
 
     if (reset) begin
       state <= IDLE;
       busy <= 1'b0;
+      fail_code <= 2'd0;
       locked_cpu_type <= 1'b0;
       operation_load <= 1'b0;
       settle_count <= 2'd0;
@@ -158,6 +162,7 @@ module savestate_manager_l1b (
             if (!allow_save_state) begin
               done <= 1'b1;
               error <= 1'b1;
+              error_code <= 2'd1;
             end else begin
               busy <= 1'b1;
               locked_cpu_type <= cpu_type;
@@ -241,11 +246,14 @@ module savestate_manager_l1b (
         end
         LOAD_HEADER1: begin
           if (slot_ready) begin
-            if ((header0_read != HEADER0) ||
-                (slot_rdata[0] != locked_cpu_type) ||
-              (slot_rdata[31:16] != 16'd1) ||
-              (slot_rdata[15:8] != 8'd1) ||
-              (slot_rdata[7:1] != 7'd0)) begin
+            if (header0_read != HEADER0) begin
+              fail_code <= 2'd2;
+              state <= FAIL;
+            end else if ((slot_rdata[0] != locked_cpu_type) ||
+                (slot_rdata[31:16] != 16'd1) ||
+                (slot_rdata[15:8] != 8'd1) ||
+                (slot_rdata[7:1] != 7'd0)) begin
+              fail_code <= 2'd3;
               state <= FAIL;
             end else begin
               reg_index <= 4'd0;
@@ -315,11 +323,13 @@ module savestate_manager_l1b (
           busy <= 1'b0;
           done <= 1'b1;
           error <= 1'b1;
+          error_code <= fail_code;
           state <= IDLE;
         end
         default: begin
           busy <= 1'b0;
           error <= 1'b1;
+          error_code <= 2'd2;
           state <= IDLE;
         end
       endcase
