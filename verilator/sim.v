@@ -357,7 +357,7 @@ apple2_top apple2_top
 	.virtual_open_apple(virtual_open_apple),
 	.virtual_closed_apple(virtual_closed_apple),
 
-	.joy(virtual_keyboard_active ? 8'h00 : joyd),
+	.joy(virtual_keyboard_active ? 16'h0000 : {joystick_0[15:8], joyd}),
 	.joy_an(virtual_keyboard_active ? 16'h0000 : joya),
 	.JOY_TO_KEY_EN(1'b1),
 

@@ -26,6 +26,12 @@ module apple2_top(
     cpu_type,
     CPU_WAIT,
     cpu_stall,
+    ss_addr,
+    ss_wdata,
+    ss_wren,
+    ss_rdata,
+    machine_ce,
+    cpu_frozen,
     ram_we,
     ram_di,
     ram_do,
@@ -66,18 +72,24 @@ module apple2_top(
     joy,
     joy_an,
     JOY_TO_KEY_EN,
-    TRACK1,
-    TRACK1_ADDR,
-    TRACK1_DI,
-    TRACK1_DO,
-    TRACK1_WE,
-    TRACK1_BUSY,
-    TRACK2,
-    TRACK2_ADDR,
-    TRACK2_DI,
-    TRACK2_DO,
-    TRACK2_WE,
-    TRACK2_BUSY,
+    // WOZ SD block interface (one hps_io channel per drive)
+    SD_LBA0,
+    SD_RD0,
+    SD_WR0,
+    SD_ACK0,
+    SD_BUFF_DIN0,
+    SD_LBA1,
+    SD_RD1,
+    SD_WR1,
+    SD_ACK1,
+    SD_BUFF_DIN1,
+    SD_BUFF_ADDR,
+    SD_BUFF_DOUT,
+    SD_BUFF_WR,
+    IMG_MOUNTED0,
+    IMG_MOUNTED1,
+    IMG_READONLY,
+    IMG_SIZE,
     D1_ACTIVE,
     D2_ACTIVE,
     D1_MOTOR_ON,
@@ -130,6 +142,13 @@ module apple2_top(
     input         CPU_WAIT;
     input         cpu_stall; // 1: hold the CPU in place (OSD pause)
 
+    input  [9:0]  ss_addr;
+    input  [63:0] ss_wdata;
+    input         ss_wren;
+    output [63:0] ss_rdata;
+    input         machine_ce;
+    output        cpu_frozen;
+
     // main RAM
     output        ram_we;
     output [7:0]  ram_di;
@@ -177,19 +196,24 @@ module apple2_top(
     input  [15:0] joy_an;
     input         JOY_TO_KEY_EN;
 
-    // disk control
-    output [5:0]  TRACK1;		// Current track (0-34)
-    output [12:0] TRACK1_ADDR;
-    output [7:0]  TRACK1_DI;
-    input  [7:0]  TRACK1_DO;
-    output        TRACK1_WE;
-    input         TRACK1_BUSY;
-    output [5:0]  TRACK2;		// Current track (0-34)
-    output [12:0] TRACK2_ADDR;
-    output [7:0]  TRACK2_DI;
-    input  [7:0]  TRACK2_DO;
-    output        TRACK2_WE;
-    input         TRACK2_BUSY;
+    // WOZ disk control: SD block interface, one hps_io channel per drive
+    output [31:0] SD_LBA0;
+    output        SD_RD0;
+    output        SD_WR0;
+    input         SD_ACK0;
+    output [7:0]  SD_BUFF_DIN0;
+    output [31:0] SD_LBA1;
+    output        SD_RD1;
+    output        SD_WR1;
+    input         SD_ACK1;
+    output [7:0]  SD_BUFF_DIN1;
+    input  [8:0]  SD_BUFF_ADDR;
+    input  [7:0]  SD_BUFF_DOUT;
+    input         SD_BUFF_WR;
+    input         IMG_MOUNTED0;
+    input         IMG_MOUNTED1;
+    input         IMG_READONLY;
+    input  [63:0] IMG_SIZE;
 
     output        D1_ACTIVE;	// Disk 1 motor on
     output        D2_ACTIVE;	// Disk 2 motor on
@@ -205,7 +229,19 @@ module apple2_top(
     input         D2_WP;
 
     output        DISK_ACT;
-    input  [1:0]  DISK_READY;
+    input  [1:0]  DISK_READY;	// unused in WOZ mode (no track buffer)
+
+    // The WOZ card exposes only D1/D2_ACTIVE (motor incl. 1 s holdover).
+    // The fine-grained Disk II drive signals do not exist on the flux
+    // drives and are tied off (the WOZ wrapper does not use them).
+    assign D1_MOTOR_ON        = 1'b0;
+    assign D2_MOTOR_ON        = 1'b0;
+    assign D1_IO_ACTIVE       = 1'b0;
+    assign D2_IO_ACTIVE       = 1'b0;
+    assign D1_STEP_ACTIVE     = 1'b0;
+    assign D2_STEP_ACTIVE     = 1'b0;
+    assign D1_TRACK_ZERO_STEP = 1'b0;
+    assign D2_TRACK_ZERO_STEP = 1'b0;
 
     // HDD control
     output [15:0] HDD_SECTOR;
@@ -304,6 +340,7 @@ module apple2_top(
     wire [9:0]    psg_5_audio_l;
     wire [9:0]    psg_5_audio_r;
     wire [9:0]    audio;
+    wire [63:0]   core_ss_rdata;
 
     // box-average the $C030 speaker bit at 14.318 MHz into
     // ~48 kHz samples (298 clocks = 20.8 us) so fast toggles average out
@@ -324,19 +361,28 @@ module apple2_top(
     // In the Apple ][, this was a 555 timer
     always @(posedge CLK_14M)
     begin: power_on
-        reset <= reset_warm | power_on_reset;
-
-        if (reset_cold == 1'b1 || soft_reset == 1'b1)
+        if (ss_wren && (ss_addr == 10'd8))
         begin
-            power_on_reset <= 1'b1;
-            flash_clk      <= {23{1'b0}};
+            flash_clk      <= ss_wdata[22:0];
+            power_on_reset <= ss_wdata[23];
+            reset          <= ss_wdata[24];
         end
-        else
+        else if (machine_ce)
         begin
-            if (flash_clk[22] == 1'b1)
-                power_on_reset <= 1'b0;
+            reset <= reset_warm | power_on_reset;
 
-            flash_clk <= flash_clk + 1;
+            if (reset_cold == 1'b1 || soft_reset == 1'b1)
+            begin
+                power_on_reset <= 1'b1;
+                flash_clk      <= {23{1'b0}};
+            end
+            else
+            begin
+                if (flash_clk[22] == 1'b1)
+                    power_on_reset <= 1'b0;
+
+                flash_clk <= flash_clk + 1;
+            end
         end
     end
 
@@ -402,6 +448,22 @@ module apple2_top(
                 (IO_SELECT[2] == 1'b1 | DEVICE_SELECT[2] == 1'b1 | SSC_ROM_EN == 1'b1) ? SSC_DO :
                 DISK_DO;
 
+    // 60 Hz IRQ (level_2/level_2b pattern): one short pulse per VBL
+    // rising edge, in the 14 MHz domain.  The ROM's 60 Hz handler keeps
+    // the OS 1-second counter that the DOS 3.3 boot path waits on;
+    // without it the boot hangs.  (The Disk II variant of this top does
+    // not generate it - pre-existing main-project behavior.)
+    reg  [4:0] irq_60hz_cnt;
+    reg        vbl_irq_d;
+    wire       irq_60hz_pulse = (irq_60hz_cnt != 5'd0);
+    always @(posedge CLK_14M) begin
+        vbl_irq_d <= VBL;
+        if (VBL && !vbl_irq_d)
+            irq_60hz_cnt <= 5'd16;
+        else if (irq_60hz_cnt != 5'd0)
+            irq_60hz_cnt <= irq_60hz_cnt - 5'd1;
+    end
+
     apple2 core(
         .CLK_14M(CLK_14M),
         .CLK_2M(CLK_2M),
@@ -422,7 +484,7 @@ module apple2_top(
         .aux(ram_aux),
         .PD(PD),
         .CPU_WE(cpu_we),
-        .IRQ_n(psg_4_irq_n & psg_5_irq_n & ssc_irq_n & mouse_4_irq_n & mouse_5_irq_n),
+        .IRQ_n(psg_4_irq_n & psg_5_irq_n & ssc_irq_n & mouse_4_irq_n & mouse_5_irq_n & ~irq_60hz_pulse),
         .NMI_n(psg_4_nmi_n & psg_5_nmi_n),
         .ram_we(we_ram),
         .VIDEO(VIDEO),
@@ -452,13 +514,18 @@ module apple2_top(
         .DBG_DI(),
         .DBG_ROM_ADDR(),
         .DBG_ROM_OUT(),
-        .ss_addr(10'd0),
-        .ss_wdata(64'd0),
-        .ss_wren(1'b0),
-        .ss_rdata(),
-        .machine_ce(1'b1),
-        .cpu_frozen()
+        .ss_addr(ss_addr),
+        .ss_wdata(ss_wdata),
+        .ss_wren(ss_wren),
+        .ss_rdata(core_ss_rdata),
+        .machine_ce(machine_ce),
+        .cpu_frozen(cpu_frozen)
     );
+
+    assign ss_rdata = (ss_addr == 10'd8) ?
+                      {39'd0, reset, power_on_reset, flash_clk} :
+                      (ss_addr == 10'd9) ?
+                      {36'd0, spk_avg, spk_sum, spk_cnt} : core_ss_rdata;
 
     vga_controller tv(
         .CLK_14M(CLK_14M),
@@ -544,43 +611,46 @@ module apple2_top(
 
     assign DISK_ACT = ~(D1_ACTIVE | D2_ACTIVE);
 
-    disk_ii disk(
+    // WOZ Disk II slot controller (rtl/woz/disk_ii_woz.sv): replaces
+    // disk_ii + drive_ii x2 + the track buffer bus.  Reads the .woz image
+    // over the hps_io SD block interface (one channel per drive); the
+    // hps_io streaming protocol is exactly what the WOZ expects, and
+    // sd_blk_cnt is left 0 (single-block requests).  IMG_MOUNTED is a
+    // LEVEL (the wrapper latches the hps_io mount pulse).  DD_RESET is
+    // reset_cold: a cold reset re-seats the drives; a warm reset leaves
+    // them spinning (real-machine behavior).
+    disk_ii_woz disk(
         .CLK_14M(CLK_14M),
-        .CLK_2M(CLK_2M),
+        .RESET(reset),
+        .DD_RESET(reset_cold),
         .PHASE_ZERO(PHASE_ZERO),
         .IO_SELECT(IO_SELECT[6]),
         .DEVICE_SELECT(DEVICE_SELECT[6]),
-        .RESET(reset),
-        .DISK_READY(DISK_READY),
+        .WE(cpu_we),
         .A(ADDR),
         .D_IN(D),
         .D_OUT(DISK_DO),
         .D1_ACTIVE(D1_ACTIVE),
         .D2_ACTIVE(D2_ACTIVE),
-        .D1_MOTOR_ON(D1_MOTOR_ON),
-        .D2_MOTOR_ON(D2_MOTOR_ON),
-        .D1_IO_ACTIVE(D1_IO_ACTIVE),
-        .D2_IO_ACTIVE(D2_IO_ACTIVE),
-        .D1_STEP_ACTIVE(D1_STEP_ACTIVE),
-        .D2_STEP_ACTIVE(D2_STEP_ACTIVE),
-        .D1_TRACK_ZERO_STEP(D1_TRACK_ZERO_STEP),
-        .D2_TRACK_ZERO_STEP(D2_TRACK_ZERO_STEP),
         .D1_WP(D1_WP),
         .D2_WP(D2_WP),
-        //-- track buffer interface for disk 1
-        .TRACK1(TRACK1),
-        .TRACK1_ADDR(TRACK1_ADDR),
-        .TRACK1_DO(TRACK1_DO),
-        .TRACK1_DI(TRACK1_DI),
-        .TRACK1_WE(TRACK1_WE),
-        .TRACK1_BUSY(TRACK1_BUSY),
-        //-- track buffer interface for disk 2
-        .TRACK2(TRACK2),
-        .TRACK2_ADDR(TRACK2_ADDR),
-        .TRACK2_DO(TRACK2_DO),
-        .TRACK2_DI(TRACK2_DI),
-        .TRACK2_WE(TRACK2_WE),
-        .TRACK2_BUSY(TRACK2_BUSY)
+        .SD_LBA0(SD_LBA0),
+        .SD_RD0(SD_RD0),
+        .SD_WR0(SD_WR0),
+        .SD_ACK0(SD_ACK0),
+        .SD_BUFF_DIN0(SD_BUFF_DIN0),
+        .SD_LBA1(SD_LBA1),
+        .SD_RD1(SD_RD1),
+        .SD_WR1(SD_WR1),
+        .SD_ACK1(SD_ACK1),
+        .SD_BUFF_DIN1(SD_BUFF_DIN1),
+        .SD_BUFF_ADDR(SD_BUFF_ADDR),
+        .SD_BUFF_DOUT(SD_BUFF_DOUT),
+        .SD_BUFF_WR(SD_BUFF_WR),
+        .IMG_MOUNTED0(IMG_MOUNTED0),
+        .IMG_MOUNTED1(IMG_MOUNTED1),
+        .IMG_READONLY(IMG_READONLY),
+        .IMG_SIZE(IMG_SIZE)
     );
 
 // HDD presence: the full build and SIM_FAST_HDD keep it; plain SIM_FAST stubs slot 7.
@@ -816,13 +886,19 @@ module apple2_top(
 `endif
 
     always @(posedge CLK_14M) begin
-        if (spk_cnt == 9'd297) begin
-            spk_cnt <= 9'd0;
-            spk_sum <= 9'd0;
-            spk_avg <= spk_div[9:0];
-        end else begin
-            spk_cnt <= spk_cnt + 9'd1;
-            if (spk_bit) spk_sum <= spk_sum + 9'd1;
+        if (ss_wren && (ss_addr == 10'd9)) begin
+            spk_cnt <= ss_wdata[8:0];
+            spk_sum <= ss_wdata[17:9];
+            spk_avg <= ss_wdata[27:18];
+        end else if (machine_ce) begin
+            if (spk_cnt == 9'd297) begin
+                spk_cnt <= 9'd0;
+                spk_sum <= 9'd0;
+                spk_avg <= spk_div[9:0];
+            end else begin
+                spk_cnt <= spk_cnt + 9'd1;
+                if (spk_bit) spk_sum <= spk_sum + 9'd1;
+            end
         end
     end
     assign audio = spk_avg;

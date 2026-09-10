@@ -244,7 +244,7 @@ pll pll
 
 /////////////////  HPS  ///////////////////////////
 
-wire [31:0] status;
+wire [63:0] status;
 wire  [1:0] buttons;
 wire        forced_scandoubler;
 wire [21:0] gamma_bus;
@@ -392,8 +392,12 @@ apple2_top apple2_top
 
 	.PS2_Key(ps2_key),
 
-	.joy(joyd),
+	// 16-bit digital bus for joy-to-key: low 8 = joyd (axis-masked, unchanged),
+	// high 8 = raw hps_io bits 8-15 (the A/B/X/Y/L/R key buttons).
+	.joy({joystick_0[15:8], joyd}),
 	.joy_an(joya),
+	// Joy-to-key OSD toggle (input 43, same slot as the newsdee project).
+	.JOY_TO_KEY_EN(status[43]),
 
 	.mb_4_inslot(~status[4]),
 	
