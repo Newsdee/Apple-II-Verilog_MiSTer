@@ -1,10 +1,12 @@
 //-----------------------------------------------------------------------------
 // Standalone VGA color tester top.
 //
-// Thin 1:1 pass-through around vga_controller so the tester's Verilator top
-// is its own module. The C++ side drives the exact DUT ports; frame capture
-// and DUT priming live in C++ (src/main.cpp). Keep this file free of logic
-// so the DUT port list stays the single source of truth.
+// Pass-through around vga_controller plus the composite decode branch
+// (apple_composite + composite_decoder) on the same raw feed, so the tester
+// can iterate on the composite image without the full machine. The C++ side
+// drives the exact DUT ports and selects which output set to capture; frame
+// capture and DUT priming live in C++ (src/main.cpp). The only logic added
+// here is the composite sync derivation (mirrors the FPGA wrapper).
 //
 // The sibling vga_controller.v is an intentional snapshot of
 // ../rtl/vga_controller.v. Compare them explicitly after any change to
@@ -38,7 +40,97 @@ module vga_color_test_top (
     input      [7:0]  ioctl_index,
     input             ioctl_download,
     input             ioctl_wr,
-    output            ioctl_wait
+    output            ioctl_wait,
+
+    // ---- Composite decode branch (apple_composite + composite_decoder) ----
+    // Runs in parallel with the VGA controller on the same raw VIDEO/HBL/VBL
+    // feed; the C++ harness selects which output set to capture (the GUI
+    // "Composite" box, on by default).  The VGA controller path is untouched.
+    // Knob inputs map 1:1 to the composite_decoder adjust ports.
+    input      [7:0]  COMPOSITE_SAT,        // 128 = unity
+    input      [7:0]  COMPOSITE_HUE,        // 256 = one full cycle
+    input      [7:0]  COMPOSITE_BRIGHT,     // signed luma offset, 0 = none
+    input      [7:0]  COMPOSITE_CONTRAST,   // mid-gray-centred gain, 128 = unity
+    input      [1:0]  COMPOSITE_PIXEL_DELAY,// source delay in composite samples
+    input      [3:0]  COMPOSITE_SMEAR,      // chroma trail length, 0 = off
+    input      [3:0]  COMPOSITE_LUMA_DELAY, // luma delay, samples
+    input      [1:0]  COMPOSITE_CHROMA_MAP, // 0 normal; 1 Q mirror; 2 swap; 3 I
+    input             COMPOSITE_CHROMA_SHORT,
+    input             COMPOSITE_AGC_EN,     // track level off the burst
+    output     [7:0]  COMP_R,
+    output     [7:0]  COMP_G,
+    output     [7:0]  COMP_B,
+    output            COMP_HB,             // decoder-delayed blanking;
+    output            COMP_VB              // capture window (560 samples wide)
+);
+
+// ---------------------------------------------------------------------------
+// Sync derivation for the composite encoder - same structure and windows as
+// the FPGA wrapper (unit_tests/level_2/mister/Apple-II.sv): the hs pulse
+// sits in the middle of HBL (hblank 130..197) so the generated color burst
+// (hcnt 8..72 after the hs fall) and the decoder's black clamp (hcnt 72..88)
+// both land inside the back porch, and vs pulses 3 lines into the VBL block.
+// The raw VIDEO stream carries no sync of its own (see apple_composite.sv).
+// ---------------------------------------------------------------------------
+// Vector-width so the counter comparisons stay width-clean (the FPGA
+// wrapper uses integers in a 32-bit-clean context; here the counters are
+// 10/7-bit).
+localparam [9:0] HSYNC_FRONT_PORCH = 130;
+localparam [9:0] HSYNC_WIDTH       = 68;
+localparam [6:0] VSYNC_FRONT_PORCH = 33;
+localparam [6:0] VSYNC_LINES       = 3;
+
+reg [9:0] hblank_cnt = 10'd0;
+always @(posedge CLK_14M)
+    if (!HBL) hblank_cnt <= 10'd0;
+    else      hblank_cnt <= hblank_cnt + 10'd1;
+
+reg         hbl_d    = 1'b0;
+wire        hbl_rise = HBL & ~hbl_d;
+always @(posedge CLK_14M) hbl_d <= HBL;
+
+reg [6:0] vblank_lines = 7'd0;
+always @(posedge CLK_14M)
+    if (VBL)
+        if (hbl_rise) vblank_lines <= vblank_lines + 7'd1;
+    else
+        vblank_lines <= 7'd0;
+
+wire comp_hsync = HBL & (hblank_cnt >= HSYNC_FRONT_PORCH) &
+                  (hblank_cnt < HSYNC_FRONT_PORCH + HSYNC_WIDTH);
+wire comp_vsync = VBL & (vblank_lines >= VSYNC_FRONT_PORCH) &
+                  (vblank_lines < VSYNC_FRONT_PORCH + VSYNC_LINES);
+
+apple_composite #(
+    .BURST_START(8),
+    .BURST_LEN  (64)
+) u_comp (
+    .clk            (CLK_14M),
+    .ce             (1'b1),
+    .video          (VIDEO),
+    .pixel_delay    (COMPOSITE_PIXEL_DELAY),
+    .hs             (comp_hsync),
+    .vs             (comp_vsync),
+    .hb             (HBL),
+    .vb             (VBL),
+    .sat            (COMPOSITE_SAT),
+    .hue            (COMPOSITE_HUE),
+    .bright         (COMPOSITE_BRIGHT),
+    .contrast       (COMPOSITE_CONTRAST),
+    .chroma_map     (COMPOSITE_CHROMA_MAP),
+    .chroma_short   (COMPOSITE_CHROMA_SHORT),
+    .smear          (COMPOSITE_SMEAR),
+    .luma_delay     (COMPOSITE_LUMA_DELAY),
+    .agc_en         (COMPOSITE_AGC_EN),
+    .r              (COMP_R),
+    .g              (COMP_G),
+    .b              (COMP_B),
+    .ce_out         (),
+    .hs_out         (),
+    .vs_out         (),
+    .hb_out         (COMP_HB),
+    .vb_out         (COMP_VB),
+    .comp_sample    ()
 );
 
 vga_controller dut (

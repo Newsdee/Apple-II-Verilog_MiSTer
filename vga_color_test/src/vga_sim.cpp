@@ -76,6 +76,29 @@ FrameResult VgaSim::runFrame(const Settings& s, const VideoSource& vs,
     ProbeState probe_hist[4] = {};
     int probe_idx = 0;  // position of the most recently recorded state
 
+    // Composite branch knobs. Static across the frame; the decoder
+    // re-locks burst and black clamp every line, so a knob change takes
+    // effect from the next line with no rebuild.
+    top_->COMPOSITE_SAT = (uint8_t)(s.composite_sat & 0xff);
+    top_->COMPOSITE_HUE = (uint8_t)(s.composite_hue & 0xff);
+    top_->COMPOSITE_BRIGHT = (uint8_t)(s.composite_bright & 0xff);
+    top_->COMPOSITE_CONTRAST = (uint8_t)(s.composite_contrast & 0xff);
+    top_->COMPOSITE_PIXEL_DELAY = (uint8_t)(s.composite_pixel_delay & 3);
+    top_->COMPOSITE_SMEAR = (uint8_t)(s.composite_smear & 0xf);
+    top_->COMPOSITE_LUMA_DELAY = (uint8_t)(s.composite_luma_delay & 0xf);
+    top_->COMPOSITE_CHROMA_MAP = (uint8_t)(s.composite_chroma_map & 3);
+    top_->COMPOSITE_CHROMA_SHORT = s.composite_chroma_short ? 1 : 0;
+    top_->COMPOSITE_AGC_EN = s.composite_agc ? 1 : 0;
+
+    // Output selection: the composite "box" (on by default) captures the
+    // decoder loopback; otherwise the VGA controller output, as before.
+    // The composite active window is the full 560 samples (the VGA
+    // controller drops 1); the frame buffer still stores kOutWidth of them.
+    const bool use_comp = s.composite_en;
+    const uint8_t* out_hb = use_comp ? &top_->COMP_HB : &top_->VGA_HBL;
+    const uint8_t* out_vb = use_comp ? &top_->COMP_VB : &top_->VGA_VBL;
+    const int line_width = use_comp ? kCompLineWidth : kOutWidth;
+
     for (int line = 0; line < kFrameLines; ++line) {
         const bool vbl = line < kLeadingVbl ||
                          line >= kLeadingVbl + kActiveLines;
@@ -163,8 +186,8 @@ FrameResult VgaSim::runFrame(const Settings& s, const VideoSource& vs,
                                      ->vga_color_test_top__DOT__dut__DOT__raw_rgb});
             }
 
-            const bool vga_hbl = top_->VGA_HBL != 0;
-            const bool vga_vbl = top_->VGA_VBL != 0;
+            const bool vga_hbl = *out_hb != 0;
+            const bool vga_vbl = *out_vb != 0;
 
             if (prev_vga_hbl && !vga_hbl) {
                 // VGA active line started. vbl_delayed is stable across
@@ -184,13 +207,14 @@ FrameResult VgaSim::runFrame(const Settings& s, const VideoSource& vs,
                     res.last_line_width = line_x;
                     if (line_x < res.min_line_width) res.min_line_width = line_x;
                     if (line_x > res.max_line_width) res.max_line_width = line_x;
-                    if (line_x != kOutWidth) {
+                    if (line_x != line_width) {
                         res.bad_line_widths++;
                         if (res.bad_line_widths <= 3) {
                             char buf[128];
                             snprintf(buf, sizeof(buf),
-                                     "VGA line %d has %d pixels (want %d)",
-                                     out_y, line_x, kOutWidth);
+                                     "%s line %d has %d pixels (want %d)",
+                                     use_comp ? "COMP" : "VGA",
+                                     out_y, line_x, line_width);
                             res.error = buf;
                         }
                     }
@@ -203,9 +227,15 @@ FrameResult VgaSim::runFrame(const Settings& s, const VideoSource& vs,
                 if (frame && line_active && !vga_vbl &&
                     out_y < kOutHeight && line_x < kOutWidth) {
                     size_t i = (size_t)(out_y * kOutWidth + line_x) * 3;
-                    (*frame)[i + 0] = top_->VGA_R;
-                    (*frame)[i + 1] = top_->VGA_G;
-                    (*frame)[i + 2] = top_->VGA_B;
+                    if (use_comp) {
+                        (*frame)[i + 0] = top_->COMP_R;
+                        (*frame)[i + 1] = top_->COMP_G;
+                        (*frame)[i + 2] = top_->COMP_B;
+                    } else {
+                        (*frame)[i + 0] = top_->VGA_R;
+                        (*frame)[i + 1] = top_->VGA_G;
+                        (*frame)[i + 2] = top_->VGA_B;
+                    }
                     res.valid_pixels++;
                     if (trace_armed && line_x == trace_x &&
                         out_y == trace_y) {
@@ -280,6 +310,27 @@ FrameResult VgaSim::runFrame(const Settings& s, const VideoSource& vs,
             top_->CLK_14M = 0;
             top_->eval();
             prev_vga_hbl = vga_hbl;
+        }
+    }
+
+    // Composite horizontal left-shift: the decoder's luma/chroma content
+    // lands a few samples right of the derived sync, pushing the right edge
+    // off-frame. Pull the whole captured frame left by (3 + knob) pixels:
+    // frame_out[x] = frame_in[x + shift]; the right `shift` columns go black.
+    // VGA path is untouched.
+    if (frame && use_comp) {
+        const int shift = 3 + (s.composite_left_shift & 3);  // 3..6
+        if (shift > 0 && shift < kOutWidth) {
+            for (int y = 0; y < kOutHeight; ++y) {
+                uint8_t* row = &(*frame)[(size_t)y * kOutWidth * 3];
+                for (int x = 0; x + shift < kOutWidth; ++x) {
+                    row[x * 3 + 0] = row[(x + shift) * 3 + 0];
+                    row[x * 3 + 1] = row[(x + shift) * 3 + 1];
+                    row[x * 3 + 2] = row[(x + shift) * 3 + 2];
+                }
+                for (int x = kOutWidth - shift; x < kOutWidth; ++x)
+                    row[x * 3 + 0] = row[x * 3 + 1] = row[x * 3 + 2] = 0;
+            }
         }
     }
 

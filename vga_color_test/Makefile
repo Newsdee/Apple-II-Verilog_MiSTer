@@ -13,7 +13,8 @@ TOP     := vga_color_test_top
 OBJDIR  := obj_dir
 EXE     := $(OBJDIR)/V$(TOP)
 
-RTL_SRCS := rtl/vga_color_test_top.sv rtl/vga_controller.v
+RTL_SRCS := rtl/vga_color_test_top.sv rtl/vga_controller.v \
+            rtl/apple_composite.sv rtl/composite_decoder.sv
 CPP_SRCS := $(wildcard src/*.cpp)
 
 # ImGui + SDL2 (Phase 3). ImGui is reused from the full harness via relative

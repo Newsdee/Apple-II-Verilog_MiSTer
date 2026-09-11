@@ -37,6 +37,10 @@ constexpr int kFrameLines = kLeadingVbl + kActiveLines + kTrailingVbl;  // 262
 // line is 559 px wide (measured, deterministic). See PROGRESS.md.
 constexpr int kOutWidth = 559;
 constexpr int kOutHeight = 192;
+// Composite path: the decoder passes the full 560-sample active window
+// through (the VGA controller drops 1 to its 559). Capture still writes
+// only the first kOutWidth samples per line.
+constexpr int kCompLineWidth = 560;
 constexpr int kExpectedPixels = kOutWidth * kOutHeight;  // 107,328
 
 // COLOR_LINE control (Decision Q2).
@@ -62,6 +66,27 @@ struct Settings {
     // real core the video stream's phase relative to HBL compensates this
     // implicitly; the synthetic feeder compensates it explicitly.
     int align = 12;
+
+    // ---- Composite decode branch (apple_composite + composite_decoder) ----
+    // composite_en is the GUI "box": when set, the captured frame comes from
+    // the composite encoder/decoder loopback instead of the VGA controller.
+    // On by default; the VGA path is untouched and still runs every frame.
+    bool composite_en = true;
+    int composite_sat = 128;          // 128 = unity
+    int composite_hue = 0;            // 256 = one full cycle
+    int composite_bright = 0;         // signed luma offset, -128..127
+    int composite_contrast = 128;     // mid-gray-centred gain, 128 = unity
+    int composite_pixel_delay = 0;    // 0..3 source delay (composite samples)
+    int composite_smear = 0;          // 0..15 chroma trail, 0 = off
+    int composite_luma_delay = 0;     // 0..15 samples
+    int composite_chroma_map = 0;     // 0 normal; 1 Q mirror; 2 swap; 3 I
+    bool composite_chroma_short = false;
+    bool composite_agc = true;        // track level off the burst
+    // Horizontal left-shift of the captured composite frame, in pixels.
+    // The decoder's content sits a few samples right of the sync, so the
+    // right edge is pushed off-frame. A fixed 3px left shift plus this
+    // 0-3 knob (total 3-6px) pulls it back. Applied at capture time.
+    int composite_left_shift = 0;     // 0..3 (added to a fixed 3px)
 };
 
 int color_line_for(const Settings& s, int active_line);

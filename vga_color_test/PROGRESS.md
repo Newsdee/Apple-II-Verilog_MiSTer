@@ -291,9 +291,50 @@ content 2 samples right of the window edge - the real core's actual phase).
 7. **bad-size**: 100x100 PPM rejected with a descriptive error.
 Failing frames dump to `output/smoke_fail_<gate>.ppm`. Code: `src/smoke_test.{h,cpp}`.
 
+## Composite decode branch (added 2026-09-10)
+
+Goal: iterate on the NTSC composite image without the level_2 full-machine
+testbench. The composite decoder (`unit_tests/level_2/mister/composite_decoder.sv`)
+and the Apple II composite encoder+loopback (`rtl/apple_composite.sv`) are
+now verilated inside this harness, in parallel with the VGA controller, on
+the same raw VIDEO/HBL/VBL feed.
+
+- `rtl/composite_decoder.sv` — byte-identical snapshot of the level_2 copy.
+- `rtl/apple_composite.sv` — snapshot of `../rtl/apple_composite.sv`,
+  extended with the knobs the FPGA wrapper hardwires (smear, luma_delay,
+  chroma_map, chroma_short, agc_en) as live inputs. The FPGA module keeps
+  its port list; compare the shared regions after edits to either copy.
+- `rtl/vga_color_test_top.sv` — adds the composite branch. Sync derivation
+  mirrors the FPGA wrapper exactly (hs = HBL && hblank 130..197; vs = VBL
+  && vblank_lines 33..35) so the generated burst and the decoder's black
+  clamp both land in the back porch. New ports: COMPOSITE_* knobs in,
+  COMP_R/G/B + COMP_HB/VB out. The VGA controller instance is untouched.
+- C++: `Settings` gains `composite_en` (**on by default** - the "box") and
+  the knob values; `runFrame` selects the capture source (composite active
+  window is the full 560 samples vs the VGA controller's 559). New GUI
+  window "Composite Knobs" (own window, below the VGA controls) with all
+  knobs live - the decoder re-locks burst/black clamp every line, so no
+  rebuild is ever needed. CLI: `--composite`/`--no-composite` and
+  `--comp-sat/hue/bright/contrast/pixel-delay/smear/luma-delay/
+  chroma-map/chroma-short`, `--no-comp-agc`.
+- Smoke test: the VGA-pipeline gates pin `composite_en=false`; new gate
+  3c **composite-path** checks composite capture geometry (560-sample
+  lines, 192 lines) and knob liveness (bright+40 changes the frame).
+
+Validation (2026-09-10): `--smoke-test` 28/28 PASS (was 27; +composite-path).
+Visual check: `assets/bruce_lee.png` and `assets/colorbars.png` composite
+dumps (output/comp_check_*.png) - colorbars round-trip with luma levels
+intact; the 1-bit source shows the decoder's artifact-color response, which
+is the authentic composite behavior for 14.318 MHz 1-bit video (no rebuild
+needed to play with the knobs: `run.bat` -> Composite Knobs window).
+
+New Verilator warnings: none from the new top-level code; `composite_decoder.sv`
+carries 3 WIDTHEXPAND notes inherent to the upstream source (same as the
+level_2 build). Pre-existing `vga_controller.v` warnings unchanged.
+
 ## Next steps (when resuming)
 
-1. (none outstanding - all planned phases done; README.md written 2026-08-30)
+1. (none outstanding - composite branch landed 2026-09-10)
 2. Candidate follow-ups (not planned, user-driven):
    - Recapture Total Replay as a native 560/568-px source (full palette).
    - Investigate the (c)-flagged B&W/Green/Amber + COLOR_LINE=1 divergence

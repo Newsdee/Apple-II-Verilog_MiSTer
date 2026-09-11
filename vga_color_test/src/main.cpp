@@ -203,6 +203,38 @@ bool parse_args(int argc, char** argv, Cli* c) {
                 return false;
             }
             s->color_line_start = n;
+        } else if (a == "--composite") {
+            s->composite_en = true;
+        } else if (a == "--no-composite") {
+            s->composite_en = false;  // capture the VGA controller output
+        } else if (a == "--comp-sat") {
+            const char* v = next(a.c_str()); if (!v) return false;
+            s->composite_sat = atoi(v); s->composite_en = true;
+        } else if (a == "--comp-hue") {
+            const char* v = next(a.c_str()); if (!v) return false;
+            s->composite_hue = atoi(v); s->composite_en = true;
+        } else if (a == "--comp-bright") {
+            const char* v = next(a.c_str()); if (!v) return false;
+            s->composite_bright = atoi(v); s->composite_en = true;
+        } else if (a == "--comp-contrast") {
+            const char* v = next(a.c_str()); if (!v) return false;
+            s->composite_contrast = atoi(v); s->composite_en = true;
+        } else if (a == "--comp-pixel-delay") {
+            const char* v = next(a.c_str()); if (!v) return false;
+            s->composite_pixel_delay = atoi(v); s->composite_en = true;
+        } else if (a == "--comp-smear") {
+            const char* v = next(a.c_str()); if (!v) return false;
+            s->composite_smear = atoi(v); s->composite_en = true;
+        } else if (a == "--comp-luma-delay") {
+            const char* v = next(a.c_str()); if (!v) return false;
+            s->composite_luma_delay = atoi(v); s->composite_en = true;
+        } else if (a == "--comp-chroma-map") {
+            const char* v = next(a.c_str()); if (!v) return false;
+            s->composite_chroma_map = atoi(v); s->composite_en = true;
+        } else if (a == "--comp-chroma-short") {
+            s->composite_chroma_short = true; s->composite_en = true;
+        } else if (a == "--no-comp-agc") {
+            s->composite_agc = false; s->composite_en = true;
         } else if (a == "--smoke-test") {
             c->smoke_test = true;
         } else if (a == "--debug") {

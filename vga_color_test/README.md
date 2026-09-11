@@ -11,13 +11,43 @@ Design and decisions: `PLAN.md`. Live status, findings, and resume point:
 
 ## What is verilated
 
-Only two HDL files:
+Four HDL files:
 
-- `rtl/vga_color_test_top.sv` — thin 1:1 pass-through wrapper
+- `rtl/vga_color_test_top.sv` — pass-through wrapper plus the composite
+  sync derivation (mirrors the FPGA wrapper)
 - `rtl/vga_controller.v` — **snapshot** of `../rtl/vga_controller.v` (see
   "Controller snapshot sync" below)
+- `rtl/apple_composite.sv` — **snapshot** of `../rtl/apple_composite.sv`
+  (NTSC composite encoder + decoder loopback), extended with the decoder
+  knobs the FPGA wrapper hardwires (smear, luma_delay, chroma_map,
+  chroma_short, agc_en) as live inputs
+- `rtl/composite_decoder.sv` — **snapshot** of
+  `../unit_tests/level_2/mister/composite_decoder.sv` (mister's portable
+  NTSC composite decoder, SPC=4)
 
 No full-machine sources, no Quartus files, no audio.
+
+## Composite decode branch
+
+The top also instantiates `apple_composite` on the same raw VIDEO/HBL/VBL
+feed, in parallel with the VGA controller. The raw stream carries no sync
+or burst, so the encoder synthesizes them (sync tip from the hs pulse, a
+free-running color burst in the back porch) exactly as the FPGA wrapper
+does; the decoder inside `apple_composite` then recovers RGB from the
+modulated stream. Capture source is selectable at run time — the GUI
+"Composite" box (on by default) or `--no-composite` on the CLI. The VGA
+controller path is untouched and still runs every frame.
+
+Notes:
+
+- The composite active window is the full **560** samples (the VGA
+  controller drops 1 to 559); the frame buffer still stores 559×192.
+- A 1-bit source has no chroma of its own, so what you see is a real
+  composite receiver's response to 14.318 MHz 1-bit video: luma plus the
+  decoder's artifact-color response (the same physics as the classic Apple
+  II composite colors). The hue/sat knobs rotate/scale that chroma.
+- The decoder re-locks burst and black clamp every line, so all knobs are
+  live with no rebuild; a knob change applies from the next line.
 
 ## Build and run
 
@@ -53,6 +83,13 @@ ntsc|iigs|applewin|custom`, `--sharp-rgb`, `--vertical-blend`, `--color-line
 none|text|full`, `--color-line-start N`, `--threshold 0..255` (default 128),
 `--phase 0..3` (default **2**), `--align 0..16` (default **12**), `--frames N`
 (default 3 = 2 preamble + 1 captured), `--debug`.
+
+Composite branch: `--composite` / `--no-composite` (capture source; composite
+is the default), `--comp-sat N` (128=unity), `--comp-hue N` (256=cycle),
+`--comp-bright N` (-128..127), `--comp-contrast N` (128=unity),
+`--comp-pixel-delay 0..3`, `--comp-smear 0..15`, `--comp-luma-delay 0..15`,
+`--comp-chroma-map 0..3`, `--comp-chroma-short`, `--no-comp-agc`. Every
+`--comp-*` flag also turns the composite capture on.
 
 ## Input images
 
@@ -101,6 +138,21 @@ Controls window (left):
 - **Save frame as PNG** — `output/gui_frame_<timestamp>.png` (same encoder
   as the headless dumps, so GUI and CLI captures are byte-identical)
 - Status line: frame count, fps, loop/sim ms, distinct colors
+
+Composite Knobs window (below the controls):
+
+- **Composite decode path (box)** — selects the captured output source
+  (composite on by default); the VGA controller keeps running either way
+- **Saturation / Hue / Brightness / Contrast** — the decoder's luma and
+  chroma adjust knobs (128/0/0/128 = identity)
+- **Pixel delay / Chroma smear / Luma delay** — encoder source delay and
+  the decoder's chroma-trail / luma-alignment knobs
+- **Chroma map / Chroma short / AGC** — I/Q mapping, boxcar length, burst
+  level tracking
+- **Reset knobs to defaults**
+
+All knobs are live (the decoder re-locks every line); the video window's
+first line shows which source is being captured.
 
 Video window (right):
 

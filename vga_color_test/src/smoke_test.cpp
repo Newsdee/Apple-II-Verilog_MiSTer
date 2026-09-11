@@ -103,6 +103,8 @@ FrameResult capture_clean(VgaSim& sim, const Settings& s,
 int run_smoke_test() {
     printf("=== vga_color_test smoke test (headless) ===\n");
     Settings s;  // defaults: color, NTSC, phase 2, align 12, full color-line
+    s.composite_en = false;  // VGA-pipeline gates; the composite branch has
+                             // its own gate below (Gate 3c)
     VgaSim sim;
     std::vector<uint8_t> frame((size_t)kOutWidth * kOutHeight * 3, 0);
 
@@ -244,6 +246,36 @@ int run_smoke_test() {
             dump_failure("run_gate_gated", fa);
             dump_failure("run_gate_off", fb);
             dump_failure("run_gate_ungated", fc);
+        }
+    }
+
+    // --- Gate 3c: composite decode branch ---
+    // The composite encoder/decoder loopback must produce a geometrically
+    // valid frame (560-sample lines, 192 captured) and the knobs must be
+    // live: a brightness offset changes the image without a rebuild.
+    {
+        Settings m = s;
+        m.composite_en = true;
+        VideoSource cvs;
+        cvs.image = &rep->image;
+        cvs.offset = m.phase + m.align;
+        std::vector<uint8_t> fa(frame.size()), fb(frame.size());
+        FrameResult ra = capture_clean(sim, m, cvs, &fa);
+        Settings mb = m;
+        mb.composite_bright = 40;
+        FrameResult rb = capture_clean(sim, mb, cvs, &fb);
+        int diff = 0;
+        for (size_t i = 0; i < fa.size(); ++i)
+            if (fa[i] != fb[i]) diff++;
+        if (!check("composite-path", ra.ok() && rb.ok() && diff > 0,
+                   rep->path + ": " + std::to_string(ra.valid_pixels) +
+                   " px, " + std::to_string(ra.lines_captured) +
+                   " lines, " + std::to_string(ra.bad_line_widths) +
+                   " bad widths, bright+40 changed " + std::to_string(diff) +
+                   " bytes (want >0)" +
+                   (ra.error.empty() ? std::string() : " " + ra.error))) {
+            dump_failure("composite_base", fa);
+            dump_failure("composite_bright", fb);
         }
     }
 

@@ -265,6 +265,60 @@ int VgaGui::run() {
         ImGui::TextWrapped("%s", status_.c_str());
         ImGui::End();
 
+        // ---------------- Composite knobs window ----------------
+        // Own window so the composite decoder knobs can be played with
+        // without touching the VGA controls. The box selects the captured
+        // output source (composite on by default); knobs are live - the
+        // decoder re-locks burst/black clamp every line, no rebuild needed.
+        ImGui::SetNextWindowPos(ImVec2(0, 530), ImGuiCond_Once);
+        ImGui::SetNextWindowSize(ImVec2(280, 360), ImGuiCond_Once);
+        ImGui::Begin("Composite Knobs");
+        ImGui::Checkbox("Composite decode path (box)", &s_.composite_en);
+        if (!s_.composite_en)
+            ImGui::TextDisabled("(capturing VGA controller output)");
+        ImGui::Separator();
+        ImGui::SliderInt("##csat", &s_.composite_sat, 0, 255);
+        ImGui::TextDisabled("Saturation  %d  (128 = unity)", s_.composite_sat);
+        ImGui::SliderInt("##chue", &s_.composite_hue, 0, 255);
+        ImGui::TextDisabled("Hue  %d  (256 = one cycle)", s_.composite_hue);
+        ImGui::SliderInt("##cbright", &s_.composite_bright, -128, 127);
+        ImGui::TextDisabled("Brightness  %d  (signed offset)",
+                            s_.composite_bright);
+        ImGui::SliderInt("##ccontrast", &s_.composite_contrast, 0, 255);
+        ImGui::TextDisabled("Contrast  %d  (128 = unity)",
+                            s_.composite_contrast);
+        ImGui::SliderInt("##cpixdelay", &s_.composite_pixel_delay, 0, 3);
+        ImGui::TextDisabled("Pixel delay  %d  (composite samples)",
+                            s_.composite_pixel_delay);
+        ImGui::SliderInt("##csmear", &s_.composite_smear, 0, 15);
+        ImGui::TextDisabled("Chroma smear  %d  (0 = off)", s_.composite_smear);
+        ImGui::SliderInt("##clumadelay", &s_.composite_luma_delay, 0, 15);
+        ImGui::TextDisabled("Luma delay  %d  (samples)",
+                            s_.composite_luma_delay);
+        ImGui::SetNextItemWidth(-1);
+        ImGui::Combo("##cchromamap", &s_.composite_chroma_map,
+                     "Normal\0Q mirror\0Swap\0I mirror\0");
+        ImGui::Checkbox("Chroma short (2-sample boxcar)",
+                        &s_.composite_chroma_short);
+        ImGui::Checkbox("AGC (track level off burst)", &s_.composite_agc);
+        ImGui::SliderInt("##clshift", &s_.composite_left_shift, 0, 3);
+        ImGui::TextDisabled("Left shift  %d  (adds to a fixed 3px: %d total)",
+                            s_.composite_left_shift, 3 + s_.composite_left_shift);
+        if (ImGui::Button("Reset knobs to defaults")) {
+            s_.composite_sat = 128;
+            s_.composite_hue = 0;
+            s_.composite_bright = 0;
+            s_.composite_contrast = 128;
+            s_.composite_pixel_delay = 0;
+            s_.composite_smear = 0;
+            s_.composite_luma_delay = 0;
+            s_.composite_chroma_map = 0;
+            s_.composite_chroma_short = false;
+            s_.composite_agc = true;
+            s_.composite_left_shift = 0;
+        }
+        ImGui::End();
+
         const auto t_loop_start = std::chrono::steady_clock::now();
 
         // ---------------- Run one DUT frame ----------------
@@ -292,6 +346,9 @@ int VgaGui::run() {
         ImGui::SetNextWindowPos(ImVec2(290, 0), ImGuiCond_Once);
         ImGui::SetNextWindowSize(ImVec2(840, 880), ImGuiCond_Once);
         ImGui::Begin("VGA Output (DUT)");
+        ImGui::TextDisabled(s_.composite_en
+                                ? "source: composite decode (apple_composite)"
+                                : "source: VGA controller");
         // Width: full 559, or the full frame scaled to half width.
         // (In 4:3 canvas mode the real output width 559 is always shown.)
         if (canvas43_) {
