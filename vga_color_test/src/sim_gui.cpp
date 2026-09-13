@@ -102,7 +102,7 @@ int VgaGui::run() {
                           SDL_WINDOW_ALLOW_HIGHDPI);
     sdl_window_ = SDL_CreateWindow("Apple II VGA Color Tester",
                                    SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                                   1200, 900, flags);
+                                   1920, 900, flags);
     if (!sdl_window_) {
         fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
         SDL_Quit();
@@ -163,8 +163,13 @@ int VgaGui::run() {
 
         // ---------------- Controls window ----------------
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Once);
-        ImGui::SetNextWindowSize(ImVec2(280, 520), ImGuiCond_Once);
-        ImGui::Begin("VGA Controls");
+        ImGui::SetNextWindowSize(ImVec2(290, 880), ImGuiCond_Once);
+        char controls_title[64];
+        snprintf(controls_title, sizeof(controls_title),
+             "VGA Controls (%d px)###VGA Controls", controls_width_);
+        ImGui::Begin(controls_title);
+        controls_width_ = (int)ImGui::GetWindowWidth();
+        ImGui::PushItemWidth(-1);
 
         // Image selection. Labels sit ABOVE the controls so the widgets get
         // the full window width (saves wrapped lines in the narrow window).
@@ -191,14 +196,15 @@ int VgaGui::run() {
         }
         ImGui::Text("Luminance threshold");
         ImGui::SliderInt("##threshold", &s_.threshold, 0, 255);
-        // Feed offset = phase (color, mod 4) + align (DUT skew). Both are
-        // live: they only re-map the feed, no DUT rebuild needed.
+        // Feed phase remains shared because both DUT paths consume the same
+        // VIDEO signal. Their common DUT-skew compensation stays fixed.
         ImGui::Text("Feed phase (color, mod 4)");
         if (ImGui::SliderInt("##phase", &s_.phase, 0, 3))
             vs_.offset = s_.phase + s_.align;
-        ImGui::Text("Feed align (samples)");
-        if (ImGui::SliderInt("##align", &s_.align, 0, 16))
-            vs_.offset = s_.phase + s_.align;
+        ImGui::Text("RGB phase (input samples)");
+        ImGui::SliderInt("##rgbphase", &s_.rgb_phase_adjust, 0, 3);
+        ImGui::TextWrapped("%d  (RGB artifact phase only; composite unchanged)",
+                   s_.rgb_phase_adjust);
         if (s_.image_path.empty())
             ImGui::TextDisabled("(no image: synthetic pattern)");
 
@@ -219,18 +225,18 @@ int VgaGui::run() {
         ImGui::SetNextItemWidth(-1);
         ImGui::Combo("##palette", &s_.color_palette,
                      "NTSC //e\0IIgs\0AppleWin\0Custom\0");
-        ImGui::Checkbox("Sharper RGB (composite fix + seam fill)",
-                        &s_.gray_seam_fix);
+        ImGui::Checkbox("Sharper RGB", &s_.gray_seam_fix);
+        ImGui::TextWrapped("Composite fix and seam fill");
         if (s_.gray_seam_fix) {
             ImGui::Indent();
-            ImGui::Checkbox("2-3 px seam fill (experimental)",
-                            &s_.seam_run_fill);
+            ImGui::Checkbox("2-3 px seam fill", &s_.seam_run_fill);
+            ImGui::TextWrapped("Experimental");
             if (s_.seam_run_fill) {
                 ImGui::Indent();
-                ImGui::Checkbox("extend to 2-5 px runs (benched: overfills HGR)",
-                                &s_.seam_run_wide);
-                ImGui::Checkbox("mode gate RUN_FILL_OK (auto in core: GR/DHGR)",
-                                &s_.run_fill_ok);
+                ImGui::Checkbox("Extend to 2-5 px runs", &s_.seam_run_wide);
+                ImGui::TextWrapped("Benched: overfills HGR");
+                ImGui::Checkbox("Mode gate RUN_FILL_OK", &s_.run_fill_ok);
+                ImGui::TextWrapped("Automatic in core: GR/DHGR");
                 ImGui::Unindent();
             } else {
                 s_.seam_run_wide = false;
@@ -263,6 +269,7 @@ int VgaGui::run() {
                            frame_count_, ui_fps_, loop_ms_, sim_ms_,
                            last_distinct_);
         ImGui::TextWrapped("%s", status_.c_str());
+        ImGui::PopItemWidth();
         ImGui::End();
 
         // ---------------- Composite knobs window ----------------
@@ -270,53 +277,75 @@ int VgaGui::run() {
         // without touching the VGA controls. The box selects the captured
         // output source (composite on by default); knobs are live - the
         // decoder re-locks burst/black clamp every line, no rebuild needed.
-        ImGui::SetNextWindowPos(ImVec2(0, 530), ImGuiCond_Once);
-        ImGui::SetNextWindowSize(ImVec2(280, 360), ImGuiCond_Once);
-        ImGui::Begin("Composite Knobs");
+        ImGui::SetNextWindowPos(ImVec2(1620, 0), ImGuiCond_Once);
+        ImGui::SetNextWindowSize(ImVec2(300, 880), ImGuiCond_Once);
+        char composite_title[64];
+        snprintf(composite_title, sizeof(composite_title),
+             "Composite Knobs (%d px)###Composite Knobs",
+             composite_width_);
+        ImGui::Begin(composite_title);
+        composite_width_ = (int)ImGui::GetWindowWidth();
+        ImGui::PushItemWidth(-1);
         ImGui::Checkbox("Composite decode path (box)", &s_.composite_en);
         if (!s_.composite_en)
             ImGui::TextDisabled("(capturing VGA controller output)");
         ImGui::Separator();
         ImGui::SliderInt("##csat", &s_.composite_sat, 0, 255);
-        ImGui::TextDisabled("Saturation  %d  (128 = unity)", s_.composite_sat);
-        ImGui::SliderInt("##chue", &s_.composite_hue, 0, 255);
-        ImGui::TextDisabled("Hue  %d  (256 = one cycle)", s_.composite_hue);
+        ImGui::TextWrapped("Saturation  %d  (128 = unity)", s_.composite_sat);
+        ImGui::SliderInt("##chue", &s_.composite_hue, 111, 143);
+        ImGui::TextWrapped("Hue  %d  (fine range 111-143)",
+                   s_.composite_hue);
         ImGui::SliderInt("##cbright", &s_.composite_bright, -128, 127);
-        ImGui::TextDisabled("Brightness  %d  (signed offset)",
-                            s_.composite_bright);
+        ImGui::TextWrapped("Brightness  %d  (signed offset)",
+                   s_.composite_bright);
         ImGui::SliderInt("##ccontrast", &s_.composite_contrast, 0, 255);
-        ImGui::TextDisabled("Contrast  %d  (128 = unity)",
-                            s_.composite_contrast);
+        ImGui::TextWrapped("Contrast  %d  (128 = unity)",
+                   s_.composite_contrast);
         ImGui::SliderInt("##cpixdelay", &s_.composite_pixel_delay, 0, 3);
-        ImGui::TextDisabled("Pixel delay  %d  (composite samples)",
-                            s_.composite_pixel_delay);
+        ImGui::TextWrapped("Pixel delay  %d  (composite samples)",
+                   s_.composite_pixel_delay);
         ImGui::SliderInt("##csmear", &s_.composite_smear, 0, 15);
-        ImGui::TextDisabled("Chroma smear  %d  (0 = off)", s_.composite_smear);
+        ImGui::TextWrapped("Chroma smear  %d  (0 = off)", s_.composite_smear);
         ImGui::SliderInt("##clumadelay", &s_.composite_luma_delay, 0, 15);
-        ImGui::TextDisabled("Luma delay  %d  (samples)",
-                            s_.composite_luma_delay);
-        ImGui::SetNextItemWidth(-1);
-        ImGui::Combo("##cchromamap", &s_.composite_chroma_map,
-                     "Normal\0Q mirror\0Swap\0I mirror\0");
-        ImGui::Checkbox("Chroma short (2-sample boxcar)",
-                        &s_.composite_chroma_short);
+        ImGui::TextWrapped("Luma delay  %d  (samples)",
+                   s_.composite_luma_delay);
+        ImGui::Checkbox("I-mirror (chirality fix)", &s_.composite_i_mirror);
+        ImGui::Checkbox("Chroma short", &s_.composite_chroma_short);
+        ImGui::TextWrapped("2-sample boxcar");
         ImGui::Checkbox("AGC (track level off burst)", &s_.composite_agc);
+        ImGui::Checkbox("Comb (two-line average)", &s_.composite_comb);
+        ImGui::Checkbox("Color on (burst)", &s_.composite_color_line);
+        ImGui::SliderInt("##clumasharp", &s_.composite_luma_sharpen, 0, 15);
+        ImGui::TextWrapped("Luma sharpen (horizontal)  %d\n0 = off; color lines only",
+                   s_.composite_luma_sharpen);
         ImGui::SliderInt("##clshift", &s_.composite_left_shift, 0, 3);
-        ImGui::TextDisabled("Left shift  %d  (adds to a fixed 3px: %d total)",
-                            s_.composite_left_shift, 3 + s_.composite_left_shift);
+        ImGui::TextWrapped("Left shift  %d\nAdds to fixed 3 px: %d total",
+                   s_.composite_left_shift,
+                   3 + s_.composite_left_shift);
         if (ImGui::Button("Reset knobs to defaults")) {
             s_.composite_sat = 128;
-            s_.composite_hue = 0;
+            s_.composite_hue = 128;
             s_.composite_bright = 0;
             s_.composite_contrast = 128;
             s_.composite_pixel_delay = 0;
             s_.composite_smear = 0;
             s_.composite_luma_delay = 0;
-            s_.composite_chroma_map = 0;
+            s_.composite_i_mirror = true;
             s_.composite_chroma_short = false;
             s_.composite_agc = true;
+            s_.composite_comb = true;
+            s_.composite_color_line = true;
+            s_.composite_luma_sharpen = 0;
             s_.composite_left_shift = 0;
         }
+        ImGui::Separator();
+        ImGui::Checkbox("Allow full hue range", &allow_full_hue_range_);
+        ImGui::BeginDisabled(!allow_full_hue_range_);
+        ImGui::SliderInt("##chue_full", &s_.composite_hue, 0, 255);
+        ImGui::TextWrapped("Full hue  %d  (256 = one cycle)",
+                   s_.composite_hue);
+        ImGui::EndDisabled();
+        ImGui::PopItemWidth();
         ImGui::End();
 
         const auto t_loop_start = std::chrono::steady_clock::now();
@@ -343,9 +372,15 @@ int VgaGui::run() {
                      GL_RGBA, GL_UNSIGNED_BYTE, tex_.data());
 
         // ---------------- Video window ----------------
-        ImGui::SetNextWindowPos(ImVec2(290, 0), ImGuiCond_Once);
-        ImGui::SetNextWindowSize(ImVec2(840, 880), ImGuiCond_Once);
-        ImGui::Begin("VGA Output (DUT)");
+        ImGui::SetNextWindowPos(ImVec2(300, 0), ImGuiCond_Once);
+        ImGui::SetNextWindowSize(ImVec2(1310, 880), ImGuiCond_Once);
+        char output_title[64];
+        snprintf(output_title, sizeof(output_title),
+             "VGA Output (DUT) (%d px)###VGA Output (DUT)",
+             output_width_);
+        ImGui::Begin(output_title);
+        output_width_ = (int)ImGui::GetWindowWidth();
+        ImGui::PushItemWidth(-1);
         ImGui::TextDisabled(s_.composite_en
                                 ? "source: composite decode (apple_composite)"
                                 : "source: VGA controller");
@@ -409,6 +444,7 @@ int VgaGui::run() {
                                 pos.y + content_h * zoom_));
             ImGui::Dummy(ImVec2(content_w * zoom_, content_h * zoom_));
         }
+        ImGui::PopItemWidth();
         ImGui::End();
 
         // ---------------- Render ----------------

@@ -86,9 +86,12 @@ FrameResult VgaSim::runFrame(const Settings& s, const VideoSource& vs,
     top_->COMPOSITE_PIXEL_DELAY = (uint8_t)(s.composite_pixel_delay & 3);
     top_->COMPOSITE_SMEAR = (uint8_t)(s.composite_smear & 0xf);
     top_->COMPOSITE_LUMA_DELAY = (uint8_t)(s.composite_luma_delay & 0xf);
-    top_->COMPOSITE_CHROMA_MAP = (uint8_t)(s.composite_chroma_map & 3);
+    top_->COMPOSITE_I_MIRROR = s.composite_i_mirror ? 1 : 0;
     top_->COMPOSITE_CHROMA_SHORT = s.composite_chroma_short ? 1 : 0;
     top_->COMPOSITE_AGC_EN = s.composite_agc ? 1 : 0;
+    top_->COMPOSITE_COMB_EN = s.composite_comb ? 1 : 0;
+    top_->COMPOSITE_COLOR_LINE = s.composite_color_line ? 1 : 0;
+    top_->COMPOSITE_LUMA_SHARPEN = (uint8_t)(s.composite_luma_sharpen & 0xf);
 
     // Output selection: the composite "box" (on by default) captures the
     // decoder loopback; otherwise the VGA controller output, as before.
@@ -113,6 +116,10 @@ FrameResult VgaSim::runFrame(const Settings& s, const VideoSource& vs,
             // the image and bled the next row into the line.)
             const int video =
                 (!vbl && !hbl) ? vs.bit(active_line, clock - kHblHighClocks) : 0;
+            const int vga_video = (!vbl && !hbl)
+                ? vs.bit(active_line,
+                         clock - kHblHighClocks - s.rgb_phase_adjust)
+                : 0;
 
             // Pre-edge state (what pixel_generator reads at this posedge).
             const uint32_t sr_pre =
@@ -135,6 +142,7 @@ FrameResult VgaSim::runFrame(const Settings& s, const VideoSource& vs,
             prev_input_hbl = hbl;
 
             top_->VIDEO = video;
+            top_->VGA_VIDEO = vga_video;
             top_->HBL = hbl;
             top_->VBL = vbl;
             top_->COLOR_LINE = cl;
@@ -313,24 +321,19 @@ FrameResult VgaSim::runFrame(const Settings& s, const VideoSource& vs,
         }
     }
 
-    // Composite horizontal left-shift: the decoder's luma/chroma content
-    // lands a few samples right of the derived sync, pushing the right edge
-    // off-frame. Pull the whole captured frame left by (3 + knob) pixels:
-    // frame_out[x] = frame_in[x + shift]; the right `shift` columns go black.
-    // VGA path is untouched.
-    if (frame && use_comp) {
-        const int shift = 3 + (s.composite_left_shift & 3);  // 3..6
-        if (shift > 0 && shift < kOutWidth) {
-            for (int y = 0; y < kOutHeight; ++y) {
-                uint8_t* row = &(*frame)[(size_t)y * kOutWidth * 3];
-                for (int x = 0; x + shift < kOutWidth; ++x) {
-                    row[x * 3 + 0] = row[(x + shift) * 3 + 0];
-                    row[x * 3 + 1] = row[(x + shift) * 3 + 1];
-                    row[x * 3 + 2] = row[(x + shift) * 3 + 2];
-                }
-                for (int x = kOutWidth - shift; x < kOutWidth; ++x)
-                    row[x * 3 + 0] = row[x * 3 + 1] = row[x * 3 + 2] = 0;
+    // Composite horizontal correction remains capture-only. RGB phase is
+    // adjusted at its VIDEO input above, before artifact-color generation.
+    if (use_comp && frame) {
+        const int shift = 3 + (s.composite_left_shift & 3);
+        for (int y = 0; y < kOutHeight; ++y) {
+            uint8_t* row = &(*frame)[(size_t)y * kOutWidth * 3];
+            for (int x = 0; x + shift < kOutWidth; ++x) {
+                row[x * 3 + 0] = row[(x + shift) * 3 + 0];
+                row[x * 3 + 1] = row[(x + shift) * 3 + 1];
+                row[x * 3 + 2] = row[(x + shift) * 3 + 2];
             }
+            for (int x = kOutWidth - shift; x < kOutWidth; ++x)
+                row[x * 3 + 0] = row[x * 3 + 1] = row[x * 3 + 2] = 0;
         }
     }
 

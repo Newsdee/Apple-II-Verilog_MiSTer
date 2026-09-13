@@ -54,8 +54,12 @@ private:
     double loop_ms_ = 0.0;         // whole GUI iteration (DUT + render)
     double ui_fps_ = 0.0;          // DUT frames/second the loop sustains
     int last_distinct_ = 0;
+    int controls_width_ = 290;
+    int composite_width_ = 300;
+    int output_width_ = 1310;
     bool half_width_ = true;       // half = full 559 frame scaled to 50%
-    bool canvas43_ = false;        // optional 640x480 canvas: scanline-
+    bool canvas43_ = true;         // optional 640x480 canvas: scanline-
                                    // doubled, top-left, black remainder
+    bool allow_full_hue_range_ = false;
     bool combo_was_open_ = false;  // image dropdown open-state tracking
 };

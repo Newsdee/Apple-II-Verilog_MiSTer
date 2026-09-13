@@ -18,6 +18,7 @@
 #include "smoke_test.h"
 #include "vga_sim.h"
 
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -97,6 +98,9 @@ struct Cli {
     int frames = 3;            // 2 preamble + 1 captured
     bool dbg = false;
     bool smoke_test = false;
+    bool hue_sweep = false;    // headless: compare composite chroma vs native per hue
+    bool cols = false;         // print per-column native averages (band finder)
+    int x0 = 0, x1 = kOutWidth;  // x-slice for the color comparison
     std::string ppm2png_in, ppm2png_out;
     int trace_x = -1, trace_y = -1;
 };
@@ -131,6 +135,14 @@ bool parse_args(int argc, char** argv, Cli* c) {
         } else if (a == "--trace-y") {
             const char* v = next(a.c_str()); if (!v) return false;
             c->trace_y = atoi(v);
+        } else if (a == "--hue-sweep") {
+            c->hue_sweep = true;
+        } else if (a == "--cols") {
+            c->cols = true;
+        } else if (a == "--x0") {
+            const char* v = next(a.c_str()); if (!v) return false; c->x0 = atoi(v);
+        } else if (a == "--x1") {
+            const char* v = next(a.c_str()); if (!v) return false; c->x1 = atoi(v);
         } else if (a == "--frames") {
             const char* v = next(a.c_str()); if (!v) return false;
             c->frames = atoi(v);
@@ -228,9 +240,15 @@ bool parse_args(int argc, char** argv, Cli* c) {
         } else if (a == "--comp-luma-delay") {
             const char* v = next(a.c_str()); if (!v) return false;
             s->composite_luma_delay = atoi(v); s->composite_en = true;
-        } else if (a == "--comp-chroma-map") {
+        } else if (a == "--comp-i-mirror") {
             const char* v = next(a.c_str()); if (!v) return false;
-            s->composite_chroma_map = atoi(v); s->composite_en = true;
+            s->composite_i_mirror = (atoi(v) != 0); s->composite_en = true;
+        } else if (a == "--comp-luma-sharpen") {
+            const char* v = next(a.c_str()); if (!v) return false;
+            s->composite_luma_sharpen = atoi(v); s->composite_en = true;
+        } else if (a == "--comp-color-line") {
+            const char* v = next(a.c_str()); if (!v) return false;
+            s->composite_color_line = (atoi(v) != 0); s->composite_en = true;
         } else if (a == "--comp-chroma-short") {
             s->composite_chroma_short = true; s->composite_en = true;
         } else if (a == "--no-comp-agc") {
@@ -245,6 +263,98 @@ bool parse_args(int argc, char** argv, Cli* c) {
         }
     }
     return true;
+}
+
+// Average R/G/B over an x-slice [x0,x1) of the captured frame buffer.
+static void frame_avg(const std::vector<uint8_t>& f, int x0, int x1, int& r, int& g, int& b) {
+    long sr = 0, sg = 0, sb = 0; long n = 0;
+    for (int y = 0; y < kOutHeight; ++y)
+        for (int x = x0; x < x1 && x < kOutWidth; ++x) {
+            size_t i = (size_t)(y * kOutWidth + x) * 3;
+            sr += f[i]; sg += f[i+1]; sb += f[i+2]; n++;
+        }
+    r = (int)(sr / n); g = (int)(sg / n); b = (int)(sb / n);
+}
+static double chroma_angle(int r, int g, int b) {
+    return atan2((double)(b - g), (double)(r - g)) * 180.0 / M_PI;
+}
+
+// Headless hue calibration: render the same input through the NATIVE (correct-color
+// LUT) path as a reference, then through the COMPOSITE path at each hue, and report
+// the hue whose chroma direction best matches the native reference.
+int run_hue_sweep(const Cli& c) {
+    Image1Bit image;
+    VideoSource vs;
+    if (c.settings.image_path.empty()) { fprintf(stderr, "--hue-sweep needs --image\n"); return 2; }
+    std::string err;
+    if (!load_image_1bit(c.settings.image_path, c.settings.threshold, &image, &err)) {
+        fprintf(stderr, "load: %s\n", err.c_str()); return 1;
+    }
+    vs.image = &image;
+    vs.offset = c.settings.phase + c.settings.align;
+
+    VgaSim sim;
+    const size_t fsz = (size_t)kOutWidth * kOutHeight * 3;
+    std::vector<uint8_t> fr(fsz, 0);
+
+    // Preamble to settle burst lock / vertical comb (both paths run every frame).
+    Settings pre = c.settings; pre.composite_en = true;
+    sim.runFrame(pre, vs, nullptr, false);
+    sim.runFrame(pre, vs, nullptr, false);
+
+    Settings ns = c.settings; ns.composite_en = false;
+    sim.runFrame(ns, vs, nullptr, false);
+    sim.runFrame(ns, vs, &fr, false);
+    int nr, ng, nb; frame_avg(fr, c.x0, c.x1, nr, ng, nb);
+    double nang = chroma_angle(nr, ng, nb);
+    printf("native  avg RGB = %3d %3d %3d  chroma angle = %7.2f deg  [x %d..%d]\n", nr, ng, nb, nang, c.x0, c.x1);
+
+    const int x0 = c.x0, x1 = c.x1;
+    // Per-column native diagnostic (downsampled) so a single strong-color band can be picked.
+    if (c.cols) {
+        std::vector<uint8_t> nf(fsz, 0);
+        sim.runFrame(ns, vs, nullptr, false);
+        sim.runFrame(ns, vs, &nf, false);
+        for (int cx = 8; cx < kOutWidth; cx += 24) {
+            int rr, gg, bb; frame_avg(nf, cx, cx + 8, rr, gg, bb);
+            printf("col %3d: native RGB = %3d %3d %3d  angle=%7.2f\n", cx, rr, gg, bb, chroma_angle(rr,gg,bb));
+        }
+    }
+
+    // Strong-color bands (x-slices) from the colorbars, used for the global metric.
+    struct Band { int x0, x1; const char* name; };
+    static const Band bands[] = {
+        { 96,120,"blue"}, {120,144,"green1"}, {144,168,"blue2"}, {216,240,"green2"},
+        {288,312,"red"},  {312,336,"magenta"},{384,408,"orange"}, {456,480,"yellow"},
+    };
+    const int NB = (int)(sizeof(bands)/sizeof(bands[0]));
+    double nat_ang[NB];
+    for (int i = 0; i < NB; ++i) {
+        int rr,gg,bb; frame_avg(fr, bands[i].x0, bands[i].x1, rr,gg,bb); // fr = native capture
+        nat_ang[i] = chroma_angle(rr,gg,bb);
+    }
+
+    int best_h = -1; double best_d = 1e9;
+    for (int h = 0; h < 256; h += 2) {
+        Settings cs = c.settings; cs.composite_en = true; cs.composite_hue = h;
+        sim.runFrame(cs, vs, nullptr, false);
+        sim.runFrame(cs, vs, &fr, false);
+        double total = 0; double per[NB];
+        for (int i = 0; i < NB; ++i) {
+            int cr,cg,cb; frame_avg(fr, bands[i].x0, bands[i].x1, cr,cg,cb);
+            double a = chroma_angle(cr,cg,cb);
+            double d = fabs(a - nat_ang[i]); if (d > 180.0) d = 360.0 - d;
+            per[i] = d; total += d;
+        }
+        if (total < best_d) { best_d = total; best_h = h; }
+        if (h % 32 == 0 || h == 254) {
+            printf("hue %3d: total_err=%7.2f  [", h, total);
+            for (int i = 0; i < NB; ++i) printf(" %s=%.0f", bands[i].name, per[i]);
+            printf(" ]\n");
+        }
+    }
+    printf("BEST hue = %d (total band angle error = %.2f deg vs native)\n", best_h, best_d);
+    return 0;
 }
 
 int run_headless(const Cli& c) {
@@ -320,6 +430,9 @@ int main(int argc, char** argv) {
 
     if (c.smoke_test)
         return run_smoke_test();
+
+    if (c.hue_sweep)
+        return run_hue_sweep(c);
 
     if (c.dump_requested)
         return run_headless(c);

@@ -91,6 +91,9 @@ is the default), `--comp-sat N` (128=unity), `--comp-hue N` (256=cycle),
 `--comp-chroma-map 0..3`, `--comp-chroma-short`, `--no-comp-agc`. Every
 `--comp-*` flag also turns the composite capture on.
 
+Run `validate.bat` for a single-command clean validation build and smoke test.
+It uses `obj_dir_validate` so an open GUI does not lock the normal executable.
+
 ## Input images
 
 1-bit Apple II frames. Color is ignored after a luminance threshold

@@ -18,6 +18,7 @@
 module vga_color_test_top (
     input             CLK_14M,
     input             VIDEO,
+    input             VGA_VIDEO,
     input             COLOR_LINE,
     input      [1:0]  SCREEN_MODE,
     input      [1:0]  COLOR_PALETTE,
@@ -54,9 +55,12 @@ module vga_color_test_top (
     input      [1:0]  COMPOSITE_PIXEL_DELAY,// source delay in composite samples
     input      [3:0]  COMPOSITE_SMEAR,      // chroma trail length, 0 = off
     input      [3:0]  COMPOSITE_LUMA_DELAY, // luma delay, samples
-    input      [1:0]  COMPOSITE_CHROMA_MAP, // 0 normal; 1 Q mirror; 2 swap; 3 I
+    input             COMPOSITE_I_MIRROR,   // 1 = I-mirror chirality fix; 0 = normal (upstream)
     input             COMPOSITE_CHROMA_SHORT,
     input             COMPOSITE_AGC_EN,     // track level off the burst
+    input             COMPOSITE_COLOR_LINE, // 1 = color on; 0 = color kill (suppress burst)
+    input             COMPOSITE_COMB_EN,    // two-line comb average before the notch
+    input      [3:0]  COMPOSITE_LUMA_SHARPEN, // horizontal luma unsharp (0=off); color lines only
     output     [7:0]  COMP_R,
     output     [7:0]  COMP_G,
     output     [7:0]  COMP_B,
@@ -113,15 +117,18 @@ apple_composite #(
     .vs             (comp_vsync),
     .hb             (HBL),
     .vb             (VBL),
+    .color_line     (COMPOSITE_COLOR_LINE),
     .sat            (COMPOSITE_SAT),
     .hue            (COMPOSITE_HUE),
     .bright         (COMPOSITE_BRIGHT),
     .contrast       (COMPOSITE_CONTRAST),
-    .chroma_map     (COMPOSITE_CHROMA_MAP),
+    .i_mirror       (COMPOSITE_I_MIRROR),
     .chroma_short   (COMPOSITE_CHROMA_SHORT),
     .smear          (COMPOSITE_SMEAR),
     .luma_delay     (COMPOSITE_LUMA_DELAY),
     .agc_en         (COMPOSITE_AGC_EN),
+    .comb_en        (COMPOSITE_COMB_EN),
+    .luma_sharpen   (COMPOSITE_LUMA_SHARPEN),
     .r              (COMP_R),
     .g              (COMP_G),
     .b              (COMP_B),
@@ -135,7 +142,7 @@ apple_composite #(
 
 vga_controller dut (
     .CLK_14M            (CLK_14M),
-    .VIDEO              (VIDEO),
+    .VIDEO              (VGA_VIDEO),
     .COLOR_LINE         (COLOR_LINE),
     .SCREEN_MODE        (SCREEN_MODE),
     .COLOR_PALETTE      (COLOR_PALETTE),

@@ -60,6 +60,7 @@ struct Settings {
     int threshold = 128;          // luminance threshold for images
     int phase = 2;                // feed phase 0..3 (color-phase offset;
                                   // 2 verified correct against real NTSC)
+    int rgb_phase_adjust = 0;     // extra 0..3 sample phase for RGB only
     // Alignment offset in samples. The DUT's internal data pipeline leads its
     // timing window by ~12 samples (measured 0.08% residual at shift 12), so
     // content fed at the HBL falling edge appears ~12 samples early. In the
@@ -73,15 +74,18 @@ struct Settings {
     // On by default; the VGA path is untouched and still runs every frame.
     bool composite_en = true;
     int composite_sat = 128;          // 128 = unity
-    int composite_hue = 0;            // 256 = one full cycle
+    int composite_hue = 128;          // 256 = one full cycle
     int composite_bright = 0;         // signed luma offset, -128..127
     int composite_contrast = 128;     // mid-gray-centred gain, 128 = unity
     int composite_pixel_delay = 0;    // 0..3 source delay (composite samples)
     int composite_smear = 0;          // 0..15 chroma trail, 0 = off
     int composite_luma_delay = 0;     // 0..15 samples
-    int composite_chroma_map = 0;     // 0 normal; 1 Q mirror; 2 swap; 3 I
+    bool composite_i_mirror = true;   // 1 = I-mirror chirality fix; 0 = normal (upstream)
     bool composite_chroma_short = false;
     bool composite_agc = true;        // track level off the burst
+    bool composite_comb = true;       // two-line comb average before the notch
+    bool composite_color_line = true; // 1 = color on; 0 = color kill (suppress burst)
+    int  composite_luma_sharpen = 0;  // horizontal luma unsharp (0=off); 0..15, color lines only
     // Horizontal left-shift of the captured composite frame, in pixels.
     // The decoder's content sits a few samples right of the sync, so the
     // right edge is pushed off-frame. A fixed 3px left shift plus this
